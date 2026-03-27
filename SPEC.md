@@ -29,7 +29,7 @@ claude-spaces --help   # Show help
 |                                    |                              |
 |                                    | N:new C:cls H:hide D:DEL    |
 |                                    | F:manual-focus Q:detach      |
-|                                    | claude-spaces v0.8.0       |
+|                                    | claude-spaces v0.8.1-dev       |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
 ```
