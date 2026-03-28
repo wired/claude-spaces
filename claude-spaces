@@ -1330,8 +1330,13 @@ cs_picker_loop() {
     local n=${#ENTRIES_ID[@]}
     cur=$(cs_read_state current_pane)
     if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
-        # Left pane already exists (reload case) — keep it
-        :
+        # Left pane already exists (reload case) — sync SELECTED
+        for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
+            if [[ "${ENTRIES_PANE[${fi}]}" == "${cur}" ]]; then
+                SELECTED=${fi}
+                break
+            fi
+        done
     elif ((n == 0)); then
         # No sessions — auto-create
         cs_new_session
