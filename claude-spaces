@@ -1508,6 +1508,25 @@ cs_switch_to_project() {
     _tmux detach-client
 }
 
+cs_sync_highlight_local() {
+    local cur
+    cur=$(cs_read_state current_pane)
+    if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
+        for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
+            if [[ "${ENTRIES_PANE[${fi}]}" == "${cur}" ]]; then
+                SELECTED=${fi}
+                return
+            fi
+        done
+    fi
+    for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
+        if [[ "${ENTRIES_TYPE[${fi}]}" != "header" && "${ENTRIES_TYPE[${fi}]}" != "spacer" ]]; then
+            SELECTED=${fi}
+            return
+        fi
+    done
+}
+
 cs_activate_selected() {
     local n=${#ENTRIES_ID[@]}
     ((n == 0)) && return 0
@@ -1523,14 +1542,17 @@ cs_activate_selected() {
         header|spacer) return 0 ;;
         project)
             cs_switch_to_project "${entry_path}"
+            cs_sync_highlight_local
             return 0
             ;;
         remote)
             cs_switch_to_project "${entry_path}" "${sid}"
+            cs_sync_highlight_local
             return 0
             ;;
         inactive)
             cs_switch_to_project "${entry_path}"
+            cs_sync_highlight_local
             return 0
             ;;
     esac
