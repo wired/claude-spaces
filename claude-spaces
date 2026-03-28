@@ -1727,6 +1727,7 @@ cs_reset() {
     cs_remove_keybindings
 
     rm -rf "${STATE_DIR}"
+    _tmux kill-server 2>/dev/null || true
     echo "Reset complete."
 }
 
