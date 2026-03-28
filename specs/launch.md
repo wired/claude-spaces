@@ -42,6 +42,9 @@ Ephemeral. Stale refs cleaned up on picker startup.
 | `project_path`    | Real filesystem path for this project       |
 | `switch_target`   | Target path for cross-server switching      |
 | `pending_load`    | Session ID to auto-load on the target server |
+| `term/<num>`      | Terminal pane ID for session pane `%<num>`  |
+| `term/<num>.shown` | Presence = terminal should be visible      |
+| `term/<num>.height` | Runtime height override (chars)           |
 
 See [discovery.md](discovery.md) for how `switch_target` and `pending_load` are written.
 

@@ -34,6 +34,18 @@ claude-spaces --help   # Show help
          left slot                    picker (30 cols default)
 ```
 
+With optional terminal pane (toggled via `prefix+F`):
+```
++------------------------------------+------------------------------+
+|  Active claude session             |                              |
+|                                    |  Picker pane                 |
++------------------------------------+  (full height, pinned)       |
+|  Terminal pane (shell)             |                              |
++------------------------------------+------------------------------+
+```
+
+Terminal pane is per-session: each session independently tracks whether its terminal is visible. Swapping sessions preserves each session's terminal state.
+
 Picker width and side are configurable. Width re-pins on terminal resize.
 
 ## Architecture
@@ -116,7 +128,6 @@ Focused state detected at render time via `_tmux display-message -t $PICKER_PANE
 | `C`              | Close managed pane (keeps session on disk). Local only.     |
 | `H`              | Hide session with `y/N` confirm. Local only.                |
 | `D`              | Permanent delete with `y/N` confirm. Local only.            |
-| `r`              | Refresh session list (forces remote rescan)                 |
 | `R`              | Rename session. Local only.                                 |
 | `F`              | Toggle auto-focus mode                                      |
 | `Q`              | Detach (exit claude-spaces)                               |
@@ -124,11 +135,19 @@ Focused state detected at render time via `_tmux display-message -t $PICKER_PANE
 
 ### Global tmux bindings (work from any pane)
 
+Spatial layout on QWERTY: `e`=context, `r`=session, `t`=picker, `f`=terminal.
+
 | Key              | Action                                                    |
 |------------------|-----------------------------------------------------------|
+| `prefix + r`     | Focus session (Claude pane)                               |
+| `prefix + f`     | Focus terminal (opens if not visible for this session)    |
+| `prefix + t`     | Focus picker                                              |
+| `prefix + Tab`   | Focus picker (quick bail-out)                             |
+| `prefix + F`     | Toggle terminal visibility for current session            |
 | `prefix + j / ↓` | Next local session + focus (skips remote/inactive)       |
 | `prefix + k / ↑` | Prev local session + focus (skips remote/inactive)       |
-| `prefix + Tab`   | Toggle focus between session and picker                   |
+
+`prefix+e` and `prefix+E` are reserved for the future context pane.
 
 > See [specs/mechanics.md](specs/mechanics.md) for pane swap sequence, bell detection, and binding lifecycle.
 
@@ -157,6 +176,9 @@ File: `~/.claude/claude-spaces.conf` (created on first run with commented defaul
 
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
+
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
+# terminal_height=30%
 ```
 
 ## Dependencies

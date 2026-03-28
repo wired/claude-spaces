@@ -162,23 +162,28 @@ cs_assert_consistent() {
         ((errors++))
     fi
 
-    # 6. Picker window pane count: 2 if current_pane alive, 1 if not
+    # 6. Picker window pane count: 1 (picker only), 2 (picker + session),
+    #    or 3 (picker + session + terminal)
     if [[ -n "${pp}" ]] && pane_alive "${pp}"; then
         local picker_window
         picker_window=$(_tmux display-message -t "${pp}" -p '#{window_id}' 2>/dev/null)
         if [[ -n "${picker_window}" ]]; then
-            local pane_count
+            local pane_count expected_panes=1
             pane_count=$(_tmux list-panes -t "${picker_window}" -F '#{pane_id}' 2>/dev/null | wc -l)
             if [[ -n "${cp}" ]] && pane_alive "${cp}"; then
-                if ((pane_count != 2)); then
-                    echo -e "    ${RED}FAIL${RESET} [${label}] picker window has ${pane_count} panes (expected 2)"
-                    ((errors++))
+                ((expected_panes++))
+                # Check for visible terminal in picker window
+                local _tp
+                _tp=$(cs_term_pane_for "${cp}")
+                if [[ -n "${_tp}" ]] && pane_alive "${_tp}"; then
+                    local _tp_win
+                    _tp_win=$(_tmux display-message -t "${_tp}" -p '#{window_id}' 2>/dev/null)
+                    [[ "${_tp_win}" == "${picker_window}" ]] && ((expected_panes++))
                 fi
-            else
-                if ((pane_count != 1)); then
-                    echo -e "    ${RED}FAIL${RESET} [${label}] picker window has ${pane_count} panes (expected 1)"
-                    ((errors++))
-                fi
+            fi
+            if ((pane_count != expected_panes)); then
+                echo -e "    ${RED}FAIL${RESET} [${label}] picker window has ${pane_count} panes (expected ${expected_panes})"
+                ((errors++))
             fi
         fi
     fi
@@ -198,6 +203,19 @@ cs_assert_consistent() {
             tracked_windows["${wid}"]=1
         done
 
+        # Track terminal pane windows
+        for f in "${STATE_DIR}"/term/*; do
+            [[ -f "${f}" ]] || continue
+            [[ "$(basename "${f}")" == *.* ]] && continue
+            local tpid
+            tpid=$(cat "${f}" 2>/dev/null || true)
+            if [[ -n "${tpid}" ]] && pane_alive "${tpid}"; then
+                local twid
+                twid=$(_tmux display-message -t "${tpid}" -p '#{window_id}' 2>/dev/null) || continue
+                tracked_windows["${twid}"]=1
+            fi
+        done
+
         if [[ -n "${wp}" ]] && pane_alive "${wp}"; then
             local wwid
             wwid=$(_tmux display-message -t "${wp}" -p '#{window_id}' 2>/dev/null) || true
@@ -215,6 +233,27 @@ cs_assert_consistent() {
         done <<< "${all_windows}"
     fi
 
+    # 8. Terminal state consistency
+    for f in "${STATE_DIR}"/term/*; do
+        [[ -f "${f}" ]] || continue
+        [[ "$(basename "${f}")" == *.* ]] && continue
+        local tpid
+        tpid=$(cat "${f}" 2>/dev/null || true)
+        if [[ -n "${tpid}" ]] && ! pane_alive "${tpid}"; then
+            echo -e "    ${RED}FAIL${RESET} [${label}] term/$(basename "${f}") references dead pane '${tpid}'"
+            ((errors++))
+        fi
+    done
+    for f in "${STATE_DIR}"/term/*.shown; do
+        [[ -f "${f}" ]] || continue
+        local base
+        base=$(basename "${f}" .shown)
+        if [[ ! -f "${STATE_DIR}/term/${base}" ]]; then
+            echo -e "    ${RED}FAIL${RESET} [${label}] term/${base}.shown exists but term/${base} does not"
+            ((errors++))
+        fi
+    done
+
     return "${errors}"
 }
 
@@ -224,7 +263,7 @@ cs_test_setup() {
     TEST_SESSION="cs-test-$$"
     TMUX_SERVER="cs-test-$$"
 
-    mkdir -p "${TEST_TMP}/state/panes"
+    mkdir -p "${TEST_TMP}/state/panes" "${TEST_TMP}/state/term"
     mkdir -p "${TEST_TMP}/claude/projects"
     mkdir -p "${TEST_TMP}/claude/sessions"
 
@@ -241,7 +280,8 @@ EOF
     : > "${CLAUDE_DIR}/claude-spaces-hidden.conf"
     : > "${NAMES_FILE}"
 
-    MOCK_PWD="/tmp/cs-test-project"
+    MOCK_PWD="/tmp/cs-test-project-$$"
+    mkdir -p "${MOCK_PWD}"
     MOCK_PROJECT_DIR="${PROJECTS_DIR}/$(echo "${MOCK_PWD}" | tr '/' '-')"
     mkdir -p "${MOCK_PROJECT_DIR}"
 
@@ -268,6 +308,7 @@ EOF
 cs_test_teardown() {
     _tmux kill-session -t "${TEST_SESSION}" 2>/dev/null || true
     rm -rf "${TEST_TMP}"
+    rm -rf "${MOCK_PWD}"
 }
 
 cs_test_reset() {
@@ -284,6 +325,7 @@ cs_test_reset() {
     # Clear state
     rm -f "${STATE_DIR}/current_pane" "${STATE_DIR}/new_pane" "${STATE_DIR}/welcome_pane"
     rm -f "${STATE_DIR}/panes/"*
+    rm -f "${STATE_DIR}/term/"*
     : > "${STATE_DIR}/bells"
     echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
     echo $$ > "${STATE_DIR}/picker_pid"
@@ -904,6 +946,341 @@ test_guard_local_only_actions() {
     cs_assert_consistent "guard_local_only"
 }
 
+# ── Terminal pane tests ──────────────────────────
+
+test_term_create_and_kill() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    [[ -n "${pane_a}" ]] || { echo "    no current_pane"; return 1; }
+
+    cs_term_create "${pane_a}"
+    sleep 0.1
+
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+    [[ -n "${term_pane}" ]] || { echo "    no term pane"; return 1; }
+    pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
+    [[ -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    no term state file"; return 1; }
+    [[ -f "${STATE_DIR}/term/${pane_a#%}.shown" ]] || { echo "    no .shown file"; return 1; }
+
+    cs_term_kill "${pane_a}"
+    sleep 0.1
+
+    cs_refresh_pane_cache
+    pane_alive "${term_pane}" && { echo "    term still alive after kill"; return 1; }
+    [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+
+    cs_assert_consistent "term_create_kill"
+}
+
+test_term_toggle_on_off() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+
+    cs_term_toggle
+    sleep 0.1
+    cs_term_is_shown "${pane_a}" || { echo "    not shown after toggle on"; return 1; }
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+    pane_alive "${term_pane}" || { echo "    term dead after toggle on"; return 1; }
+    cs_assert_consistent "term_toggle_on" || return 1
+
+    cs_term_toggle
+    sleep 0.1
+    cs_term_is_shown "${pane_a}" && { echo "    still shown after toggle off"; return 1; }
+    cs_refresh_pane_cache
+    pane_alive "${term_pane}" || { echo "    term dead after toggle off"; return 1; }
+
+    cs_assert_consistent "term_toggle_off"
+}
+
+test_term_swap_with_terminal() {
+    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    cs_create_mock_session "${sid_a}" "session A"
+    cs_create_mock_session "${sid_b}" "session B"
+    cs_scan_sessions
+
+    # Resume A and give it a terminal
+    cs_resume_session "${sid_a}"
+    sleep 0.2
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_a
+    term_a=$(cs_term_pane_for "${pane_a}")
+
+    # Switch to B (dormant)
+    cs_scan_sessions
+    local idx_b
+    idx_b=$(find_entry_index "${sid_b}")
+    SELECTED=${idx_b}
+    cs_activate_selected
+    sleep 0.3
+
+    local pane_b
+    pane_b=$(cs_read_state current_pane)
+    [[ "${pane_b}" != "${pane_a}" ]] || { echo "    didn't switch to B"; return 1; }
+
+    # B should not have a terminal
+    cs_term_is_shown "${pane_b}" && { echo "    B has terminal but shouldn't"; return 1; }
+    # A's terminal should still be alive (parked)
+    cs_refresh_pane_cache
+    pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
+    cs_assert_consistent "term_swap_no_term" || return 1
+
+    # Switch back to A — terminal should reappear
+    cs_scan_sessions
+    local idx_a
+    idx_a=$(find_entry_index "${sid_a}")
+    SELECTED=${idx_a}
+    cs_activate_selected
+    sleep 0.2
+
+    local cur
+    cur=$(cs_read_state current_pane)
+    [[ "${cur}" == "${pane_a}" ]] || { echo "    didn't switch back to A"; return 1; }
+    cs_term_is_shown "${pane_a}" || { echo "    A's terminal not shown after swap back"; return 1; }
+
+    cs_assert_consistent "term_swap_back"
+}
+
+test_term_swap_both_have_terminal() {
+    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    cs_create_mock_session "${sid_a}" "session A"
+    cs_create_mock_session "${sid_b}" "session B"
+    cs_scan_sessions
+
+    # Resume A with terminal
+    cs_resume_session "${sid_a}"
+    sleep 0.2
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_a
+    term_a=$(cs_term_pane_for "${pane_a}")
+
+    # Switch to B (dormant) and give it a terminal
+    cs_scan_sessions
+    local idx_b
+    idx_b=$(find_entry_index "${sid_b}")
+    SELECTED=${idx_b}
+    cs_activate_selected
+    sleep 0.3
+    local pane_b
+    pane_b=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_b
+    term_b=$(cs_term_pane_for "${pane_b}")
+    cs_assert_consistent "term_both_B_active" || return 1
+
+    # Switch back to A
+    cs_scan_sessions
+    local idx_a
+    idx_a=$(find_entry_index "${sid_a}")
+    SELECTED=${idx_a}
+    cs_activate_selected
+    sleep 0.2
+
+    cs_refresh_pane_cache
+    pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
+    pane_alive "${term_b}" || { echo "    B's terminal died"; return 1; }
+    cs_term_is_shown "${pane_a}" || { echo "    A's terminal not shown"; return 1; }
+
+    cs_assert_consistent "term_both_swap"
+}
+
+test_term_auto_create_on_focus() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_is_shown "${pane_a}" && { echo "    has terminal before focus"; return 1; }
+
+    cs_term_focus
+    sleep 0.1
+
+    cs_term_is_shown "${pane_a}" || { echo "    not shown after focus"; return 1; }
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+    pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
+
+    cs_assert_consistent "term_auto_focus"
+}
+
+test_term_toggle_no_session() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_show_welcome
+    sleep 0.2
+
+    local wp
+    wp=$(cs_read_state welcome_pane)
+    [[ -n "${wp}" ]] || { echo "    no welcome pane"; return 1; }
+
+    cs_term_toggle
+    sleep 0.1
+
+    local count
+    count=$(find "${STATE_DIR}/term" -maxdepth 1 -not -name term -type f 2>/dev/null | wc -l)
+    ((count == 0)) || { echo "    term state created: ${count} files"; return 1; }
+
+    cs_assert_consistent "term_toggle_welcome"
+}
+
+test_term_close_session_with_terminal() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+
+    cs_close_pane "${pane_a}"
+    cs_after_remove "${pane_a}"
+    sleep 0.1
+
+    cs_refresh_pane_cache
+    pane_alive "${pane_a}" && { echo "    session still alive"; return 1; }
+    pane_alive "${term_pane}" && { echo "    terminal still alive"; return 1; }
+    [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+
+    cs_assert_consistent "term_close"
+}
+
+test_term_dies_externally() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+
+    _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
+    sleep 0.1
+
+    # Simulate the health check
+    cs_refresh_pane_cache
+    if cs_term_is_shown "${pane_a}"; then
+        local tp
+        tp=$(cs_term_pane_for "${pane_a}")
+        if [[ -n "${tp}" ]] && ! cs_pane_alive "${tp}"; then
+            rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height}
+        fi
+    fi
+
+    [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+
+    cs_assert_consistent "term_dies"
+}
+
+test_term_height_persists() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+
+    _tmux resize-pane -t "${term_pane}" -y 10 2>/dev/null || true
+    sleep 0.1
+
+    # Toggle off (saves height)
+    cs_term_toggle
+    sleep 0.1
+
+    local saved_h
+    saved_h=$(cat "${STATE_DIR}/term/${pane_a#%}.height" 2>/dev/null || true)
+    [[ -n "${saved_h}" ]] || { echo "    height not saved"; return 1; }
+
+    # Toggle back on
+    cs_term_toggle
+    sleep 0.1
+
+    local new_h
+    new_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+    local diff=$(( new_h - saved_h ))
+    (( diff < 0 )) && diff=$(( -diff ))
+    (( diff <= 2 )) || { echo "    height not restored: saved=${saved_h} got=${new_h}"; return 1; }
+
+    cs_assert_consistent "term_height"
+}
+
+test_term_across_reload() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+
+    cs_term_is_shown "${pane_a}" || { echo "    not shown before reload"; return 1; }
+
+    # Simulate reload: stale cleanup
+    cs_refresh_pane_cache
+    for f in "${STATE_DIR}"/term/*; do
+        [[ -f "${f}" ]] || continue
+        local bn
+        bn=$(basename "${f}")
+        [[ "${bn}" == *.* ]] && continue
+        local tpid
+        tpid=$(cat "${f}" 2>/dev/null || true)
+        if [[ -n "${tpid}" ]] && ! cs_pane_alive "${tpid}"; then
+            rm -f "${f}" "${f}.shown" "${f}.height"
+        fi
+    done
+
+    pane_alive "${term_pane}" || { echo "    term died after reload"; return 1; }
+    cs_term_is_shown "${pane_a}" || { echo "    not shown after reload"; return 1; }
+
+    cs_assert_consistent "term_reload"
+}
+
 # ── Main ─────────────────────────────────────────
 main() {
     echo "claude-spaces integration tests"
@@ -949,6 +1326,18 @@ main() {
     run_test "header skip navigation"      test_header_skip_navigation
     run_test "activate remote"             test_activate_remote
     run_test "guard local-only actions"    test_guard_local_only_actions
+
+    # Terminal pane tests
+    run_test "term create and kill"        test_term_create_and_kill
+    run_test "term toggle on/off"          test_term_toggle_on_off
+    run_test "term swap with terminal"     test_term_swap_with_terminal
+    run_test "term swap both terminals"    test_term_swap_both_have_terminal
+    run_test "term auto-create on focus"   test_term_auto_create_on_focus
+    run_test "term toggle no session"      test_term_toggle_no_session
+    run_test "term close with terminal"    test_term_close_session_with_terminal
+    run_test "term dies externally"        test_term_dies_externally
+    run_test "term height persists"        test_term_height_persists
+    run_test "term across reload"          test_term_across_reload
 
     echo ""
     echo "══════════════════════════════════"

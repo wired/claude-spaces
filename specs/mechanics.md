@@ -18,6 +18,24 @@ _tmux break-pane -d -s $OLD -t $SESSION: \;
 
 The `-t $SESSION:` ensures parked panes stay in the correct tmux session. The `resize-pane` pins the picker width. WINCH handler re-pins on terminal resize.
 
+### Swap with terminal pane
+
+When the old session has a visible terminal, the terminal is parked first (extended chain):
+
+```
+_tmux break-pane -d -s $OLD_TERM -t $SESSION: \;
+     break-pane -d -s $OLD -t $SESSION: \;
+     join-pane -h [-b] -s $NEW -t $PICKER \;
+     resize-pane -t $PICKER -x $PICKER_WIDTH \;
+     select-pane -t $PICKER
+```
+
+After the main swap, if the new session has `term/<num>.shown`, its terminal is attached:
+- Parked terminal exists: `join-pane -v -d -s $TERM -t $SESSION -l $HEIGHT`
+- No terminal yet: `split-window -v -d -t $SESSION -l $HEIGHT`
+
+Terminal height is saved per-session before parking (`term/<num>.height`).
+
 ### Focus behavior
 
 Swaps keep focus on the picker. User explicitly focuses via `h`/`l`/arrows or second `Enter`.
@@ -35,4 +53,13 @@ Bell state clears when the session is brought to the foreground. The bell hook i
 
 ## Binding Lifecycle
 
-Global tmux bindings (`prefix + j/k/↑/↓/Tab`) are installed on picker startup and cleaned up on exit/reset. Arrow keys are restored to their default pane navigation behavior on cleanup.
+Global tmux bindings are installed on picker startup and cleaned up on exit/reset.
+
+Spatial focus keys (QWERTY layout):
+- `prefix + r` — focus session (sends `|` to picker)
+- `prefix + f` — focus terminal (sends `` ` `` to picker, opens if needed)
+- `prefix + t` / `prefix + Tab` — focus picker (direct `select-pane`)
+- `prefix + F` — toggle terminal (sends `~` to picker)
+- `prefix + j/k/↑/↓` — session navigation (sends `J`/`K` to picker)
+
+Arrow keys and `prefix+r` are restored to tmux defaults on cleanup. `prefix+e/E` reserved for future context pane.

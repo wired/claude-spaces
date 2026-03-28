@@ -86,18 +86,22 @@ claude-spaces --help   # Show help
 | `H` | Hide session (with confirm) |
 | `D` | Delete session permanently (with confirm) |
 | `R` | Rename session |
-| `r` | Refresh (force remote rescan) |
 | `F` | Toggle auto-focus mode |
 | `Q` | Detach (exit) |
 | `X` | Reload picker in-place (picks up code changes) |
 
 ### Global tmux bindings
 
+Spatial layout on QWERTY keyboard: `e`=context, `r`=session, `t`=picker, `f`=terminal.
+
 | Key | Action |
 |-----|--------|
+| `prefix + r` | Focus session (Claude pane) |
+| `prefix + f` | Focus terminal (opens if not visible) |
+| `prefix + t` / `prefix + Tab` | Focus picker |
+| `prefix + F` | Toggle terminal on/off for current session |
 | `prefix + j` / `prefix + ↓` | Next local session + focus |
 | `prefix + k` / `prefix + ↑` | Prev local session + focus |
-| `prefix + Tab` | Toggle focus between session and picker |
 
 ## Bell Detection
 
@@ -146,6 +150,9 @@ Config file: `~/.claude/claude-spaces.conf` (created on first run with commented
 
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
+
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
+# terminal_height=30%
 ```
 
 Custom session names: `~/.claude/claude-spaces-names.conf` (`session_id=name`)

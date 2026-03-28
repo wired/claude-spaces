@@ -32,6 +32,7 @@ ENTER_FOCUSES=0
 WINDOW_NAME_LEN=12
 TMUX_SERVER="cs${PWD//\//-}"
 TMUX_CONF="${HOME}/.tmux.conf"
+TERMINAL_HEIGHT="30%"
 
 # ── tmux wrapper ─────────────────────────────────
 _tmux() {
@@ -68,6 +69,7 @@ cs_load_config() {
             enter_focuses) ENTER_FOCUSES="${value}" ;;
             window_name_len) WINDOW_NAME_LEN="${value}" ;;
             tmux_conf) TMUX_CONF="${value}" ;;
+            terminal_height) TERMINAL_HEIGHT="${value}" ;;
         esac
     done < "${CONFIG_FILE}"
 }
@@ -97,6 +99,9 @@ cs_create_default_config() {
 
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
+
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
+# terminal_height=30%
 EOF
 }
 
@@ -110,11 +115,14 @@ cs_help_text() {
     echo "    C              Close pane (keeps session)"
     echo "    H              Hide session (keeps on disk)"
     echo "    D              Delete session from disk"
-    echo "    r              Refresh list"
     echo "    R              Rename session"
     echo "    F              Toggle auto-focus"
     echo "    X              Reload picker (dev)"
     echo "  Global (from any pane):"
+    echo "    prefix+r       Focus session (Claude)"
+    echo "    prefix+f       Focus terminal (opens if needed)"
+    echo "    prefix+t/Tab   Focus picker"
+    echo "    prefix+F       Toggle terminal on/off"
     echo "    prefix+j/Down  Next session + focus"
     echo "    prefix+k/Up    Prev session + focus"
 }
@@ -145,7 +153,7 @@ cs_init_state() {
     if [[ -n "${old_picker}" ]] && ! cs_pane_alive "${old_picker}"; then
         rm -rf "${STATE_DIR}"
     fi
-    mkdir -p "${STATE_DIR}/panes"
+    mkdir -p "${STATE_DIR}/panes" "${STATE_DIR}/term"
     echo "${PWD}" > "${STATE_DIR}/project_path"
 }
 
@@ -714,10 +722,29 @@ cs_show_pane() {
 
     if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]]; then
         if cs_pane_alive "${cur_pane}"; then
-            _tmux break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
-                 join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-                 resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-                 select-pane -t "${picker_pane}"
+            # Park old session's terminal first (if visible)
+            local old_term=""
+            if cs_term_is_shown "${cur_pane}"; then
+                old_term=$(cs_term_pane_for "${cur_pane}")
+            fi
+            if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
+                # Save height before parking
+                local th
+                th=$(_tmux display-message -t "${old_term}" -p '#{pane_height}' 2>/dev/null || true)
+                [[ -n "${th}" ]] && echo "${th}" > "${STATE_DIR}/term/${cur_pane#%}.height"
+                # Extended chain: park terminal, park session, join new
+                _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
+                     break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
+                     join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
+                     resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
+                     select-pane -t "${picker_pane}"
+                cs_rename_pane_window "${old_term}" "cs:term"
+            else
+                _tmux break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
+                     join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
+                     resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
+                     select-pane -t "${picker_pane}"
+            fi
             # Rename the parked window
             local parked_sid parked_name
             parked_sid=$(cat "${STATE_DIR}/panes/${cur_pane#%}" 2>/dev/null || true)
@@ -746,6 +773,15 @@ cs_show_pane() {
 
     echo "${target_pane}" > "${STATE_DIR}/current_pane"
     unset "BELL_SET[${target_pane}]" 2>/dev/null || true
+
+    # Attach new session's terminal (if that session has term shown)
+    local wp
+    wp=$(cs_read_state welcome_pane)
+    if [[ "${target_pane}" != "${wp}" ]] && cs_term_is_shown "${target_pane}"; then
+        cs_term_show "${target_pane}"
+        _tmux resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+    fi
+
     # Let tmux settle layout before picker re-renders
     sleep 0.05
 }
@@ -757,6 +793,162 @@ cs_focus_session() {
     if [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}"; then
         _tmux select-pane -t "${cur_pane}"
     fi
+}
+
+# ── Terminal Pane ────────────────────────────────
+
+# Get terminal pane ID for a session pane (O(1) lookup)
+cs_term_pane_for() {
+    cat "${STATE_DIR}/term/${1#%}" 2>/dev/null || true
+}
+
+# Check if session's terminal should be visible
+cs_term_is_shown() {
+    [[ -f "${STATE_DIR}/term/${1#%}.shown" ]]
+}
+
+# Compute terminal height in characters
+cs_term_compute_height() {
+    local session_pane="$1"
+    # Per-session runtime override
+    local h
+    h=$(cat "${STATE_DIR}/term/${session_pane#%}.height" 2>/dev/null || true)
+    if [[ -n "${h}" ]]; then
+        echo "${h}"
+        return
+    fi
+    # Config value
+    if [[ "${TERMINAL_HEIGHT}" == *% ]]; then
+        local pct="${TERMINAL_HEIGHT%\%}"
+        local pane_h=0
+        if cs_pane_alive "${session_pane}"; then
+            pane_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || echo 0)
+        fi
+        h=$(( pane_h * pct / 100 ))
+    else
+        h="${TERMINAL_HEIGHT}"
+    fi
+    (( h < 3 )) && h=3
+    echo "${h}"
+}
+
+# Create a new terminal pane below the session pane.
+# Precondition: session_pane must already be visible in the picker window.
+cs_term_create() {
+    local session_pane="$1"
+    local height
+    height=$(cs_term_compute_height "${session_pane}")
+    local pane_id
+    pane_id=$(_tmux split-window -v -d -t "${session_pane}" -l "${height}" \
+        -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+    echo "${pane_id}" > "${STATE_DIR}/term/${session_pane#%}"
+    echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+}
+
+# Show terminal for a session. Auto-creates if needed, unparks if parked.
+cs_term_show() {
+    local session_pane="$1"
+    local term_pane
+    term_pane=$(cs_term_pane_for "${session_pane}")
+    cs_refresh_pane_cache
+
+    # No terminal or dead — create fresh
+    if [[ -z "${term_pane}" ]] || ! cs_pane_alive "${term_pane}"; then
+        [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
+        cs_term_create "${session_pane}"
+        return
+    fi
+
+    # Already visible in picker window — nothing to do
+    if _tmux list-panes -t "${PICKER_PANE}" -F '#{pane_id}' 2>/dev/null | grep -q "^${term_pane}$"; then
+        echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+        return
+    fi
+
+    # Parked — unpark below session
+    local height
+    height=$(cs_term_compute_height "${session_pane}")
+    _tmux join-pane -v -d -s "${term_pane}" -t "${session_pane}" -l "${height}" 2>/dev/null || true
+    echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+}
+
+# Park terminal in a hidden window.
+cs_term_hide() {
+    local session_pane="$1"
+    local term_pane
+    term_pane=$(cs_term_pane_for "${session_pane}")
+    cs_refresh_pane_cache
+    [[ -n "${term_pane}" ]] && cs_pane_alive "${term_pane}" || return 0
+
+    # Save current height
+    local th
+    th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+    [[ -n "${th}" ]] && echo "${th}" > "${STATE_DIR}/term/${session_pane#%}.height"
+
+    # Park
+    local picker_session
+    picker_session=$(_tmux display-message -t "${PICKER_PANE}" -p '#{session_name}' 2>/dev/null || true)
+    _tmux break-pane -d -s "${term_pane}" -t "${picker_session}:" 2>/dev/null || true
+    cs_rename_pane_window "${term_pane}" "cs:term"
+    rm -f "${STATE_DIR}/term/${session_pane#%}.shown"
+}
+
+# Kill terminal and clean up all state files.
+cs_term_kill() {
+    local session_pane="$1"
+    local term_pane
+    term_pane=$(cs_term_pane_for "${session_pane}")
+    [[ -n "${term_pane}" ]] || return 0
+    _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
+    rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
+}
+
+# Toggle terminal visibility for current session (prefix+F).
+cs_term_toggle() {
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
+    # Don't toggle for welcome pane
+    local wp
+    wp=$(cs_read_state welcome_pane)
+    [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
+
+    if cs_term_is_shown "${cur_pane}"; then
+        cs_term_hide "${cur_pane}"
+    else
+        cs_term_show "${cur_pane}"
+    fi
+    _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+    # Focus terminal on toggle-on
+    if cs_term_is_shown "${cur_pane}"; then
+        local term_pane
+        term_pane=$(cs_term_pane_for "${cur_pane}")
+        [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
+    fi
+}
+
+# Focus terminal pane, opening it if not visible (prefix+f).
+cs_term_focus() {
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
+    local wp
+    wp=$(cs_read_state welcome_pane)
+    [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
+
+    if ! cs_term_is_shown "${cur_pane}"; then
+        cs_term_show "${cur_pane}"
+        _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+    fi
+    local term_pane
+    term_pane=$(cs_term_pane_for "${cur_pane}")
+    [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
+}
+
+# WINCH handler — re-pin picker width on terminal resize.
+cs_handle_winch() {
+    _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null
+    DIRTY=1
 }
 
 cs_new_session() {
@@ -792,6 +984,9 @@ cs_close_pane() {
     if cs_pane_alive "${pane_id}"; then
         pane_pid=$(_tmux display-message -t "${pane_id}" -p '#{pane_pid}' 2>/dev/null || true)
     fi
+
+    # Kill associated terminal pane first
+    cs_term_kill "${pane_id}"
 
     if [[ "${cur_pane}" == "${pane_id}" ]]; then
         _tmux break-pane -d -s "${pane_id}" 2>/dev/null || true
@@ -928,7 +1123,7 @@ cs_picker_render() {
         for ((cl = 3; cl < height; cl++)); do
             printf '\e[%d;1H\e[K' "${cl}"
         done
-        printf '\e[%d;1H\e[K\e[90m N:new r:ref X:rld\e[0m' "${height}"
+        printf '\e[%d;1H\e[K\e[90m N:new X:rld\e[0m' "${height}"
         return
     fi
 
@@ -1044,9 +1239,9 @@ cs_picker_render() {
     local footer_line=$((last_entry_line + 2))
     local selected_type="${ENTRIES_TYPE[${SELECTED}]:-local}"
     if [[ "${selected_type}" == "remote" || "${selected_type}" == "project" || "${selected_type}" == "inactive" ]]; then
-        cs_print_centered "${footer_line}" "Enter:switch r:ref" "${width}"
+        cs_print_centered "${footer_line}" "Enter:switch" "${width}"
     else
-        cs_print_centered "${footer_line}" "N:new C:cls H:hide D:DEL r:ref" "${width}"
+        cs_print_centered "${footer_line}" "N:new C:cls H:hide D:DEL" "${width}"
     fi
 
     # Focus toggle + detach
@@ -1101,9 +1296,25 @@ cs_picker_loop() {
             rm -f "${f}"
         fi
     done
+    # Clean stale terminal pane refs
+    for f in "${STATE_DIR}"/term/*; do
+        [[ -f "${f}" ]] || continue
+        local basename_f
+        basename_f=$(basename "${f}")
+        [[ "${basename_f}" == *.* ]] && continue
+        local term_pane_id
+        term_pane_id=$(cat "${f}" 2>/dev/null || true)
+        if [[ -n "${term_pane_id}" ]] && ! cs_pane_alive "${term_pane_id}"; then
+            rm -f "${f}" "${f}.shown" "${f}.height"
+        fi
+    done
 
     # Install keybindings and bell hook
-    _tmux bind-key Tab select-pane -t :.+
+    _tmux bind-key Tab select-pane -t "${PICKER_PANE}"
+    _tmux bind-key t select-pane -t "${PICKER_PANE}"
+    _tmux bind-key r send-keys -t "${PICKER_PANE}" "|"
+    _tmux bind-key f send-keys -t "${PICKER_PANE}" "\`"
+    _tmux bind-key F send-keys -t "${PICKER_PANE}" "~"
     _tmux bind-key j send-keys -t "${PICKER_PANE}" "J"
     _tmux bind-key k send-keys -t "${PICKER_PANE}" "K"
     _tmux bind-key Up send-keys -t "${PICKER_PANE}" "K"
@@ -1112,7 +1323,7 @@ cs_picker_loop() {
 
     stty -echo 2>/dev/null || true
     trap 'stty echo 2>/dev/null; printf "\e[?25h\e[0m"; cs_remove_bell_hook; cs_remove_keybindings' EXIT
-    trap '_tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null; DIRTY=1' WINCH
+    trap 'cs_handle_winch' WINCH
 
     cs_build_all_entries
 
@@ -1177,7 +1388,9 @@ cs_picker_loop() {
                 C) cs_close_selected; DIRTY=1 ;;
                 H) cs_confirm_hide; DIRTY=1 ;;
                 D) cs_confirm_delete; DIRTY=1 ;;
-                r) cs_rescan; DIRTY=1 ;;
+                '~') cs_term_toggle; DIRTY=1 ;;
+                '`') cs_term_focus; DIRTY=1 ;;
+                '|') cs_focus_session ;;
                 R) cs_rename_selected; DIRTY=1 ;;
                 X)
                     stty echo 2>/dev/null || true
@@ -1203,6 +1416,17 @@ cs_picker_loop() {
             fi
             cs_check_bells
             cs_rescan
+            # Check if current session's terminal died externally
+            # (must be after cs_rescan which refreshes the pane cache)
+            local _cur_pane
+            _cur_pane=$(cs_read_state current_pane)
+            if [[ -n "${_cur_pane}" ]] && cs_term_is_shown "${_cur_pane}"; then
+                local _tp
+                _tp=$(cs_term_pane_for "${_cur_pane}")
+                if [[ -n "${_tp}" ]] && ! cs_pane_alive "${_tp}"; then
+                    rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height}
+                fi
+            fi
             local fp
             fp=$(cs_fingerprint)
             if [[ "${fp}" != "${LAST_FINGERPRINT}" ]]; then
@@ -1438,6 +1662,12 @@ cs_remove_bell_hook() {
 cs_remove_keybindings() {
     _tmux unbind-key j 2>/dev/null || true
     _tmux unbind-key k 2>/dev/null || true
+    _tmux unbind-key f 2>/dev/null || true
+    _tmux unbind-key F 2>/dev/null || true
+    _tmux unbind-key t 2>/dev/null || true
+    # Restore defaults
+    _tmux bind-key Tab select-pane -t :.+ 2>/dev/null || true
+    _tmux bind-key r refresh-client 2>/dev/null || true
     _tmux bind-key Up select-pane -U 2>/dev/null || true
     _tmux bind-key Down select-pane -D 2>/dev/null || true
 }
@@ -1465,6 +1695,15 @@ cs_check_bells() {
 # ── Reset ─────────────────────────────────────────
 cs_reset() {
     cs_init_state
+
+    # Kill terminal panes first
+    for f in "${STATE_DIR}"/term/*; do
+        [[ -f "${f}" ]] || continue
+        [[ "$(basename "${f}")" == *.* ]] && continue
+        local tp
+        tp=$(cat "${f}" 2>/dev/null || true)
+        [[ -n "${tp}" ]] && { _tmux kill-pane -t "${tp}" 2>/dev/null || true; }
+    done
 
     for f in "${STATE_DIR}"/panes/*; do
         [[ -f "${f}" ]] || continue
