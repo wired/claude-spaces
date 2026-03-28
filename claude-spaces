@@ -1745,6 +1745,8 @@ cs_launch() {
             if [[ -n "${TMUX_CONF}" && -f "${TMUX_CONF}" ]]; then
                 _tmux source-file "${TMUX_CONF}" 2>/dev/null || true
             fi
+            _tmux set -g window-status-format ''
+            _tmux set -g window-status-current-format ''
         fi
 
         # Block until detach (NOT exec — we need control back for project switching)
