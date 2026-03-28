@@ -10,7 +10,8 @@ with cross-server discovery and seamless project switching.
 
 - `claude-spaces` — the entire tool
 - `run_tests` — integration tests (evals function definitions up to the `# ── Entrypoint` marker, mocks Claude with sleep panes)
-- `SPEC.md` — full specification (layout, keybinds, state machine, discovery logic)
+- `SPEC.md` — specification overview (layout, keybinds, state machine, config, architecture)
+- `specs/` — detailed specs (discovery, launch, mechanics, testing, future work)
 - `Makefile` — `make install`, `make dev` (symlink), `make test`
 
 ## Architecture
@@ -50,7 +51,7 @@ falls back to the current pane on miss.
 - **Atomic pane swap**: the break-pane + join-pane + resize-pane sequence must be a single
   `_tmux` call (semicolon-chained). Splitting it causes flicker and race conditions.
 - **Bell detection**: requires a Claude Code Stop hook with `> /dev/tty`. The `#{window_bell_flag}`
-  approach does NOT work (flag is momentary). See SPEC.md § Bell Detection.
+  approach does NOT work (flag is momentary). See specs/mechanics.md § Bell Detection.
 - **`~/.claude/sessions/`**: this is Claude Code's own session tracking dir, not ours. Don't rename it.
 
 ## Testing
@@ -87,4 +88,5 @@ Strategy: **bump-on-open, default patch.**
 
 README.md documents keybinds, configuration options, and bell detection setup.
 When changing keybinds, config keys, or user-facing features in the source, update
-README.md to match. SPEC.md is the authoritative reference; README.md is the user-facing subset.
+README.md to match. SPEC.md is the authoritative overview; specs/ subfiles have detailed
+mechanics. When updating spec content, check both SPEC.md and the relevant subfile for drift.
