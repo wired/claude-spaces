@@ -1223,24 +1223,27 @@ test_term_height_persists() {
 
     _tmux resize-pane -t "${term_pane}" -y 10 2>/dev/null || true
     sleep 0.1
+    local orig_h
+    orig_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
 
-    # Toggle off (saves height)
+    # Toggle off (saves height as percentage)
     cs_term_toggle
     sleep 0.1
 
-    local saved_h
-    saved_h=$(cat "${STATE_DIR}/term/${pane_a#%}.height" 2>/dev/null || true)
-    [[ -n "${saved_h}" ]] || { echo "    height not saved"; return 1; }
+    local saved_pct
+    saved_pct=$(cat "${STATE_DIR}/term/${pane_a#%}.height" 2>/dev/null || true)
+    [[ -n "${saved_pct}" ]] || { echo "    height not saved"; return 1; }
 
     # Toggle back on
     cs_term_toggle
     sleep 0.1
 
+    # Restored height should be close to the original
     local new_h
     new_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    local diff=$(( new_h - saved_h ))
+    local diff=$(( new_h - orig_h ))
     (( diff < 0 )) && diff=$(( -diff ))
-    (( diff <= 2 )) || { echo "    height not restored: saved=${saved_h} got=${new_h}"; return 1; }
+    (( diff <= 2 )) || { echo "    height not restored: orig=${orig_h} got=${new_h}"; return 1; }
 
     cs_assert_consistent "term_height"
 }
@@ -1279,6 +1282,62 @@ test_term_across_reload() {
     cs_term_is_shown "${pane_a}" || { echo "    not shown after reload"; return 1; }
 
     cs_assert_consistent "term_reload"
+}
+
+test_term_winch_repin() {
+    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    cs_create_mock_session "${sid}" "session A"
+    cs_scan_sessions
+    cs_resume_session "${sid}"
+    sleep 0.2
+
+    local pane_a
+    pane_a=$(cs_read_state current_pane)
+    cs_term_toggle
+    sleep 0.1
+    local term_pane
+    term_pane=$(cs_term_pane_for "${pane_a}")
+
+    # Record initial percentage
+    local init_th init_sh init_pct
+    init_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+    init_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+    init_pct=$(( init_th * 100 / (init_th + init_sh) ))
+
+    # Shrink window
+    _tmux resize-window -y 20 2>/dev/null || true
+    sleep 0.1
+
+    # Call WINCH handler
+    cs_handle_winch
+    sleep 0.1
+
+    # Check terminal is still approximately the right percentage
+    local new_th new_sh new_pct
+    new_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+    new_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+    new_pct=$(( new_th * 100 / (new_th + new_sh) ))
+
+    local diff=$(( new_pct - init_pct ))
+    (( diff < 0 )) && diff=$(( -diff ))
+    (( diff <= 3 )) || { echo "    pct drifted: init=${init_pct}% now=${new_pct}% (diff=${diff})"; return 1; }
+
+    # Grow back
+    _tmux resize-window -y 40 2>/dev/null || true
+    sleep 0.1
+    cs_handle_winch
+    sleep 0.1
+
+    local fin_th fin_sh fin_pct
+    fin_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+    fin_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+    fin_pct=$(( fin_th * 100 / (fin_th + fin_sh) ))
+
+    diff=$(( fin_pct - init_pct ))
+    (( diff < 0 )) && diff=$(( -diff ))
+    (( diff <= 3 )) || { echo "    pct drifted after grow: init=${init_pct}% now=${fin_pct}% (diff=${diff})"; return 1; }
+
+    cs_assert_consistent "term_winch"
 }
 
 # ── Main ─────────────────────────────────────────
@@ -1338,6 +1397,7 @@ main() {
     run_test "term dies externally"        test_term_dies_externally
     run_test "term height persists"        test_term_height_persists
     run_test "term across reload"          test_term_across_reload
+    run_test "term WINCH re-pin"           test_term_winch_repin
 
     echo ""
     echo "══════════════════════════════════"

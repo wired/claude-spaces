@@ -728,10 +728,13 @@ cs_show_pane() {
                 old_term=$(cs_term_pane_for "${cur_pane}")
             fi
             if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
-                # Save height before parking
-                local th
+                # Save height as percentage before parking
+                local th sh
                 th=$(_tmux display-message -t "${old_term}" -p '#{pane_height}' 2>/dev/null || true)
-                [[ -n "${th}" ]] && echo "${th}" > "${STATE_DIR}/term/${cur_pane#%}.height"
+                sh=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
+                if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
+                    echo $(( th * 100 / (th + sh) )) > "${STATE_DIR}/term/${cur_pane#%}.height"
+                fi
                 # Extended chain: park terminal, park session, join new
                 _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
                      break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
@@ -810,21 +813,20 @@ cs_term_is_shown() {
 # Compute terminal height in characters
 cs_term_compute_height() {
     local session_pane="$1"
-    # Per-session runtime override
-    local h
+    # Per-session runtime override (stored as percentage)
+    local pct="" h
     h=$(cat "${STATE_DIR}/term/${session_pane#%}.height" 2>/dev/null || true)
     if [[ -n "${h}" ]]; then
-        echo "${h}"
-        return
+        pct="${h}"
+    elif [[ "${TERMINAL_HEIGHT}" == *% ]]; then
+        pct="${TERMINAL_HEIGHT%\%}"
     fi
-    # Config value
-    if [[ "${TERMINAL_HEIGHT}" == *% ]]; then
-        local pct="${TERMINAL_HEIGHT%\%}"
+    if [[ -n "${pct}" ]]; then
         local pane_h=0
         if cs_pane_alive "${session_pane}"; then
             pane_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || echo 0)
         fi
-        h=$(( pane_h * pct / 100 ))
+        h=$(( (pane_h * pct + 50) / 100 ))
     else
         h="${TERMINAL_HEIGHT}"
     fi
@@ -880,10 +882,13 @@ cs_term_hide() {
     cs_refresh_pane_cache
     [[ -n "${term_pane}" ]] && cs_pane_alive "${term_pane}" || return 0
 
-    # Save current height
-    local th
-    th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    [[ -n "${th}" ]] && echo "${th}" > "${STATE_DIR}/term/${session_pane#%}.height"
+    # Save current height as percentage
+    local term_h sess_h
+    term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+    sess_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
+    if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
+        echo $(( term_h * 100 / (term_h + sess_h) )) > "${STATE_DIR}/term/${session_pane#%}.height"
+    fi
 
     # Park
     local picker_session
@@ -948,6 +953,27 @@ cs_term_focus() {
 # WINCH handler — re-pin picker width on terminal resize.
 cs_handle_winch() {
     _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null
+    # Re-pin terminal height to saved percentage
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    if [[ -n "${cur_pane}" ]] && cs_term_is_shown "${cur_pane}"; then
+        local term_pane
+        term_pane=$(cs_term_pane_for "${cur_pane}")
+        if [[ -n "${term_pane}" ]]; then
+            local pct
+            pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
+            [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
+            [[ -z "${pct}" ]] && pct=30
+            local term_h sess_h
+            term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+            sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
+            if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
+                local new_h=$(( ((term_h + sess_h) * pct + 50) / 100 ))
+                (( new_h < 3 )) && new_h=3
+                _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
+            fi
+        fi
+    fi
     DIRTY=1
 }
 
