@@ -426,6 +426,17 @@ cs_rescan() {
             return
         fi
     fi
+    # Fallback: sync SELECTED to the currently displayed pane
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    if [[ -n "${cur_pane}" ]]; then
+        for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
+            if [[ "${ENTRIES_PANE[${fi}]}" == "${cur_pane}" ]]; then
+                SELECTED=${fi}
+                return
+            fi
+        done
+    fi
     local n=${#ENTRIES_ID[@]}
     if ((SELECTED >= n && n > 0)); then
         SELECTED=$((n - 1))

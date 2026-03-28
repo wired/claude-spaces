@@ -641,6 +641,42 @@ test_selection_preserved() {
     [[ "${ENTRIES_ID[${SELECTED}]}" == "${sid_b}" ]] || { echo "    selection not preserved: expected ${sid_b}, got ${ENTRIES_ID[${SELECTED}]}"; return 1; }
 }
 
+test_selection_fallback_to_pane() {
+    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    cs_create_mock_session "${sid_a}" "session A"
+    cs_create_mock_session "${sid_b}" "session B"
+    cs_scan_sessions
+
+    # Activate session B so it becomes current_pane
+    local idx
+    idx=$(find_entry_index "${sid_b}")
+    [[ "${idx}" != "-1" ]] || { echo "    session B not found"; return 1; }
+    SELECTED=${idx}
+    cs_activate_selected
+    sleep 0.2
+
+    # Simulate SELECTED pointing at an ID that will disappear
+    SELECTED=0
+    ENTRIES_ID[0]="__gone__"
+
+    cs_rescan
+
+    # SELECTED should fall back to session B (the current_pane)
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    [[ -n "${cur_pane}" ]] || { echo "    current_pane not set"; return 1; }
+    [[ "${ENTRIES_PANE[${SELECTED}]}" == "${cur_pane}" ]] || {
+        echo "    SELECTED not synced to current_pane: pane=${ENTRIES_PANE[${SELECTED}]}, expected=${cur_pane}"
+        return 1
+    }
+    [[ "${ENTRIES_ID[${SELECTED}]}" == "${sid_b}" ]] || {
+        echo "    SELECTED on wrong session: got ${ENTRIES_ID[${SELECTED}]}, expected ${sid_b}"
+        return 1
+    }
+    cs_assert_consistent "selection_fallback_to_pane"
+}
+
 test_custom_names() {
     local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     cs_create_mock_session "${sid}" "some long boring message"
@@ -903,6 +939,7 @@ main() {
     run_test "show pane safety"             test_show_pane_safety
     run_test "double-N"                     test_double_n
     run_test "selection preserved"          test_selection_preserved
+    run_test "selection fallback to pane"  test_selection_fallback_to_pane
     run_test "custom session names"         test_custom_names
     run_test "clean message"                test_clean_message
     run_test "active-elsewhere detection"   test_active_elsewhere_detection
