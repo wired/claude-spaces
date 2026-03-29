@@ -79,6 +79,7 @@ claude-spaces --help   # Show help
 |-----|--------|
 | `j` / `↓` | Move cursor down (skips headers) |
 | `k` / `↑` | Move cursor up (skips headers) |
+| `/` | Search/filter sessions |
 | `Enter` | Local: load session (press again to focus). Remote/inactive: switch project. |
 | `h` / `l` / `←` / `→` | Load + focus session immediately (local only) |
 | `N` | New session |

@@ -122,6 +122,7 @@ Focused state detected at render time via `_tmux display-message -t $PICKER_PANE
 |------------------|-------------------------------------------------------------|
 | `j` / `↓`       | Move cursor down (skips headers/spacers)                    |
 | `k` / `↑`       | Move cursor up (skips headers/spacers)                      |
+| `/`              | Search/filter sessions (substring match, all sections)      |
 | `Enter`          | Local: first press loads, second press focuses. Remote/project/inactive: switch to that server. |
 | `h` / `l` / `←` / `→` | Load/resume session AND focus it immediately. Local only. |
 | `N`              | Create new `claude` session (always focuses it)             |
@@ -150,6 +151,33 @@ Spatial layout on QWERTY: `e`=context, `r`=session, `t`=picker, `f`=terminal.
 `prefix+e` and `prefix+E` are reserved for the future context pane.
 
 > See [specs/mechanics.md](specs/mechanics.md) for pane swap sequence, bell detection, and binding lifecycle.
+
+## Search
+
+`/` activates search mode. A search field appears at the bottom of the picker (replacing the
+footer), matching vim convention and the existing rename/confirm dialog patterns. All sections
+(local, remote, inactive) are filtered by case-insensitive substring match against the
+displayed name. Filter is applied immediately on each keystroke.
+
+The search field acts as a virtual entry for navigation wrapping: `↓` from the field goes to
+the first result, `↑` goes to the last. From results, wrapping past either end returns to the
+field. While in the search field, `j`/`k` are literal characters; in results they navigate.
+
+| Context | Key | Action |
+|---------|-----|--------|
+| Search field | printable chars | Append to search term, filter immediately |
+| Search field | `Backspace` | Delete last char (empty = stay in search) |
+| Search field | `Enter` (1 match) | Select it, exit search, load/focus |
+| Search field | `Enter` (>1 matches) | Move to first result |
+| Search field | `Escape` | Exit search, restore full list |
+| Search field | `↑` / `↓` | Navigate to results |
+| Results | `j`/`k`/`↑`/`↓` | Navigate (wraps through search field) |
+| Results | `Enter` | Exit search, load/focus per `enter_focuses` |
+| Results | `Escape` | Exit search, restore full list |
+| Results | `←`/`→` | Exit search, load + focus |
+
+Section headers are only shown when they have matching children. Action keys
+(`N`/`C`/`H`/`D`/`R`/`F`/`Q`/`X`) are ignored during search to prevent accidental operations.
 
 ## Configuration
 

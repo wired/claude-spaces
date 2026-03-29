@@ -110,6 +110,7 @@ EOF
 cs_help_text() {
     echo "  Keybinds:"
     echo "    j/k, arrows   Navigate sessions"
+    echo "    /              Search/filter sessions"
     echo "    Enter          Load/resume session"
     echo "    h/l            Load + focus session"
     echo "    N              New session"
@@ -437,28 +438,34 @@ cs_rescan() {
         selected_id="${ENTRIES_ID[${SELECTED}]}"
     fi
     cs_build_all_entries
+    cs_search_save_full
+    # Restore selection: by ID, then by pane, then clamp
+    local _sel_found=0
     if [[ -n "${selected_id}" ]]; then
         local idx
         idx=$(cs_find_entry_index "${selected_id}")
         if [[ "${idx}" != "-1" ]]; then
             SELECTED=${idx}
-            return
+            _sel_found=1
         fi
     fi
-    # Fallback: sync SELECTED to the currently displayed pane
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    if [[ -n "${cur_pane}" ]]; then
-        local pidx
-        pidx=$(cs_find_entry_by_pane "${cur_pane}")
-        if [[ "${pidx}" != "-1" ]]; then
-            SELECTED=${pidx}
-            return
+    if ((!_sel_found)); then
+        local cur_pane
+        cur_pane=$(cs_read_state current_pane)
+        if [[ -n "${cur_pane}" ]]; then
+            local pidx
+            pidx=$(cs_find_entry_by_pane "${cur_pane}")
+            if [[ "${pidx}" != "-1" ]]; then
+                SELECTED=${pidx}
+            fi
+        fi
+        local n=${#ENTRIES_ID[@]}
+        if ((SELECTED >= n && n > 0)); then
+            SELECTED=$((n - 1))
         fi
     fi
-    local n=${#ENTRIES_ID[@]}
-    if ((SELECTED >= n && n > 0)); then
-        SELECTED=$((n - 1))
+    if ((SEARCH_ACTIVE)); then
+        cs_search_apply_filter
     fi
 }
 
@@ -489,6 +496,263 @@ REMOTE_SERVERS=()
 INACTIVE_PROJECTS=()
 cs_cache_clear
 LAST_REMOTE_SCAN=0
+
+# ── Search / Filter ──────────────────────────────
+SEARCH_ACTIVE=0
+SEARCH_TERM=""
+SEARCH_FIELD_FOCUSED=0
+FULL_ENTRIES_ID=(); FULL_ENTRIES_NAME=(); FULL_ENTRIES_MTIME=()
+FULL_ENTRIES_STATUS=(); FULL_ENTRIES_PANE=(); FULL_ENTRIES_TYPE=(); FULL_ENTRIES_PATH=()
+
+cs_search_save_full() {
+    FULL_ENTRIES_ID=("${ENTRIES_ID[@]}")
+    FULL_ENTRIES_NAME=("${ENTRIES_NAME[@]}")
+    FULL_ENTRIES_MTIME=("${ENTRIES_MTIME[@]}")
+    FULL_ENTRIES_STATUS=("${ENTRIES_STATUS[@]}")
+    FULL_ENTRIES_PANE=("${ENTRIES_PANE[@]}")
+    FULL_ENTRIES_TYPE=("${ENTRIES_TYPE[@]}")
+    FULL_ENTRIES_PATH=("${ENTRIES_PATH[@]}")
+}
+
+cs_search_apply_filter() {
+    # Capture selected ID for preservation (only when in results, not search field)
+    local selected_id=""
+    if ((!SEARCH_FIELD_FOCUSED)) && ((${#ENTRIES_ID[@]} > 0)) && ((SELECTED < ${#ENTRIES_ID[@]})); then
+        selected_id="${ENTRIES_ID[${SELECTED}]}"
+    fi
+
+    cs_entry_clear
+
+    if [[ -z "${SEARCH_TERM}" ]]; then
+        ENTRIES_ID=("${FULL_ENTRIES_ID[@]}")
+        ENTRIES_NAME=("${FULL_ENTRIES_NAME[@]}")
+        ENTRIES_MTIME=("${FULL_ENTRIES_MTIME[@]}")
+        ENTRIES_STATUS=("${FULL_ENTRIES_STATUS[@]}")
+        ENTRIES_PANE=("${FULL_ENTRIES_PANE[@]}")
+        ENTRIES_TYPE=("${FULL_ENTRIES_TYPE[@]}")
+        ENTRIES_PATH=("${FULL_ENTRIES_PATH[@]}")
+    else
+        local term="${SEARCH_TERM,,}"
+        local n=${#FULL_ENTRIES_ID[@]}
+
+        # Pass 1: mark matching entries
+        local -a match=()
+        local i
+        for ((i = 0; i < n; i++)); do
+            local type="${FULL_ENTRIES_TYPE[${i}]}"
+            if [[ "${type}" == "header" || "${type}" == "spacer" ]]; then
+                match+=(0)
+            else
+                local name="${FULL_ENTRIES_NAME[${i}],,}"
+                if [[ "${name}" == *"${term}"* ]]; then
+                    match+=(1)
+                else
+                    match+=(0)
+                fi
+            fi
+        done
+
+        # Pass 2: copy matches, include spacer/header only if section has matches
+        for ((i = 0; i < n; i++)); do
+            local type="${FULL_ENTRIES_TYPE[${i}]}"
+            if [[ "${type}" == "spacer" || "${type}" == "header" ]]; then
+                # Look ahead: any match before next spacer or end?
+                local has_child=0 j
+                for ((j = i + 1; j < n; j++)); do
+                    [[ "${FULL_ENTRIES_TYPE[${j}]}" == "spacer" ]] && break
+                    ((match[j])) && { has_child=1; break; }
+                done
+                if ((has_child)); then
+                    cs_entry_append "${FULL_ENTRIES_ID[${i}]}" "${FULL_ENTRIES_NAME[${i}]}" "${FULL_ENTRIES_MTIME[${i}]}" "${FULL_ENTRIES_STATUS[${i}]}" "${FULL_ENTRIES_PANE[${i}]}" "${FULL_ENTRIES_TYPE[${i}]}" "${FULL_ENTRIES_PATH[${i}]}"
+                fi
+            elif ((match[i])); then
+                cs_entry_append "${FULL_ENTRIES_ID[${i}]}" "${FULL_ENTRIES_NAME[${i}]}" "${FULL_ENTRIES_MTIME[${i}]}" "${FULL_ENTRIES_STATUS[${i}]}" "${FULL_ENTRIES_PANE[${i}]}" "${FULL_ENTRIES_TYPE[${i}]}" "${FULL_ENTRIES_PATH[${i}]}"
+            fi
+        done
+    fi
+
+    # Restore selection
+    local new_n=${#ENTRIES_ID[@]}
+    if [[ -n "${selected_id}" ]]; then
+        local idx
+        idx=$(cs_find_entry_index "${selected_id}")
+        if [[ "${idx}" != "-1" ]]; then
+            SELECTED=${idx}
+            SCROLL=0
+            return
+        fi
+    fi
+    # Fallback: clamp and skip to nearest selectable
+    if ((new_n == 0)); then
+        SELECTED=0
+    elif ((SELECTED >= new_n)); then
+        SELECTED=$((new_n - 1))
+    fi
+    # Skip past headers/spacers
+    local start=${SELECTED}
+    while ((new_n > 0)) && [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]]; do
+        SELECTED=$(( (SELECTED + 1) % new_n ))
+        ((SELECTED == start)) && break
+    done
+    SCROLL=0
+}
+
+cs_search_enter() {
+    SEARCH_ACTIVE=1
+    SEARCH_TERM=""
+    SEARCH_FIELD_FOCUSED=1
+    DIRTY=1
+}
+
+cs_search_exit() {
+    # Capture selected ID before restoring full entries
+    local selected_id=""
+    if ((!SEARCH_FIELD_FOCUSED)) && ((${#ENTRIES_ID[@]} > 0)) && ((SELECTED < ${#ENTRIES_ID[@]})); then
+        selected_id="${ENTRIES_ID[${SELECTED}]}"
+    fi
+
+    SEARCH_ACTIVE=0
+    SEARCH_TERM=""
+    SEARCH_FIELD_FOCUSED=0
+
+    # Restore full entries
+    ENTRIES_ID=("${FULL_ENTRIES_ID[@]}")
+    ENTRIES_NAME=("${FULL_ENTRIES_NAME[@]}")
+    ENTRIES_MTIME=("${FULL_ENTRIES_MTIME[@]}")
+    ENTRIES_STATUS=("${FULL_ENTRIES_STATUS[@]}")
+    ENTRIES_PANE=("${FULL_ENTRIES_PANE[@]}")
+    ENTRIES_TYPE=("${FULL_ENTRIES_TYPE[@]}")
+    ENTRIES_PATH=("${FULL_ENTRIES_PATH[@]}")
+
+    # Remap SELECTED in the full list
+    if [[ -n "${selected_id}" ]]; then
+        local idx
+        idx=$(cs_find_entry_index "${selected_id}")
+        if [[ "${idx}" != "-1" ]]; then
+            SELECTED=${idx}
+            DIRTY=1
+            return
+        fi
+    fi
+    # Fallback: clamp and skip
+    local n=${#ENTRIES_ID[@]}
+    if ((n == 0)); then
+        SELECTED=0
+    elif ((SELECTED >= n)); then
+        SELECTED=$((n - 1))
+    fi
+    local start=${SELECTED}
+    while ((n > 0)) && [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]]; do
+        SELECTED=$(( (SELECTED + 1) % n ))
+        ((SELECTED == start)) && break
+    done
+    DIRTY=1
+}
+
+cs_search_handle_key() {
+    local key="$1"
+    case "${key}" in
+        $'\e')
+            local seq=""
+            read -rsn2 -t 0.1 seq || true
+            case "${seq}" in
+                '[A') cs_search_move_up; DIRTY=1 ;;
+                '[B') cs_search_move_down; DIRTY=1 ;;
+                '') cs_search_exit; DIRTY=1 ;;
+            esac
+            ;;
+        '')  # Enter
+            local n=${#ENTRIES_ID[@]}
+            # Count selectable entries
+            local selectable=0 first_sel=-1 i
+            for ((i = 0; i < n; i++)); do
+                if [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]]; then
+                    ((selectable++))
+                    ((first_sel == -1)) && first_sel=${i}
+                fi
+            done
+            if ((selectable == 1)); then
+                SEARCH_FIELD_FOCUSED=0
+                SELECTED=${first_sel}
+                cs_search_exit
+                cs_activate_selected
+                ((ENTER_FOCUSES)) && cs_focus_session
+                DIRTY=1
+            elif ((selectable > 1)); then
+                SEARCH_FIELD_FOCUSED=0
+                SELECTED=0
+                # Skip to first selectable
+                while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED < n - 1)); do
+                    ((SELECTED++))
+                done
+                DIRTY=1
+            fi
+            ;;
+        $'\177'|$'\b')  # Backspace
+            if ((${#SEARCH_TERM} > 0)); then
+                SEARCH_TERM="${SEARCH_TERM%?}"
+                cs_search_apply_filter
+            fi
+            DIRTY=1
+            ;;
+        *)
+            # Only append printable characters
+            if [[ "${key}" == [[:print:]] ]]; then
+                SEARCH_TERM+="${key}"
+                cs_search_apply_filter
+                DIRTY=1
+            fi
+            ;;
+    esac
+}
+
+cs_search_move_down() {
+    local n=${#ENTRIES_ID[@]}
+    # Count selectable entries
+    local selectable=0 i
+    for ((i = 0; i < n; i++)); do
+        [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]] && ((selectable++))
+    done
+    ((selectable == 0)) && { SEARCH_FIELD_FOCUSED=1; return; }
+
+    if ((SEARCH_FIELD_FOCUSED)); then
+        SEARCH_FIELD_FOCUSED=0
+        SELECTED=0
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED < n - 1)); do
+            ((SELECTED++))
+        done
+    else
+        local old=${SELECTED}
+        cs_move_down
+        if ((SELECTED <= old)); then
+            SEARCH_FIELD_FOCUSED=1
+        fi
+    fi
+}
+
+cs_search_move_up() {
+    local n=${#ENTRIES_ID[@]}
+    # Count selectable entries
+    local selectable=0 i
+    for ((i = 0; i < n; i++)); do
+        [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]] && ((selectable++))
+    done
+    ((selectable == 0)) && { SEARCH_FIELD_FOCUSED=1; return; }
+
+    if ((SEARCH_FIELD_FOCUSED)); then
+        SEARCH_FIELD_FOCUSED=0
+        SELECTED=$((n - 1))
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED > 0)); do
+            ((SELECTED--))
+        done
+    else
+        local old=${SELECTED}
+        cs_move_up
+        if ((SELECTED >= old)); then
+            SEARCH_FIELD_FOCUSED=1
+        fi
+    fi
+}
 
 cs_remote_scan_needed() {
     local now
@@ -671,7 +935,7 @@ cs_after_remove() {
 cs_fingerprint() {
     local pf
     pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-    local fp="focus:${pf}|"
+    local fp="focus:${pf}|search:${SEARCH_ACTIVE}:${SEARCH_TERM}:${SEARCH_FIELD_FOCUSED}|"
     for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
         fp+="${ENTRIES_ID[${fi}]}:${ENTRIES_STATUS[${fi}]}:${ENTRIES_MTIME[${fi}]}:${ENTRIES_TYPE[${fi}]}|"
     done
@@ -1132,14 +1396,26 @@ cs_picker_render() {
     printf '\e[1;%dH\e[48;5;245;30m%s\e[0m' "$((pad + 1))" "${title}"
 
     if ((n == 0)); then
-        printf '\e[2;1H\e[K\e[90m  No sessions found.\e[0m'
+        local empty_msg="No sessions found."
+        ((SEARCH_ACTIVE)) && empty_msg="No matches."
+        printf '\e[2;1H\e[K\e[90m  %s\e[0m' "${empty_msg}"
         # Clear remaining lines
         local cl
-        for ((cl = 3; cl < height - 1; cl++)); do
+        for ((cl = 3; cl < height; cl++)); do
             printf '\e[%d;1H\e[K' "${cl}"
         done
-        cs_print_centered "$((height - 1))" "N:new X:rld" "${width}"
-        cs_print_centered "${height}" "Q:detach S:shutdown" "${width}"
+        if ((SEARCH_ACTIVE)); then
+            printf '\e[%d;1H\e[K' "${height}"
+            if ((SEARCH_FIELD_FOCUSED)); then
+                printf '\e[%d;1H\e[48;5;235m\e[1m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+                printf '\e[%d;%dH\e[?25h' "${height}" "$((2 + ${#SEARCH_TERM}))"
+            else
+                printf '\e[%d;1H\e[90m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+            fi
+        else
+            cs_print_centered "$((height - 1))" "N:new X:rld" "${width}"
+            cs_print_centered "${height}" "Q:detach S:shutdown" "${width}"
+        fi
         return
     fi
 
@@ -1221,8 +1497,8 @@ cs_picker_render() {
         local indent_str=""
         ((indent > 0)) && printf -v indent_str '%*s' "${indent}" ""
 
-        # Selection background (skip for focused)
-        if ((i == SELECTED)) && [[ -z "${line_prefix}" ]]; then
+        # Selection background (skip for focused or search field focused)
+        if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ -z "${line_prefix}" ]]; then
             printf '\e[48;5;235m'
         fi
 
@@ -1251,36 +1527,51 @@ cs_picker_render() {
         printf '\e[%d;1H\e[K' "$((last_entry_line + 1))"
     fi
 
-    # Centered footer (context-sensitive)
-    local footer_line=$((last_entry_line + 2))
-    local selected_type="${ENTRIES_TYPE[${SELECTED}]:-local}"
-    if [[ "${selected_type}" == "remote" || "${selected_type}" == "project" || "${selected_type}" == "inactive" ]]; then
-        cs_print_centered "${footer_line}" "Enter:switch" "${width}"
+    if ((SEARCH_ACTIVE)); then
+        # Clear from after scroll indicator to bottom, then render search field
+        local cl
+        for ((cl = last_entry_line + 2; cl < height; cl++)); do
+            printf '\e[%d;1H\e[K' "${cl}"
+        done
+        printf '\e[%d;1H\e[K' "${height}"
+        if ((SEARCH_FIELD_FOCUSED)); then
+            printf '\e[%d;1H\e[48;5;235m\e[1m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+            printf '\e[%d;%dH\e[?25h' "${height}" "$((2 + ${#SEARCH_TERM}))"
+        else
+            printf '\e[%d;1H\e[90m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+        fi
     else
-        cs_print_centered "${footer_line}" "N:new C:cls H:hide D:DEL" "${width}"
+        # Centered footer (context-sensitive)
+        local footer_line=$((last_entry_line + 2))
+        local selected_type="${ENTRIES_TYPE[${SELECTED}]:-local}"
+        if [[ "${selected_type}" == "remote" || "${selected_type}" == "project" || "${selected_type}" == "inactive" ]]; then
+            cs_print_centered "${footer_line}" "Enter:switch" "${width}"
+        else
+            cs_print_centered "${footer_line}" "N:new C:cls H:hide D:DEL" "${width}"
+        fi
+
+        # Focus toggle
+        local focus_line=$((footer_line + 1))
+        local focus_label
+        if ((ENTER_FOCUSES)); then
+            focus_label="F:auto-focus"
+        else
+            focus_label="F:manual-focus"
+        fi
+        cs_print_centered "${focus_line}" "${focus_label}" "${width}"
+
+        # Quit row
+        local quit_line=$((focus_line + 1))
+        cs_print_centered "${quit_line}" "Q:detach S:shutdown" "${width}"
+
+        # Version line
+        printf '\e[%d;1H\e[K' "$((quit_line + 1))"
+        local version_line=$((quit_line + 2))
+        cs_print_centered "${version_line}" "claude-spaces v${VERSION}" "${width}"
+
+        # Clear everything below
+        printf '\e[%d;1H\e[J' "$((version_line + 1))"
     fi
-
-    # Focus toggle
-    local focus_line=$((footer_line + 1))
-    local focus_label
-    if ((ENTER_FOCUSES)); then
-        focus_label="F:auto-focus"
-    else
-        focus_label="F:manual-focus"
-    fi
-    cs_print_centered "${focus_line}" "${focus_label}" "${width}"
-
-    # Quit row
-    local quit_line=$((focus_line + 1))
-    cs_print_centered "${quit_line}" "Q:detach S:shutdown" "${width}"
-
-    # Version line
-    printf '\e[%d;1H\e[K' "$((quit_line + 1))"
-    local version_line=$((quit_line + 2))
-    cs_print_centered "${version_line}" "claude-spaces v${VERSION}" "${width}"
-
-    # Clear everything below
-    printf '\e[%d;1H\e[J' "$((version_line + 1))"
 }
 
 cs_picker_loop() {
@@ -1345,6 +1636,7 @@ cs_picker_loop() {
     trap 'cs_handle_winch' WINCH
 
     cs_build_all_entries
+    cs_search_save_full
 
     local n=${#ENTRIES_ID[@]}
     cur=$(cs_read_state current_pane)
@@ -1358,6 +1650,7 @@ cs_picker_loop() {
         cs_new_session
         sleep 0.3
         cs_build_all_entries
+        cs_search_save_full
     else
         cs_show_welcome
         # Force focus to picker so user can navigate immediately
@@ -1369,53 +1662,92 @@ cs_picker_loop() {
     while true; do
         local key=""
         if read -rsn1 -t 1 key; then
-            case "${key}" in
-                j) cs_move_down; DIRTY=1 ;;
-                k) cs_move_up; DIRTY=1 ;;
-                J) cs_move_down 1
-                   cs_activate_selected; cs_focus_session
-                   DIRTY=1 ;;
-                K) cs_move_up 1
-                   cs_activate_selected; cs_focus_session
-                   DIRTY=1 ;;
-                h|l) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
-                $'\e')
-                    local seq=""
-                    read -rsn2 -t 0.1 seq || true
-                    case "${seq}" in
-                        '[A') cs_move_up; DIRTY=1 ;;
-                        '[B') cs_move_down; DIRTY=1 ;;
-                        '[C'|'[D') cs_activate_selected; cs_focus_session; DIRTY=1 ;;
+            if ((SEARCH_ACTIVE)); then
+                if ((SEARCH_FIELD_FOCUSED)); then
+                    cs_search_handle_key "${key}"
+                else
+                    # In search results — limited keyset
+                    case "${key}" in
+                        j) cs_search_move_down; DIRTY=1 ;;
+                        k) cs_search_move_up; DIRTY=1 ;;
+                        J) cs_search_move_down
+                           if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
+                               cs_activate_selected; cs_focus_session
+                           fi
+                           DIRTY=1 ;;
+                        K) cs_search_move_up
+                           if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
+                               cs_activate_selected; cs_focus_session
+                           fi
+                           DIRTY=1 ;;
+                        $'\e')
+                            local seq=""
+                            read -rsn2 -t 0.1 seq || true
+                            case "${seq}" in
+                                '[A') cs_search_move_up; DIRTY=1 ;;
+                                '[B') cs_search_move_down; DIRTY=1 ;;
+                                '[C'|'[D') cs_search_exit; cs_activate_selected; cs_focus_session; DIRTY=1 ;;
+                                '') cs_search_exit; DIRTY=1 ;;
+                            esac
+                            ;;
+                        '')
+                            cs_search_exit
+                            cs_activate_selected
+                            ((ENTER_FOCUSES)) && cs_focus_session
+                            DIRTY=1
+                            ;;
                     esac
-                    ;;
-                '')
-                    cs_activate_selected
-                    ((ENTER_FOCUSES)) && cs_focus_session
-                    DIRTY=1
-                    ;;
-                F) cs_toggle_enter_focuses; DIRTY=1 ;;
-                Q) _tmux detach-client ;;
-                N)
-                    cs_new_session
-                    cs_focus_session
-                    cs_kill_welcome
-                    cs_rescan
-                    DIRTY=1
-                    ;;
-                C) cs_close_selected; DIRTY=1 ;;
-                H) cs_confirm_hide; DIRTY=1 ;;
-                D) cs_confirm_delete; DIRTY=1 ;;
-                S) cs_confirm_shutdown ;;
-                '~') cs_term_toggle; DIRTY=1 ;;
-                '`') cs_term_focus; DIRTY=1 ;;
-                '|') cs_focus_session ;;
-                R) cs_rename_selected; DIRTY=1 ;;
-                X)
-                    stty echo 2>/dev/null || true
-                    printf '\e[?25h\e[0m'
-                    CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}"
-                    ;;
-            esac
+                fi
+            else
+                case "${key}" in
+                    j) cs_move_down; DIRTY=1 ;;
+                    k) cs_move_up; DIRTY=1 ;;
+                    J) cs_move_down 1
+                       cs_activate_selected; cs_focus_session
+                       DIRTY=1 ;;
+                    K) cs_move_up 1
+                       cs_activate_selected; cs_focus_session
+                       DIRTY=1 ;;
+                    h|l) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
+                    $'\e')
+                        local seq=""
+                        read -rsn2 -t 0.1 seq || true
+                        case "${seq}" in
+                            '[A') cs_move_up; DIRTY=1 ;;
+                            '[B') cs_move_down; DIRTY=1 ;;
+                            '[C'|'[D') cs_activate_selected; cs_focus_session; DIRTY=1 ;;
+                        esac
+                        ;;
+                    '')
+                        cs_activate_selected
+                        ((ENTER_FOCUSES)) && cs_focus_session
+                        DIRTY=1
+                        ;;
+                    /) cs_search_enter; DIRTY=1 ;;
+                    F) cs_toggle_enter_focuses; DIRTY=1 ;;
+                    Q) _tmux detach-client ;;
+                    N)
+                        cs_new_session
+                        cs_focus_session
+                        cs_kill_welcome
+                        cs_rescan
+                        DIRTY=1
+                        ;;
+                    C) cs_close_selected; DIRTY=1 ;;
+                    H) cs_confirm_hide; DIRTY=1 ;;
+                    D) cs_confirm_delete; DIRTY=1 ;;
+                    S) cs_confirm_shutdown ;;
+                    '~') cs_term_toggle; DIRTY=1 ;;
+                    '`') cs_term_focus; DIRTY=1 ;;
+                    '|') cs_focus_session ;;
+                    R) cs_rename_selected; DIRTY=1 ;;
+                    X)
+                        stty echo 2>/dev/null || true
+                        printf '\e[?25h\e[0m'
+                        CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}"
+                        ;;
+                esac
+            fi
         else
             # Timeout — check pending load, poll bells, rescan sessions
             local pending
