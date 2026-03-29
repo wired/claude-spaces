@@ -274,9 +274,7 @@ cs_test_setup() {
     NAMES_FILE="${CLAUDE_DIR}/claude-spaces-names.conf"
     STATE_DIR="${TEST_TMP}/state"
 
-    cat > "${CONFIG_FILE}" << 'EOF'
-enter_focuses=0
-EOF
+    : > "${CONFIG_FILE}"
     : > "${CLAUDE_DIR}/claude-spaces-hidden.conf"
     : > "${NAMES_FILE}"
 

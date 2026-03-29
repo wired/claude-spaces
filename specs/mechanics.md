@@ -53,13 +53,24 @@ Bell state clears when the session is brought to the foreground. The bell hook i
 
 ## Binding Lifecycle
 
-Global tmux bindings are installed on picker startup and cleaned up on exit/reset.
+claude-spaces takes full ownership of the tmux prefix key table. After sourcing
+the user's tmux.conf (for visuals/mouse), the picker:
 
-Spatial focus keys (QWERTY layout):
-- `prefix + r` — focus session (sends `|` to picker)
-- `prefix + f` — focus terminal (sends `` ` `` to picker, opens if needed)
-- `prefix + t` / `prefix + Tab` — focus picker (direct `select-pane`)
-- `prefix + F` — toggle terminal (sends `~` to picker)
-- `prefix + j/k/↑/↓` — session navigation (sends `J`/`K` to picker)
+1. Captures the user's prefix via `show-options -gv prefix`
+2. Optionally overrides it from `claude-spaces.conf` (`prefix=` key)
+3. Wipes the entire prefix table: `unbind-key -a -T prefix`
+4. Re-binds `send-prefix` for the captured prefix key
+5. Installs all claude-spaces bindings via `cs_install_keybindings`
 
-Arrow keys and `prefix+r` are restored to tmux defaults on cleanup. `prefix+e/E` reserved for future context pane.
+Only the prefix table (`-T prefix`) is wiped — root bindings (mouse, etc.)
+and copy-mode bindings are preserved.
+
+On cleanup (exit/reset/re-exec), `cs_remove_keybindings` wipes the prefix
+table. Since the server is ephemeral, this is mainly for the `X` re-exec case.
+
+All prefix bindings are configurable via `bind_*` keys in `claude-spaces.conf`.
+The `cs_bind` helper resolves overrides and supports comma-separated multi-key
+bindings. Compound bindings (focus picker + send trigger) bypass `cs_bind` and
+use direct `_tmux` calls with `\;` chaining.
+
+See SPEC.md § Keybinds for the full binding table.

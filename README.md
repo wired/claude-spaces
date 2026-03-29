@@ -73,36 +73,48 @@ claude-spaces --help   # Show help
 
 ## Keybinds
 
-### Picker pane
+claude-spaces takes full ownership of the tmux prefix key table on its dedicated
+server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
+(colors, mouse, status) but all keybindings are managed by claude-spaces.
+
+### Picker pane (direct keys)
 
 | Key | Action |
 |-----|--------|
-| `j` / `↓` | Move cursor down (skips headers) |
-| `k` / `↑` | Move cursor up (skips headers) |
+| `j` / `k` / `↑` / `↓` | Move cursor (skips headers) |
+| `Enter` | Load + focus session (remote/inactive: switch project) |
+| `Space` | Load session (stay in picker) |
+| `H` / `L` | Load + focus session |
+| `h` / `l` / `←` / `→` | Move between panes |
 | `/` | Search/filter sessions |
-| `Enter` | Local: load session (press again to focus). Remote/inactive: switch project. |
-| `h` / `l` / `←` / `→` | Load + focus session immediately (local only) |
-| `N` | New session |
-| `C` | Close running pane (keeps session on disk) |
-| `H` | Hide session (with confirm) |
-| `D` | Delete session permanently (with confirm) |
-| `R` | Rename session |
-| `F` | Toggle auto-focus mode |
+| `:` | Command menu (new, rename, close, hide, delete, shutdown) |
 | `Q` | Detach (exit) |
 | `X` | Reload picker in-place (picks up code changes) |
 
-### Global tmux bindings
-
-Spatial layout on QWERTY keyboard: `e`=context, `r`=session, `t`=picker, `f`=terminal.
+### Prefix key bindings (from any pane)
 
 | Key | Action |
 |-----|--------|
-| `prefix + r` | Focus session (Claude pane) |
-| `prefix + f` | Focus terminal (opens if not visible) |
-| `prefix + t` / `prefix + Tab` | Focus picker |
-| `prefix + F` | Toggle terminal on/off for current session |
-| `prefix + j` / `prefix + ↓` | Next local session + focus |
-| `prefix + k` / `prefix + ↑` | Prev local session + focus |
+| `prefix + Enter` | Focus Claude pane |
+| `prefix + f` / `prefix + Space` | Focus picker |
+| `prefix + t` | Focus terminal (opens if not visible) |
+| `` prefix + ` `` | Toggle terminal on/off |
+| `prefix + j` / `prefix + ↓` | Next session + focus |
+| `prefix + k` / `prefix + ↑` | Prev session + focus |
+| `prefix + h` / `prefix + ←` | Select pane left |
+| `prefix + l` / `prefix + →` | Select pane right |
+| `prefix + /` | Focus picker + search |
+| `prefix + +` | Focus picker + new session |
+| `prefix + z` | Zoom/maximize pane |
+| `prefix + [` | Copy mode |
+| `prefix + ]` | Paste buffer |
+| `prefix + PgUp` | Copy mode + scroll up |
+| `prefix + d` | Detach |
+| `prefix + :` | Command menu (focus picker + open) |
+| `prefix + Tab` | Refresh/rescan |
+| `prefix + F12` | tmux command prompt (escape hatch) |
+| `prefix + M-↑/↓` | Resize pane vertically |
+| `prefix + M-←/→` | Resize pane horizontally |
 
 ## Bell Detection
 
@@ -143,9 +155,6 @@ Config file: `~/.claude/claude-spaces.conf` (created on first run with commented
 # Sort order: bell = belled first, mtime = most recent first
 # sort_by=bell,mtime
 
-# Enter key focuses session immediately: 0 (default, load only) or 1 (load + focus)
-# enter_focuses=0
-
 # Max length for tmux window names
 # window_name_len=12
 
@@ -154,6 +163,27 @@ Config file: `~/.claude/claude-spaces.conf` (created on first run with commented
 
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
 # terminal_height=30%
+
+# Override tmux prefix key (default: inherited from tmux.conf)
+# prefix=C-a
+
+# Keybinding overrides (comma-separated for multiple keys)
+# bind_toggle_terminal=`
+# bind_focus_claude=Enter
+# bind_focus_terminal=t
+# bind_nav_next=j
+# bind_nav_prev=k
+# bind_pane_left=h
+# bind_pane_right=l
+# bind_focus_picker=f,Space
+# bind_detach=d
+# bind_zoom=z
+# bind_copy_mode=[
+# bind_paste=]
+# bind_search=/
+# bind_new_session=+
+# bind_refresh=Tab
+# bind_menu=:
 ```
 
 Custom session names: `~/.claude/claude-spaces-names.conf` (`session_id=name`)

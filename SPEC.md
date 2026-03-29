@@ -27,14 +27,14 @@ claude-spaces --help   # Show help
 |                                    | ─ inactive ─                 |
 |                                    | old-project                  |
 |                                    |                              |
-|                                    | N:new C:cls H:hide D:DEL    |
-|                                    | F:manual-focus Q:detach      |
+|                                    | ::menu  /:search             |
+|                                    | Q:detach                     |
 |                                    | claude-spaces v0.8.1-dev       |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
 ```
 
-With optional terminal pane (toggled via `prefix+F`):
+With optional terminal pane (toggled via `` prefix+` ``):
 ```
 +------------------------------------+------------------------------+
 |  Active claude session             |                              |
@@ -116,39 +116,66 @@ Focused state detected at render time via `_tmux display-message -t $PICKER_PANE
 
 ## Keybinds
 
-### Picker pane
+claude-spaces takes full ownership of the tmux prefix key table on its dedicated
+server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
+(colors, mouse, status) but all keybindings are managed by claude-spaces and
+configurable via `bind_*` keys in `claude-spaces.conf`.
+
+### Picker pane (direct keys)
 
 | Key              | Action                                                      |
 |------------------|-------------------------------------------------------------|
-| `j` / `↓`       | Move cursor down (skips headers/spacers)                    |
-| `k` / `↑`       | Move cursor up (skips headers/spacers)                      |
-| `/`              | Search/filter sessions (substring match, all sections)      |
-| `Enter`          | Local: first press loads, second press focuses. Remote/project/inactive: switch to that server. |
-| `h` / `l` / `←` / `→` | Load/resume session AND focus it immediately. Local only. |
-| `N`              | Create new `claude` session (always focuses it)             |
-| `C`              | Close managed pane (keeps session on disk). Local only.     |
-| `H`              | Hide session with `y/N` confirm. Local only.                |
-| `D`              | Permanent delete with `y/N` confirm. Local only.            |
-| `R`              | Rename session. Local only.                                 |
-| `F`              | Toggle auto-focus mode                                      |
-| `Q`              | Detach (exit claude-spaces)                               |
+| `j` / `k` / `↑` / `↓` | Move cursor (skips headers/spacers)                  |
+| `Enter`          | Load + focus session (remote/inactive: switch project)      |
+| `Space`          | Load session (stay in picker)                               |
+| `H` / `L`       | Load + focus session                                        |
+| `h` / `l` / `←` / `→` | Move between panes (directional)                     |
+| `/`              | Search/filter sessions                                      |
+| `:`              | Command menu (new, rename, close, hide, delete, shutdown)   |
+| `Q`              | Detach (exit claude-spaces)                                 |
 | `X`              | Reload picker script in-place (`exec`)                      |
 
-### Global tmux bindings (work from any pane)
+### Command menu
 
-Spatial layout on QWERTY: `e`=context, `r`=session, `t`=picker, `f`=terminal.
+Press `:` in the picker to open the command menu. The display shows only the
+highlighted session and a list of actions. Press the key to execute, Escape or
+any non-matching key to cancel.
+
+| Key | Action |
+|-----|--------|
+| `n` | New session |
+| `r` | Rename |
+| `c` | Close (keeps session on disk) |
+| `h` | Hide (with confirm) |
+| `d` | Delete permanently (with confirm) |
+| `s` | Shutdown (kill server) |
+| `x` | Reload picker |
+| `q` | Detach |
+
+### Prefix key bindings (from any pane)
 
 | Key              | Action                                                    |
 |------------------|-----------------------------------------------------------|
-| `prefix + r`     | Focus session (Claude pane)                               |
-| `prefix + f`     | Focus terminal (opens if not visible for this session)    |
-| `prefix + t`     | Focus picker                                              |
-| `prefix + Tab`   | Focus picker (quick bail-out)                             |
-| `prefix + F`     | Toggle terminal visibility for current session            |
-| `prefix + j / ↓` | Next local session + focus (skips remote/inactive)       |
-| `prefix + k / ↑` | Prev local session + focus (skips remote/inactive)       |
-
-`prefix+e` and `prefix+E` are reserved for the future context pane.
+| `prefix + Enter` | Focus Claude pane                                        |
+| `prefix + f` / `prefix + Space` | Focus picker                              |
+| `prefix + t`     | Focus terminal (opens if not visible)                    |
+| `` prefix + ` `` | Toggle terminal on/off                                   |
+| `prefix + j / ↓` | Next session + focus                                    |
+| `prefix + k / ↑` | Prev session + focus                                    |
+| `prefix + h / ←` | Select pane left                                        |
+| `prefix + l / →` | Select pane right                                       |
+| `prefix + /`     | Focus picker + search                                    |
+| `prefix + +`     | Focus picker + new session                               |
+| `prefix + z`     | Zoom/maximize pane                                       |
+| `prefix + [`     | Copy mode                                                |
+| `prefix + ]`     | Paste buffer                                             |
+| `prefix + PgUp`  | Copy mode + scroll up                                    |
+| `prefix + d`     | Detach                                                   |
+| `prefix + :`     | Command menu (focus picker + open)                       |
+| `prefix + Tab`   | Refresh/rescan                                           |
+| `prefix + F12`   | tmux command prompt (escape hatch)                       |
+| `prefix + M-↑/↓` | Resize pane vertically                                  |
+| `prefix + M-←/→` | Resize pane horizontally                                |
 
 > See [specs/mechanics.md](specs/mechanics.md) for pane swap sequence, bell detection, and binding lifecycle.
 
@@ -172,12 +199,11 @@ field. While in the search field, `j`/`k` are literal characters; in results the
 | Search field | `Escape` | Exit search, restore full list |
 | Search field | `↑` / `↓` | Navigate to results |
 | Results | `j`/`k`/`↑`/`↓` | Navigate (wraps through search field) |
-| Results | `Enter` | Exit search, load/focus per `enter_focuses` |
+| Results | `Enter` | Exit search, load + focus |
 | Results | `Escape` | Exit search, restore full list |
-| Results | `←`/`→` | Exit search, load + focus |
+| Results | `←`/`→` | Exit search, move between panes |
 
-Section headers are only shown when they have matching children. Action keys
-(`N`/`C`/`H`/`D`/`R`/`F`/`Q`/`X`) are ignored during search to prevent accidental operations.
+Section headers are only shown when they have matching children.
 
 ## Configuration
 
@@ -196,9 +222,6 @@ File: `~/.claude/claude-spaces.conf` (created on first run with commented defaul
 # Picker pane position: "right" (default) or "left"
 # picker_side=right
 
-# Enter key focuses session immediately: 0 (default, load only) or 1 (load + focus)
-# enter_focuses=0
-
 # Max length for tmux window names
 # window_name_len=12
 
@@ -207,6 +230,27 @@ File: `~/.claude/claude-spaces.conf` (created on first run with commented defaul
 
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
 # terminal_height=30%
+
+# Override tmux prefix key (default: inherited from tmux.conf)
+# prefix=C-a
+
+# Keybinding overrides (comma-separated for multiple keys)
+# bind_toggle_terminal=`
+# bind_focus_claude=Enter
+# bind_focus_terminal=t
+# bind_nav_next=j
+# bind_nav_prev=k
+# bind_pane_left=h
+# bind_pane_right=l
+# bind_focus_picker=f,Space
+# bind_detach=d
+# bind_zoom=z
+# bind_copy_mode=[
+# bind_paste=]
+# bind_search=/
+# bind_new_session=+
+# bind_refresh=Tab
+# bind_menu=:
 ```
 
 ## Dependencies
