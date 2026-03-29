@@ -376,13 +376,14 @@ cs_scan_sessions() {
         local sid
         sid=$(basename "${f}" .jsonl)
         [[ "${sid}" =~ ${UUID_RE} ]] || continue
-        [[ -v "HIDDEN_SET[${sid}]" ]] && continue
+        [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
 
         local mtime
         mtime=$(stat -c %Y "${f}")
 
         local name
         name=$(cs_resolve_name "${sid}" "${f}")
+        [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
 
         # Status
         local status="dormant"
@@ -517,11 +518,14 @@ LAST_REMOTE_SCAN=0
 
 # ── Command Menu ─────────────────────────────────
 MENU_ACTIVE=0
+SHOW_HIDDEN=0
 MENU_KEYS=()
 MENU_LABELS=()
 
 cs_menu_init() {
-    MENU_KEYS=(r c h '!' "" n d x s)
+    local hide_label="View hidden"
+    ((SHOW_HIDDEN)) && hide_label="Hide hidden"
+    MENU_KEYS=(r c h '!' "" n v d x s)
     MENU_LABELS=(
         "Rename"
         "Close"
@@ -529,6 +533,7 @@ cs_menu_init() {
         "Delete"
         ""
         "New session"
+        "${hide_label}"
         "Detach"
         "Reload picker"
         "Shutdown"
@@ -884,11 +889,12 @@ cs_scan_project_sessions() {
         local sid
         sid=$(basename "${f}" .jsonl)
         [[ "${sid}" =~ ${UUID_RE} ]] || continue
-        [[ -v "HIDDEN_SET[${sid}]" ]] && continue
+        [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
         local mtime
         mtime=$(stat -c %Y "${f}")
         local name
         name=$(cs_resolve_name "${sid}" "${f}")
+        [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
         local rstatus="dormant"
         [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
         r_ids+=("${sid}")
@@ -1750,6 +1756,7 @@ cs_picker_loop() {
                     r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
                     c) MENU_ACTIVE=0; cs_close_selected; DIRTY=1 ;;
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
+                    v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
                     '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
                     d) MENU_ACTIVE=0; _tmux detach-client ;;
                     s) MENU_ACTIVE=0; cs_confirm_shutdown ;;
@@ -2008,6 +2015,13 @@ cs_activate_selected() {
             ;;
     esac
 
+    # Auto-unhide if activating a hidden session
+    local did_unhide=0
+    if [[ "${status}" != "active_elsewhere" && -v "HIDDEN_SET[${sid}]" ]]; then
+        cs_unhide_session "${sid}"
+        did_unhide=1
+    fi
+
     # Kill orphaned new pane if selecting something else
     local new_p
     new_p=$(cs_read_state new_pane)
@@ -2042,6 +2056,10 @@ cs_activate_selected() {
             cs_rescan
             ;;
     esac
+
+    if ((did_unhide)) && [[ "${status}" != "dormant" ]]; then
+        cs_rescan
+    fi
 }
 
 cs_close_selected() {
@@ -2067,14 +2085,26 @@ cs_confirm() {
     [[ "${confirm}" == "y" ]]
 }
 
+cs_unhide_session() {
+    local sid="$1"
+    local hidden_file="${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    [[ -f "${hidden_file}" ]] || return 0
+    local tmp="${hidden_file}.tmp"
+    grep -vxF "${sid}" "${hidden_file}" > "${tmp}" 2>/dev/null || true
+    mv "${tmp}" "${hidden_file}"
+    unset "HIDDEN_SET[${sid}]"
+}
+
 cs_confirm_hide() {
     local n=${#ENTRIES_ID[@]}
     ((n == 0)) && return 0
     [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
 
+    local sid="${ENTRIES_ID[${SELECTED}]}"
+    [[ -v "HIDDEN_SET[${sid}]" ]] && return 0
+
     cs_confirm $'\e[33m Hide? y/N ' || return 0
 
-    local sid="${ENTRIES_ID[${SELECTED}]}"
     local removed_pane=""
     if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
         removed_pane="${ENTRIES_PANE[${SELECTED}]}"
