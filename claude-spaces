@@ -1360,6 +1360,7 @@ cs_show_welcome() {
         echo 'echo "  or press :n for a new session."'
         echo 'echo ""'
         cs_help_text | while IFS= read -r line; do
+            line="${line//\`/\\\`}"
             echo "echo \"${line}\""
         done
         cat << 'WELCOMEEOF'
