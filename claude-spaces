@@ -117,6 +117,8 @@ cs_help_text() {
     echo "    D              Delete session from disk"
     echo "    R              Rename session"
     echo "    F              Toggle auto-focus"
+    echo "    Q              Detach (return to shell)"
+    echo "    S              Shutdown (kill server)"
     echo "    X              Reload picker (dev)"
     echo "  Global (from any pane):"
     echo "    prefix+r       Focus session (Claude)"
@@ -1115,7 +1117,7 @@ cs_picker_render() {
     local width height avail
     width=$(tput cols)
     height=$(tput lines)
-    avail=$((height - 4))
+    avail=$((height - 5))
     ((avail < 1)) && avail=1
 
     local n=${#ENTRIES_ID[@]}
@@ -1146,10 +1148,11 @@ cs_picker_render() {
         printf '\e[2;1H\e[K\e[90m  No sessions found.\e[0m'
         # Clear remaining lines
         local cl
-        for ((cl = 3; cl < height; cl++)); do
+        for ((cl = 3; cl < height - 1; cl++)); do
             printf '\e[%d;1H\e[K' "${cl}"
         done
-        printf '\e[%d;1H\e[K\e[90m N:new X:rld\e[0m' "${height}"
+        cs_print_centered "$((height - 1))" "N:new X:rld" "${width}"
+        cs_print_centered "${height}" "Q:detach S:shutdown" "${width}"
         return
     fi
 
@@ -1270,7 +1273,7 @@ cs_picker_render() {
         cs_print_centered "${footer_line}" "N:new C:cls H:hide D:DEL" "${width}"
     fi
 
-    # Focus toggle + detach
+    # Focus toggle
     local focus_line=$((footer_line + 1))
     local focus_label
     if ((ENTER_FOCUSES)); then
@@ -1278,12 +1281,15 @@ cs_picker_render() {
     else
         focus_label="F:manual-focus"
     fi
-    focus_label+=" Q:detach"
     cs_print_centered "${focus_line}" "${focus_label}" "${width}"
 
+    # Quit row
+    local quit_line=$((focus_line + 1))
+    cs_print_centered "${quit_line}" "Q:detach S:shutdown" "${width}"
+
     # Version line
-    printf '\e[%d;1H\e[K' "$((focus_line + 1))"
-    local version_line=$((focus_line + 2))
+    printf '\e[%d;1H\e[K' "$((quit_line + 1))"
+    local version_line=$((quit_line + 2))
     cs_print_centered "${version_line}" "claude-spaces v${VERSION}" "${width}"
 
     # Clear everything below
@@ -1382,15 +1388,11 @@ cs_picker_loop() {
             case "${key}" in
                 j) cs_move_down; DIRTY=1 ;;
                 k) cs_move_up; DIRTY=1 ;;
-                J) cs_move_down
-                   if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-                       cs_activate_selected; cs_focus_session
-                   fi
+                J) cs_move_down 1
+                   cs_activate_selected; cs_focus_session
                    DIRTY=1 ;;
-                K) cs_move_up
-                   if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-                       cs_activate_selected; cs_focus_session
-                   fi
+                K) cs_move_up 1
+                   cs_activate_selected; cs_focus_session
                    DIRTY=1 ;;
                 h|l) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
                 $'\e')
@@ -1419,6 +1421,7 @@ cs_picker_loop() {
                 C) cs_close_selected; DIRTY=1 ;;
                 H) cs_confirm_hide; DIRTY=1 ;;
                 D) cs_confirm_delete; DIRTY=1 ;;
+                S) cs_confirm_shutdown ;;
                 '~') cs_term_toggle; DIRTY=1 ;;
                 '`') cs_term_focus; DIRTY=1 ;;
                 '|') cs_focus_session ;;
@@ -1474,23 +1477,35 @@ cs_picker_loop() {
 }
 
 cs_move_down() {
-    local n=${#ENTRIES_ID[@]}
+    local n=${#ENTRIES_ID[@]} local_only=${1:-0}
     ((n == 0)) && return 0
     local start=${SELECTED}
     SELECTED=$(( (SELECTED + 1) % n ))
-    while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
-        SELECTED=$(( (SELECTED + 1) % n ))
-    done
+    if ((local_only)); then
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" != "local" ]] && ((SELECTED != start)); do
+            SELECTED=$(( (SELECTED + 1) % n ))
+        done
+    else
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
+            SELECTED=$(( (SELECTED + 1) % n ))
+        done
+    fi
 }
 
 cs_move_up() {
-    local n=${#ENTRIES_ID[@]}
+    local n=${#ENTRIES_ID[@]} local_only=${1:-0}
     ((n == 0)) && return 0
     local start=${SELECTED}
     SELECTED=$(( (SELECTED - 1 + n) % n ))
-    while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
-        SELECTED=$(( (SELECTED - 1 + n) % n ))
-    done
+    if ((local_only)); then
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" != "local" ]] && ((SELECTED != start)); do
+            SELECTED=$(( (SELECTED - 1 + n) % n ))
+        done
+    else
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
+            SELECTED=$(( (SELECTED - 1 + n) % n ))
+        done
+    fi
 }
 
 cs_set_kv() {
@@ -1632,27 +1647,31 @@ cs_close_selected() {
     cs_after_remove "${pane}"
 }
 
+cs_confirm() {
+    local prompt="$1"
+    local height
+    height=$(tput lines)
+    printf '\e[%d;1H\e[K%s\e[0m' "${height}" "${prompt}"
+    local confirm=""
+    read -rsn1 confirm
+    [[ "${confirm}" == "y" ]]
+}
+
 cs_confirm_hide() {
     local n=${#ENTRIES_ID[@]}
     ((n == 0)) && return 0
     [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
 
-    local sid="${ENTRIES_ID[${SELECTED}]}"
-    local height
-    height=$(tput lines)
-    printf '\e[%d;1H\e[K\e[33m Hide? y/N \e[0m' "${height}"
+    cs_confirm $'\e[33m Hide? y/N ' || return 0
 
-    local confirm=""
-    read -rsn1 confirm
-    if [[ "${confirm}" == "y" ]]; then
-        local removed_pane=""
-        if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
-            removed_pane="${ENTRIES_PANE[${SELECTED}]}"
-            cs_close_pane "${removed_pane}"
-        fi
-        echo "${sid}" >> "${CLAUDE_DIR}/claude-spaces-hidden.conf"
-        cs_after_remove "${removed_pane}"
+    local sid="${ENTRIES_ID[${SELECTED}]}"
+    local removed_pane=""
+    if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
+        removed_pane="${ENTRIES_PANE[${SELECTED}]}"
+        cs_close_pane "${removed_pane}"
     fi
+    echo "${sid}" >> "${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    cs_after_remove "${removed_pane}"
 }
 
 cs_confirm_delete() {
@@ -1661,20 +1680,24 @@ cs_confirm_delete() {
     [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
     [[ "${ENTRIES_STATUS[${SELECTED}]}" == "active_elsewhere" ]] && return 0
 
-    local height
-    height=$(tput lines)
-    printf '\e[%d;1H\e[K\e[31;1m DELETE from disk? y/N \e[0m' "${height}"
+    cs_confirm $'\e[31;1m DELETE from disk? y/N ' || return 0
 
-    local confirm=""
-    read -rsn1 confirm
-    if [[ "${confirm}" == "y" ]]; then
-        local removed_pane=""
-        if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
-            removed_pane="${ENTRIES_PANE[${SELECTED}]}"
-        fi
-        cs_delete_session "${ENTRIES_ID[${SELECTED}]}" "${SELECTED}"
-        cs_after_remove "${removed_pane}"
+    local removed_pane=""
+    if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
+        removed_pane="${ENTRIES_PANE[${SELECTED}]}"
     fi
+    cs_delete_session "${ENTRIES_ID[${SELECTED}]}" "${SELECTED}"
+    cs_after_remove "${removed_pane}"
+}
+
+cs_confirm_shutdown() {
+    cs_confirm $'\e[31;1m Shutdown? y/N ' || return 0
+    stty echo 2>/dev/null || true
+    printf '\e[?25h\e[0m'
+    cs_remove_bell_hook
+    cs_remove_keybindings
+    rm -rf "${STATE_DIR}"
+    _tmux kill-server 2>/dev/null || true
 }
 
 cs_rename_selected() {
@@ -1824,8 +1847,9 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     echo ""
     echo "Usage:"
     echo "  claude-spaces          Launch picker"
-    echo "  claude-spaces --reset  Kill all managed panes, clear state"
-    echo "  claude-spaces --help   Show this help"
+    echo "  claude-spaces --reset    Kill all managed panes, clear state"
+    echo "  claude-spaces --restart  Reset and relaunch"
+    echo "  claude-spaces --help     Show this help"
     echo ""
     cs_help_text
     echo ""
@@ -1837,6 +1861,12 @@ if [[ "${1:-}" == "--reset" ]]; then
     cs_load_config
     cs_reset
     exit 0
+fi
+
+if [[ "${1:-}" == "--restart" ]]; then
+    cs_load_config
+    cs_reset
+    exec "${SCRIPT_PATH}"
 fi
 
 if [[ "${CS_PICKER:-}" == "1" ]]; then

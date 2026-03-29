@@ -886,6 +886,39 @@ test_header_skip_navigation() {
     [[ ${SELECTED} -eq 0 ]] || { echo "    move_up didn't skip header: SELECTED=${SELECTED}"; return 1; }
 }
 
+test_local_only_navigation() {
+    # Mixed entries: two locals, then spacer+header+remote
+    ENTRIES_ID=("s1" "s2" "__spacer_remote__" "__hdr_remote__" "__proj_-tmp-foo__")
+    ENTRIES_NAME=("session1" "session2" "" "other projects" "foo")
+    ENTRIES_MTIME=("0" "0" "0" "0" "0")
+    ENTRIES_STATUS=("dormant" "dormant" "" "" "")
+    ENTRIES_PANE=("" "" "" "" "")
+    ENTRIES_TYPE=("local" "local" "spacer" "header" "project")
+    ENTRIES_PATH=("" "" "" "" "/tmp/foo")
+
+    # move_down local_only from first local → second local
+    SELECTED=0
+    cs_move_down 1
+    [[ ${SELECTED} -eq 1 ]] || { echo "    down from 0: expected 1, got ${SELECTED}"; return 1; }
+
+    # move_down local_only from last local → wraps to first local
+    cs_move_down 1
+    [[ ${SELECTED} -eq 0 ]] || { echo "    down from 1: expected 0 (wrap), got ${SELECTED}"; return 1; }
+
+    # move_up local_only from first local → wraps to last local
+    cs_move_up 1
+    [[ ${SELECTED} -eq 1 ]] || { echo "    up from 0: expected 1 (wrap), got ${SELECTED}"; return 1; }
+
+    # move_up local_only from last local → first local
+    cs_move_up 1
+    [[ ${SELECTED} -eq 0 ]] || { echo "    up from 1: expected 0, got ${SELECTED}"; return 1; }
+
+    # Verify non-local_only still reaches remote
+    SELECTED=1
+    cs_move_down
+    [[ ${SELECTED} -eq 4 ]] || { echo "    bare down from 1: expected 4, got ${SELECTED}"; return 1; }
+}
+
 test_activate_remote() {
     # Mock _tmux detach-client to not actually detach
     local orig_tmux
@@ -1383,6 +1416,7 @@ main() {
     run_test "discover remote servers"     test_discover_remote_servers
     run_test "discover inactive projects"  test_discover_inactive_projects
     run_test "header skip navigation"      test_header_skip_navigation
+    run_test "local-only navigation"       test_local_only_navigation
     run_test "activate remote"             test_activate_remote
     run_test "guard local-only actions"    test_guard_local_only_actions
 
