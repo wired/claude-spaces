@@ -521,16 +521,17 @@ MENU_KEYS=()
 MENU_LABELS=()
 
 cs_menu_init() {
-    MENU_KEYS=(n r c h d s x q)
+    MENU_KEYS=(r c h '!' "" n d x s)
     MENU_LABELS=(
-        "New session"
         "Rename"
         "Close"
         "Hide"
         "Delete"
-        "Shutdown"
-        "Reload picker"
+        ""
+        "New session"
         "Detach"
+        "Reload picker"
+        "Shutdown"
     )
 }
 
@@ -1447,7 +1448,11 @@ cs_menu_render() {
     local i
     for ((i = 0; i < ${#MENU_KEYS[@]}; i++)); do
         ((row++))
-        printf '\e[%d;1H\e[K  \e[1m%s\e[0m  \e[90m%s\e[0m' "${row}" "${MENU_KEYS[${i}]}" "${MENU_LABELS[${i}]}"
+        if [[ -z "${MENU_KEYS[${i}]}" ]]; then
+            printf '\e[%d;1H\e[K' "${row}"
+        else
+            printf '\e[%d;1H\e[K  \e[1m%s\e[0m  \e[90m%s\e[0m' "${row}" "${MENU_KEYS[${i}]}" "${MENU_LABELS[${i}]}"
+        fi
     done
 
     # Clear remaining lines
@@ -1745,13 +1750,13 @@ cs_picker_loop() {
                     r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
                     c) MENU_ACTIVE=0; cs_close_selected; DIRTY=1 ;;
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
-                    d) MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
+                    '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
+                    d) MENU_ACTIVE=0; _tmux detach-client ;;
                     s) MENU_ACTIVE=0; cs_confirm_shutdown ;;
                     x) MENU_ACTIVE=0
                        stty echo 2>/dev/null || true
                        printf '\e[?25h\e[0m'
                        CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}" ;;
-                    q) MENU_ACTIVE=0; _tmux detach-client ;;
                     *) MENU_ACTIVE=0; DIRTY=1 ;;
                 esac
             elif ((SEARCH_ACTIVE)); then
