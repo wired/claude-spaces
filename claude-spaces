@@ -202,6 +202,26 @@ cs_entry_clear() {
     ENTRIES_PANE=(); ENTRIES_TYPE=(); ENTRIES_PATH=()
 }
 
+declare -gA HIDDEN_SET
+declare -gA CUSTOM_NAMES
+
+cs_load_shared_maps() {
+    HIDDEN_SET=()
+    local hidden_file="${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    if [[ -f "${hidden_file}" ]]; then
+        while IFS= read -r hid; do
+            [[ -n "${hid}" ]] && HIDDEN_SET["${hid}"]=1
+        done < "${hidden_file}"
+    fi
+    CUSTOM_NAMES=()
+    if [[ -f "${NAMES_FILE}" ]]; then
+        while IFS='=' read -r nkey nval; do
+            [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
+            CUSTOM_NAMES["${nkey}"]="${nval}"
+        done < "${NAMES_FILE}"
+    fi
+}
+
 cs_cache_clear() {
     CACHED_ENTRIES_ID=(); CACHED_ENTRIES_NAME=(); CACHED_ENTRIES_MTIME=()
     CACHED_ENTRIES_STATUS=(); CACHED_ENTRIES_PANE=(); CACHED_ENTRIES_TYPE=()
@@ -251,17 +271,9 @@ cs_scan_sessions() {
     project_dir=$(cs_get_project_dir)
 
     cs_entry_clear
+    cs_load_shared_maps
 
     [[ -d "${project_dir}" ]] || return 0
-
-    # Load hidden sessions
-    local hidden_file="${CLAUDE_DIR}/claude-spaces-hidden.conf"
-    declare -A hidden_set
-    if [[ -f "${hidden_file}" ]]; then
-        while IFS= read -r hid; do
-            [[ -n "${hid}" ]] && hidden_set["${hid}"]=1
-        done < "${hidden_file}"
-    fi
 
     # Build active-elsewhere set: sessionId -> pid
     declare -A active_pids
@@ -317,15 +329,6 @@ cs_scan_sessions() {
         fi
     done
 
-    # Load custom names
-    declare -A custom_names
-    if [[ -f "${NAMES_FILE}" ]]; then
-        while IFS='=' read -r nkey nval; do
-            [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
-            custom_names["${nkey}"]="${nval}"
-        done < "${NAMES_FILE}"
-    fi
-
     # Scan JSONL files
     local uuid_re='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     for f in "${project_dir}"/*.jsonl; do
@@ -333,15 +336,15 @@ cs_scan_sessions() {
         local sid
         sid=$(basename "${f}" .jsonl)
         [[ "${sid}" =~ ${uuid_re} ]] || continue
-        [[ -n "${hidden_set[${sid}]:-}" ]] && continue
+        [[ -v "HIDDEN_SET[${sid}]" ]] && continue
 
         local mtime
         mtime=$(stat -c %Y "${f}")
 
         # Display name
         local name=""
-        if [[ -n "${custom_names[${sid}]:-}" ]]; then
-            name="${custom_names[${sid}]}"
+        if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
+            name="${CUSTOM_NAMES[${sid}]}"
         else
             name=$(head -20 "${f}" | jq -r '
                 select(.type == "user" and (.message.content | type) == "string")
@@ -359,10 +362,10 @@ cs_scan_sessions() {
         # Status
         local status="dormant"
         local pane=""
-        if [[ -n "${managed_panes[${sid}]:-}" ]]; then
+        if [[ -v "managed_panes[${sid}]" ]]; then
             status="managed"
             pane="${managed_panes[${sid}]}"
-        elif [[ -n "${active_pids[${sid}]:-}" ]]; then
+        elif [[ -v "active_pids[${sid}]" ]]; then
             status="active_elsewhere"
         fi
 
@@ -520,7 +523,7 @@ cs_discover_inactive() {
         ((has_jsonl)) || continue
         local sanitized
         sanitized=$(basename "${dir}")
-        [[ -n "${active_set[${sanitized}]:-}" ]] && continue
+        [[ -v "active_set[${sanitized}]" ]] && continue
         # Resolve path
         local path=""
         local state_dir="${base}/claude-spaces/${sanitized}"
@@ -550,22 +553,6 @@ cs_scan_project_sessions() {
             [[ -n "${psid}" && "${psid}" != "new" ]] && remote_managed["${psid}"]=1
         done
     fi
-    # Load hidden sessions
-    local hidden_file="${CLAUDE_DIR}/claude-spaces-hidden.conf"
-    local -A hidden_set
-    if [[ -f "${hidden_file}" ]]; then
-        while IFS= read -r hid; do
-            [[ -n "${hid}" ]] && hidden_set["${hid}"]=1
-        done < "${hidden_file}"
-    fi
-    # Load custom names
-    local -A custom_names
-    if [[ -f "${NAMES_FILE}" ]]; then
-        while IFS='=' read -r nkey nval; do
-            [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
-            custom_names["${nkey}"]="${nval}"
-        done < "${NAMES_FILE}"
-    fi
     # Collect into local arrays, then sort by mtime
     local -a r_ids=() r_names=() r_mtimes=() r_statuses=()
     for f in "${project_dir}"/*.jsonl; do
@@ -573,12 +560,12 @@ cs_scan_project_sessions() {
         local sid
         sid=$(basename "${f}" .jsonl)
         [[ "${sid}" =~ ${uuid_re} ]] || continue
-        [[ -n "${hidden_set[${sid}]:-}" ]] && continue
+        [[ -v "HIDDEN_SET[${sid}]" ]] && continue
         local mtime
         mtime=$(stat -c %Y "${f}")
         local name=""
-        if [[ -n "${custom_names[${sid}]:-}" ]]; then
-            name="${custom_names[${sid}]}"
+        if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
+            name="${CUSTOM_NAMES[${sid}]}"
         else
             name=$(head -20 "${f}" | jq -r '
                 select(.type == "user" and (.message.content | type) == "string")
@@ -593,7 +580,7 @@ cs_scan_project_sessions() {
             fi
         fi
         local rstatus="dormant"
-        [[ -n "${remote_managed[${sid}]:-}" ]] && rstatus="managed"
+        [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
         r_ids+=("${sid}")
         r_names+=("${name}")
         r_mtimes+=("${mtime}")
@@ -1195,7 +1182,7 @@ cs_picker_render() {
                     if [[ "${picker_focused}" == "0" ]]; then
                         line_prefix="> "
                     fi
-                elif [[ "${status}" == "managed" && -n "${BELL_SET[${pane}]:-}" ]]; then
+                elif [[ "${status}" == "managed" ]] && [[ -v "BELL_SET[${pane}]" ]]; then
                     line_color='\e[31m'  # bell: red
                 elif [[ "${status}" == "managed" ]]; then
                     line_color=''  # running: white
@@ -1760,7 +1747,7 @@ cs_check_bells() {
     while IFS= read -r pane_id; do
         [[ -n "${pane_id}" ]] || continue
         [[ "${pane_id}" == "${cur_pane}" ]] && continue
-        if [[ -z "${BELL_SET[${pane_id}]:-}" ]]; then
+        if ! [[ -v "BELL_SET[${pane_id}]" ]]; then
             BELL_SET["${pane_id}"]=1
             DIRTY=1
         fi
