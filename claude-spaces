@@ -33,6 +33,7 @@ WINDOW_NAME_LEN=12
 TMUX_SERVER="cs${PWD//\//-}"
 TMUX_CONF="${HOME}/.tmux.conf"
 TERMINAL_HEIGHT="30%"
+UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 
 # ── tmux wrapper ─────────────────────────────────
 _tmux() {
@@ -265,6 +266,27 @@ cs_clean_message() {
     echo "${msg}"
 }
 
+cs_resolve_name() {
+    local sid="$1" jsonl="$2"
+    if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
+        echo "${CUSTOM_NAMES[${sid}]}"
+        return
+    fi
+    local name
+    name=$(head -20 "${jsonl}" | jq -r '
+        select(.type == "user" and (.message.content | type) == "string")
+        | .message.content
+        | split("\n")[0]
+    ' 2>/dev/null | head -1)
+    if [[ -n "${name}" ]]; then
+        name=$(cs_clean_message "${name}")
+    fi
+    if [[ -z "${name}" || ${#name} -lt 3 ]]; then
+        name="${sid:0:8}"
+    fi
+    echo "${name}"
+}
+
 cs_scan_sessions() {
     cs_refresh_pane_cache
     local project_dir
@@ -330,34 +352,18 @@ cs_scan_sessions() {
     done
 
     # Scan JSONL files
-    local uuid_re='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     for f in "${project_dir}"/*.jsonl; do
         [[ -f "${f}" ]] || continue
         local sid
         sid=$(basename "${f}" .jsonl)
-        [[ "${sid}" =~ ${uuid_re} ]] || continue
+        [[ "${sid}" =~ ${UUID_RE} ]] || continue
         [[ -v "HIDDEN_SET[${sid}]" ]] && continue
 
         local mtime
         mtime=$(stat -c %Y "${f}")
 
-        # Display name
-        local name=""
-        if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
-            name="${CUSTOM_NAMES[${sid}]}"
-        else
-            name=$(head -20 "${f}" | jq -r '
-                select(.type == "user" and (.message.content | type) == "string")
-                | .message.content
-                | split("\n")[0]
-            ' 2>/dev/null | head -1)
-            if [[ -n "${name}" ]]; then
-                name=$(cs_clean_message "${name}")
-            fi
-            if [[ -z "${name}" || ${#name} -lt 3 ]]; then
-                name="${sid:0:8}"
-            fi
-        fi
+        local name
+        name=$(cs_resolve_name "${sid}" "${f}")
 
         # Status
         local status="dormant"
@@ -443,12 +449,12 @@ cs_rescan() {
     local cur_pane
     cur_pane=$(cs_read_state current_pane)
     if [[ -n "${cur_pane}" ]]; then
-        for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
-            if [[ "${ENTRIES_PANE[${fi}]}" == "${cur_pane}" ]]; then
-                SELECTED=${fi}
-                return
-            fi
-        done
+        local pidx
+        pidx=$(cs_find_entry_by_pane "${cur_pane}")
+        if [[ "${pidx}" != "-1" ]]; then
+            SELECTED=${pidx}
+            return
+        fi
     fi
     local n=${#ENTRIES_ID[@]}
     if ((SELECTED >= n && n > 0)); then
@@ -460,6 +466,17 @@ cs_find_entry_index() {
     local target_id="$1"
     for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
         if [[ "${ENTRIES_ID[${fi}]}" == "${target_id}" ]]; then
+            echo "${fi}"
+            return
+        fi
+    done
+    echo "-1"
+}
+
+cs_find_entry_by_pane() {
+    local target_pane="$1"
+    for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
+        if [[ "${ENTRIES_PANE[${fi}]}" == "${target_pane}" ]]; then
             echo "${fi}"
             return
         fi
@@ -542,7 +559,6 @@ cs_discover_inactive() {
 
 cs_scan_project_sessions() {
     local project_dir="$1" project_path="$2" entry_type="$3" remote_state_dir="${4:-}"
-    local uuid_re='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     # Build remote managed set from pane files
     local -A remote_managed
     if [[ -n "${remote_state_dir}" && -d "${remote_state_dir}/panes" ]]; then
@@ -559,26 +575,12 @@ cs_scan_project_sessions() {
         [[ -f "${f}" ]] || continue
         local sid
         sid=$(basename "${f}" .jsonl)
-        [[ "${sid}" =~ ${uuid_re} ]] || continue
+        [[ "${sid}" =~ ${UUID_RE} ]] || continue
         [[ -v "HIDDEN_SET[${sid}]" ]] && continue
         local mtime
         mtime=$(stat -c %Y "${f}")
-        local name=""
-        if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
-            name="${CUSTOM_NAMES[${sid}]}"
-        else
-            name=$(head -20 "${f}" | jq -r '
-                select(.type == "user" and (.message.content | type) == "string")
-                | .message.content
-                | split("\n")[0]
-            ' 2>/dev/null | head -1)
-            if [[ -n "${name}" ]]; then
-                name=$(cs_clean_message "${name}")
-            fi
-            if [[ -z "${name}" || ${#name} -lt 3 ]]; then
-                name="${sid:0:8}"
-            fi
-        fi
+        local name
+        name=$(cs_resolve_name "${sid}" "${f}")
         local rstatus="dormant"
         [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
         r_ids+=("${sid}")
@@ -717,13 +719,7 @@ cs_show_pane() {
                 old_term=$(cs_term_pane_for "${cur_pane}")
             fi
             if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
-                # Save height as percentage before parking
-                local th sh
-                th=$(_tmux display-message -t "${old_term}" -p '#{pane_height}' 2>/dev/null || true)
-                sh=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
-                if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
-                    echo $(( th * 100 / (th + sh) )) > "${STATE_DIR}/term/${cur_pane#%}.height"
-                fi
+                cs_term_save_height "${old_term}" "${cur_pane}"
                 # Extended chain: park terminal, park session, join new
                 _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
                      break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
@@ -823,6 +819,16 @@ cs_term_compute_height() {
     echo "${h}"
 }
 
+cs_term_save_height() {
+    local term_pane="$1" session_pane="$2"
+    local th sh
+    th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+    sh=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
+    if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
+        echo $(( th * 100 / (th + sh) )) > "${STATE_DIR}/term/${session_pane#%}.height"
+    fi
+}
+
 # Create a new terminal pane below the session pane.
 # Precondition: session_pane must already be visible in the picker window.
 cs_term_create() {
@@ -871,13 +877,7 @@ cs_term_hide() {
     cs_refresh_pane_cache
     [[ -n "${term_pane}" ]] && cs_pane_alive "${term_pane}" || return 0
 
-    # Save current height as percentage
-    local term_h sess_h
-    term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    sess_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
-        echo $(( term_h * 100 / (term_h + sess_h) )) > "${STATE_DIR}/term/${session_pane#%}.height"
-    fi
+    cs_term_save_height "${term_pane}" "${session_pane}"
 
     # Park
     local picker_session
@@ -1350,12 +1350,9 @@ cs_picker_loop() {
     cur=$(cs_read_state current_pane)
     if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
         # Left pane already exists (reload case) — sync SELECTED
-        for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
-            if [[ "${ENTRIES_PANE[${fi}]}" == "${cur}" ]]; then
-                SELECTED=${fi}
-                break
-            fi
-        done
+        local pidx
+        pidx=$(cs_find_entry_by_pane "${cur}")
+        [[ "${pidx}" != "-1" ]] && SELECTED=${pidx}
     elif ((n == 0)); then
         # No sessions — auto-create
         cs_new_session
@@ -1540,12 +1537,12 @@ cs_sync_highlight_local() {
     local cur
     cur=$(cs_read_state current_pane)
     if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
-        for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
-            if [[ "${ENTRIES_PANE[${fi}]}" == "${cur}" ]]; then
-                SELECTED=${fi}
-                return
-            fi
-        done
+        local pidx
+        pidx=$(cs_find_entry_by_pane "${cur}")
+        if [[ "${pidx}" != "-1" ]]; then
+            SELECTED=${pidx}
+            return
+        fi
     fi
     for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
         if [[ "${ENTRIES_TYPE[${fi}]}" != "header" && "${ENTRIES_TYPE[${fi}]}" != "spacer" ]]; then
