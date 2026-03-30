@@ -26,8 +26,7 @@ HIDDEN_FILE="${CS_DATA_DIR}/hidden"
 
 # ── Defaults ──────────────────────────────────────
 PICKER_WIDTH="30"
-# shellcheck disable=SC2034
-SORT_BY="bell,mtime"
+RECENT_THRESHOLD=10
 # shellcheck disable=SC2034
 GROUP_BY="project"
 PICKER_SIDE="right"
@@ -70,7 +69,7 @@ cs_load_config() {
         # shellcheck disable=SC2034
         case "${key}" in
             picker_width) PICKER_WIDTH="${value}" ;;
-            sort_by) SORT_BY="${value}" ;;
+            recent_threshold) RECENT_THRESHOLD="${value}" ;;
             group_by) GROUP_BY="${value}" ;;
             picker_side) PICKER_SIDE="${value}" ;;
 
@@ -92,8 +91,9 @@ cs_create_default_config() {
 # Picker pane width: characters (e.g. 36) or percentage (e.g. 20%)
 # picker_width=30
 
-# Sort order: bell = belled first, mtime = most recent first
-# sort_by=bell,mtime
+# Sessions modified within this many minutes sort by name at the top;
+# older sessions sort by most recent first below them.
+# recent_threshold=10
 
 # Group sessions by project (for future all-sessions mode)
 # group_by=project
@@ -432,24 +432,67 @@ cs_sort_entries() {
     local n=${#ENTRIES_ID[@]}
     ((n <= 1)) && return 0
 
-    # Build sortable index: "mtime idx" then sort numerically descending
-    local indices
-    indices=$(
-        for ((i = 0; i < n; i++)); do
-            echo "${ENTRIES_MTIME[${i}]} ${i}"
-        done | sort -rnk1
-    )
+    local now
+    now=$(date +%s)
+    local cutoff=$((now - RECENT_THRESHOLD * 60))
+    RECENT_CUTOFF=${cutoff}
+
+    # Partition: recent by name, older by mtime desc; hidden always older
+    local recent_indices=() older_indices=()
+    for ((i = 0; i < n; i++)); do
+        if [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
+            older_indices+=("${i}")
+        elif ((ENTRIES_MTIME[i] >= cutoff)); then
+            recent_indices+=("${i}")
+        else
+            older_indices+=("${i}")
+        fi
+    done
+
+    # Sort recent by name (case-insensitive), index first to handle spaces
+    local sorted_recent=""
+    if ((${#recent_indices[@]} > 0)); then
+        sorted_recent=$(
+            for i in "${recent_indices[@]}"; do
+                echo "${i} ${ENTRIES_NAME[${i}],,}"
+            done | sort -t' ' -k2
+        )
+    fi
+
+    # Sort older by mtime descending
+    local sorted_older=""
+    if ((${#older_indices[@]} > 0)); then
+        sorted_older=$(
+            for i in "${older_indices[@]}"; do
+                echo "${ENTRIES_MTIME[${i}]} ${i}"
+            done | sort -rnk1
+        )
+    fi
 
     local new_id=() new_name=() new_mtime=() new_status=() new_pane=() new_type=() new_path=()
-    while read -r _ idx; do
-        new_id+=("${ENTRIES_ID[${idx}]}")
-        new_name+=("${ENTRIES_NAME[${idx}]}")
-        new_mtime+=("${ENTRIES_MTIME[${idx}]}")
-        new_status+=("${ENTRIES_STATUS[${idx}]}")
-        new_pane+=("${ENTRIES_PANE[${idx}]}")
-        new_type+=("${ENTRIES_TYPE[${idx}]}")
-        new_path+=("${ENTRIES_PATH[${idx}]}")
-    done <<< "${indices}"
+    local idx
+    if [[ -n "${sorted_recent}" ]]; then
+        while read -r idx _; do
+            new_id+=("${ENTRIES_ID[${idx}]}")
+            new_name+=("${ENTRIES_NAME[${idx}]}")
+            new_mtime+=("${ENTRIES_MTIME[${idx}]}")
+            new_status+=("${ENTRIES_STATUS[${idx}]}")
+            new_pane+=("${ENTRIES_PANE[${idx}]}")
+            new_type+=("${ENTRIES_TYPE[${idx}]}")
+            new_path+=("${ENTRIES_PATH[${idx}]}")
+        done <<< "${sorted_recent}"
+    fi
+    if [[ -n "${sorted_older}" ]]; then
+        while read -r _ idx; do
+            new_id+=("${ENTRIES_ID[${idx}]}")
+            new_name+=("${ENTRIES_NAME[${idx}]}")
+            new_mtime+=("${ENTRIES_MTIME[${idx}]}")
+            new_status+=("${ENTRIES_STATUS[${idx}]}")
+            new_pane+=("${ENTRIES_PANE[${idx}]}")
+            new_type+=("${ENTRIES_TYPE[${idx}]}")
+            new_path+=("${ENTRIES_PATH[${idx}]}")
+        done <<< "${sorted_older}"
+    fi
 
     ENTRIES_ID=("${new_id[@]}")
     ENTRIES_NAME=("${new_name[@]}")
@@ -1568,6 +1611,10 @@ cs_picker_render() {
         local entry_type="${ENTRIES_TYPE[${i}]}"
         local age
         age=$(cs_format_age "${ENTRIES_MTIME[${i}]}")
+        if [[ "${entry_type}" == "local" ]] && ((ENTRIES_MTIME[i] >= RECENT_CUTOFF)) \
+            && ! [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
+            age="<${RECENT_THRESHOLD}m"
+        fi
 
         # Header/spacer entries render separately
         if [[ "${entry_type}" == "spacer" ]]; then

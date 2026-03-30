@@ -73,7 +73,7 @@ Sessions are scoped to `$PWD`. The script scans `~/.claude/projects/<sanitized-p
 ## Picker Sections
 
 ### Local sessions (top)
-Current project's sessions with full interactive control. Sorted by mtime descending. Rescanned every 1 second.
+Current project's sessions with full interactive control. Sessions modified within `recent_threshold` minutes (default 10) sort alphabetically by name; older sessions sort by most recent first. Hidden sessions always sort in the older tier. Rescanned every 1 second.
 
 ### Other projects (middle)
 Discovered from running `cs-*` tmux sockets (excluding own server). Shows sessions grouped by project, with managed vs dormant status. Rescanned every 5 seconds (cached between scans).

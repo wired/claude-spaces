@@ -154,8 +154,9 @@ Config file: `~/.config/claude-spaces/config` (created on first run with comment
 # Picker pane position: "right" (default) or "left"
 # picker_side=right
 
-# Sort order: bell = belled first, mtime = most recent first
-# sort_by=bell,mtime
+# Sessions modified within this many minutes sort by name at the top;
+# older sessions sort by most recent first below them.
+# recent_threshold=10
 
 # Max length for tmux window names
 # window_name_len=12
