@@ -285,7 +285,7 @@ cs_test_setup() {
 
     # Create tmux session
     _tmux new-session -d -s "${TEST_SESSION}" -x 120 -y 40 "sleep 99999"
-    sleep 0.2
+    sleep 0.05
     PICKER_PANE=$(_tmux list-panes -t "${TEST_SESSION}" -F '#{pane_id}' | head -1)
     echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
     echo $$ > "${STATE_DIR}/picker_pid"
@@ -293,6 +293,9 @@ cs_test_setup() {
 
     # Override PWD for cs_get_project_dir
     PWD="${MOCK_PWD}"
+
+    # Reduce dormant-activate sleep for tests
+    CS_ACTIVATE_DELAY=0.05
 
     # Initialize globals
     SELECTED=0
@@ -318,7 +321,7 @@ cs_test_reset() {
         [[ "${p}" == "${PICKER_PANE}" ]] && continue
         _tmux kill-pane -t "${p}" 2>/dev/null || true
     done <<< "${panes}"
-    sleep 0.1
+    sleep 0.05
 
     # Clear state
     rm -f "${STATE_DIR}/current_pane" "${STATE_DIR}/new_pane" "${STATE_DIR}/welcome_pane"
@@ -345,7 +348,7 @@ cs_test_reset() {
     : > "${CLAUDE_DIR}/claude-spaces-hidden.conf"
     : > "${NAMES_FILE}"
 
-    sleep 0.1
+    sleep 0.05
 }
 
 # ── Test runner ──────────────────────────────────
@@ -371,7 +374,7 @@ test_fresh_start_no_sessions() {
     cs_scan_sessions
     [[ ${#ENTRIES_ID[@]} -eq 0 ]] || { echo "    expected 0 entries, got ${#ENTRIES_ID[@]}"; return 1; }
     cs_new_session
-    sleep 0.1
+    sleep 0.05
     local np
     np=$(cs_read_state new_pane)
     [[ -n "${np}" ]] || { echo "    new_pane not set"; return 1; }
@@ -387,7 +390,7 @@ test_fresh_start_with_sessions() {
     cs_scan_sessions
     [[ ${#ENTRIES_ID[@]} -eq 2 ]] || { echo "    expected 2 entries, got ${#ENTRIES_ID[@]}"; return 1; }
     cs_show_welcome
-    sleep 0.1
+    sleep 0.05
     local wp
     wp=$(cs_read_state welcome_pane)
     [[ -n "${wp}" ]] || { echo "    welcome_pane not set"; return 1; }
@@ -399,14 +402,14 @@ test_select_dormant() {
     cs_create_mock_session "${sid}" "test dormant"
     cs_scan_sessions
     cs_show_welcome
-    sleep 0.1
+    sleep 0.05
 
     local idx
     idx=$(find_entry_index "${sid}")
     [[ "${idx}" != "-1" ]] || { echo "    session not found in entries"; return 1; }
     SELECTED=${idx}
     cs_activate_selected
-    sleep 0.2
+    sleep 0.05
 
     local cp
     cp=$(cs_read_state current_pane)
@@ -425,13 +428,13 @@ test_switch_sessions() {
 
     # Resume A
     cs_resume_session "${sid_a}"
-    sleep 0.1
+    sleep 0.05
     local pane_a
     pane_a=$(cs_read_state current_pane)
 
     # Resume B
     cs_resume_session "${sid_b}"
-    sleep 0.1
+    sleep 0.05
     local pane_b
     pane_b=$(cs_read_state current_pane)
 
@@ -451,13 +454,13 @@ test_close_active() {
     idx=$(find_entry_index "${sid}")
     SELECTED=${idx}
     cs_resume_session "${sid}"
-    sleep 0.1
+    sleep 0.05
 
     cs_rescan
     idx=$(find_entry_index "${sid}")
     SELECTED=${idx}
     cs_close_selected
-    sleep 0.1
+    sleep 0.05
 
     local cp
     cp=$(cs_read_state current_pane)
@@ -471,7 +474,7 @@ test_close_active() {
 test_new_session() {
     cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "existing"
     cs_new_session
-    sleep 0.1
+    sleep 0.05
 
     local np
     np=$(cs_read_state new_pane)
@@ -489,7 +492,7 @@ test_new_then_select_other() {
     cs_create_mock_session "${sid}" "existing"
 
     cs_new_session
-    sleep 0.1
+    sleep 0.05
     local new_pane_id
     new_pane_id=$(cs_read_state new_pane)
 
@@ -499,7 +502,7 @@ test_new_then_select_other() {
     [[ "${idx}" != "-1" ]] || { echo "    existing session not found"; return 1; }
     SELECTED=${idx}
     cs_activate_selected
-    sleep 0.2
+    sleep 0.05
 
     # New pane should be dead
     if pane_alive "${new_pane_id}"; then
@@ -516,13 +519,13 @@ test_new_then_select_other() {
 test_new_cancelled() {
     cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "existing"
     cs_new_session
-    sleep 0.1
+    sleep 0.05
     local new_pane_id
     new_pane_id=$(cs_read_state new_pane)
 
     # Simulate cancel — kill the pane externally
     _tmux kill-pane -t "${new_pane_id}" 2>/dev/null || true
-    sleep 0.1
+    sleep 0.05
 
     cs_scan_sessions
 
@@ -538,14 +541,14 @@ test_bell_detection() {
 
     # Resume and park it (create a second to make it background)
     cs_resume_session "${sid}"
-    sleep 0.1
+    sleep 0.05
     local pane_a
     pane_a=$(cs_read_state current_pane)
 
     local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     cs_create_mock_session "${sid_b}" "foreground"
     cs_resume_session "${sid_b}"
-    sleep 0.1
+    sleep 0.05
 
     # Write bell for pane A
     echo "${pane_a}" > "${STATE_DIR}/bells"
@@ -555,7 +558,7 @@ test_bell_detection() {
 
     # Show pane A — bell should clear
     cs_show_pane "${pane_a}"
-    sleep 0.1
+    sleep 0.05
     [[ -z "${BELL_SET[${pane_a}]:-}" ]] || { echo "    BELL_SET not cleared after showing"; return 1; }
     cs_assert_consistent "bell_detection"
 }
@@ -583,7 +586,7 @@ test_delete_session() {
     cs_create_mock_session "${sid}" "to delete"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.1
+    sleep 0.05
 
     cs_rescan
     local idx
@@ -593,7 +596,7 @@ test_delete_session() {
     local pane="${ENTRIES_PANE[${idx}]}"
     cs_delete_session "${sid}" "${idx}"
     cs_after_remove "${pane}"
-    sleep 0.1
+    sleep 0.05
 
     [[ ! -f "${MOCK_PROJECT_DIR}/${sid}.jsonl" ]] || { echo "    JSONL not deleted"; return 1; }
     cs_assert_consistent "delete_session"
@@ -637,12 +640,12 @@ test_show_pane_safety() {
 
 test_double_n() {
     cs_new_session
-    sleep 0.1
+    sleep 0.05
     local pane_a
     pane_a=$(cs_read_state new_pane)
 
     cs_new_session
-    sleep 0.1
+    sleep 0.05
     local pane_b
     pane_b=$(cs_read_state new_pane)
 
@@ -694,7 +697,7 @@ test_selection_fallback_to_pane() {
     [[ "${idx}" != "-1" ]] || { echo "    session B not found"; return 1; }
     SELECTED=${idx}
     cs_activate_selected
-    sleep 0.2
+    sleep 0.05
 
     # Simulate SELECTED pointing at an ID that will disappear
     SELECTED=0
@@ -807,7 +810,7 @@ test_discover_remote_servers() {
     echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
     mkdir -p "/tmp/fake-remote-project"
     command tmux -L "${remote_server}" new-session -d -s test "sleep 99999"
-    sleep 0.2
+    sleep 0.05
 
     cs_discover_servers
 
@@ -984,14 +987,14 @@ test_term_create_and_kill() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     [[ -n "${pane_a}" ]] || { echo "    no current_pane"; return 1; }
 
     cs_term_create "${pane_a}"
-    sleep 0.1
+    sleep 0.05
 
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
@@ -1001,7 +1004,7 @@ test_term_create_and_kill() {
     [[ -f "${STATE_DIR}/term/${pane_a#%}.shown" ]] || { echo "    no .shown file"; return 1; }
 
     cs_term_kill "${pane_a}"
-    sleep 0.1
+    sleep 0.05
 
     cs_refresh_pane_cache
     pane_alive "${term_pane}" && { echo "    term still alive after kill"; return 1; }
@@ -1015,13 +1018,13 @@ test_term_toggle_on_off() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
 
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     cs_term_is_shown "${pane_a}" || { echo "    not shown after toggle on"; return 1; }
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
@@ -1029,7 +1032,7 @@ test_term_toggle_on_off() {
     cs_assert_consistent "term_toggle_on" || return 1
 
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     cs_term_is_shown "${pane_a}" && { echo "    still shown after toggle off"; return 1; }
     cs_refresh_pane_cache
     pane_alive "${term_pane}" || { echo "    term dead after toggle off"; return 1; }
@@ -1046,11 +1049,11 @@ test_term_swap_with_terminal() {
 
     # Resume A and give it a terminal
     cs_resume_session "${sid_a}"
-    sleep 0.2
+    sleep 0.05
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_a
     term_a=$(cs_term_pane_for "${pane_a}")
 
@@ -1060,7 +1063,7 @@ test_term_swap_with_terminal() {
     idx_b=$(find_entry_index "${sid_b}")
     SELECTED=${idx_b}
     cs_activate_selected
-    sleep 0.3
+    sleep 0.15
 
     local pane_b
     pane_b=$(cs_read_state current_pane)
@@ -1079,7 +1082,7 @@ test_term_swap_with_terminal() {
     idx_a=$(find_entry_index "${sid_a}")
     SELECTED=${idx_a}
     cs_activate_selected
-    sleep 0.2
+    sleep 0.05
 
     local cur
     cur=$(cs_read_state current_pane)
@@ -1098,11 +1101,11 @@ test_term_swap_both_have_terminal() {
 
     # Resume A with terminal
     cs_resume_session "${sid_a}"
-    sleep 0.2
+    sleep 0.05
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_a
     term_a=$(cs_term_pane_for "${pane_a}")
 
@@ -1112,11 +1115,11 @@ test_term_swap_both_have_terminal() {
     idx_b=$(find_entry_index "${sid_b}")
     SELECTED=${idx_b}
     cs_activate_selected
-    sleep 0.3
+    sleep 0.15
     local pane_b
     pane_b=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_b
     term_b=$(cs_term_pane_for "${pane_b}")
     cs_assert_consistent "term_both_B_active" || return 1
@@ -1127,7 +1130,7 @@ test_term_swap_both_have_terminal() {
     idx_a=$(find_entry_index "${sid_a}")
     SELECTED=${idx_a}
     cs_activate_selected
-    sleep 0.2
+    sleep 0.05
 
     cs_refresh_pane_cache
     pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
@@ -1142,14 +1145,14 @@ test_term_auto_create_on_focus() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_is_shown "${pane_a}" && { echo "    has terminal before focus"; return 1; }
 
     cs_term_focus
-    sleep 0.1
+    sleep 0.05
 
     cs_term_is_shown "${pane_a}" || { echo "    not shown after focus"; return 1; }
     local term_pane
@@ -1164,14 +1167,14 @@ test_term_toggle_no_session() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_show_welcome
-    sleep 0.2
+    sleep 0.05
 
     local wp
     wp=$(cs_read_state welcome_pane)
     [[ -n "${wp}" ]] || { echo "    no welcome pane"; return 1; }
 
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
 
     local count
     count=$(find "${STATE_DIR}/term" -maxdepth 1 -not -name term -type f 2>/dev/null | wc -l)
@@ -1185,18 +1188,18 @@ test_term_close_session_with_terminal() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
 
     cs_close_pane "${pane_a}"
     cs_after_remove "${pane_a}"
-    sleep 0.1
+    sleep 0.05
 
     cs_refresh_pane_cache
     pane_alive "${pane_a}" && { echo "    session still alive"; return 1; }
@@ -1211,17 +1214,17 @@ test_term_dies_externally() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
 
     _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
-    sleep 0.1
+    sleep 0.05
 
     # Simulate the health check
     cs_refresh_pane_cache
@@ -1243,23 +1246,23 @@ test_term_height_persists() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
 
     _tmux resize-pane -t "${term_pane}" -y 10 2>/dev/null || true
-    sleep 0.1
+    sleep 0.05
     local orig_h
     orig_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
 
     # Toggle off (saves height as percentage)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
 
     local saved_pct
     saved_pct=$(cat "${STATE_DIR}/term/${pane_a#%}.height" 2>/dev/null || true)
@@ -1267,7 +1270,7 @@ test_term_height_persists() {
 
     # Toggle back on
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
 
     # Restored height should be close to the original
     local new_h
@@ -1284,12 +1287,12 @@ test_term_across_reload() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
 
@@ -1320,12 +1323,12 @@ test_term_winch_repin() {
     cs_create_mock_session "${sid}" "session A"
     cs_scan_sessions
     cs_resume_session "${sid}"
-    sleep 0.2
+    sleep 0.05
 
     local pane_a
     pane_a=$(cs_read_state current_pane)
     cs_term_toggle
-    sleep 0.1
+    sleep 0.05
     local term_pane
     term_pane=$(cs_term_pane_for "${pane_a}")
 
@@ -1337,11 +1340,11 @@ test_term_winch_repin() {
 
     # Shrink window
     _tmux resize-window -y 20 2>/dev/null || true
-    sleep 0.1
+    sleep 0.05
 
     # Call WINCH handler
     cs_handle_winch
-    sleep 0.1
+    sleep 0.05
 
     # Check terminal is still approximately the right percentage
     local new_th new_sh new_pct
@@ -1355,9 +1358,9 @@ test_term_winch_repin() {
 
     # Grow back
     _tmux resize-window -y 40 2>/dev/null || true
-    sleep 0.1
+    sleep 0.05
     cs_handle_winch
-    sleep 0.1
+    sleep 0.05
 
     local fin_th fin_sh fin_pct
     fin_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)

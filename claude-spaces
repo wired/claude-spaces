@@ -2056,7 +2056,7 @@ cs_activate_selected() {
         dormant)
             cs_resume_session "${sid}"
             cs_kill_welcome
-            sleep 0.3
+            sleep "${CS_ACTIVATE_DELAY:-0.3}"
             cs_rescan
             ;;
     esac
