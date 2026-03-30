@@ -68,7 +68,7 @@ each operation. Requires a real tmux — nothing is mocked at the tmux level.
 
 - All functions prefixed `cs_`
 - `_tmux` for all tmux calls (never bare `tmux`)
-- Config in `~/.claude/claude-spaces.conf`, names in `claude-spaces-names.conf`, hidden in `claude-spaces-hidden.conf`
+- Config in `${XDG_CONFIG_HOME:-~/.config}/claude-spaces/config`, data (names, hidden) in `${XDG_DATA_HOME:-~/.local/share}/claude-spaces/`
 - Bash 4+ required (associative arrays)
 
 ## Versioning

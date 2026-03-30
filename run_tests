@@ -266,16 +266,21 @@ cs_test_setup() {
     mkdir -p "${TEST_TMP}/state/panes" "${TEST_TMP}/state/term"
     mkdir -p "${TEST_TMP}/claude/projects"
     mkdir -p "${TEST_TMP}/claude/sessions"
+    mkdir -p "${TEST_TMP}/config"
+    mkdir -p "${TEST_TMP}/data"
 
     CLAUDE_DIR="${TEST_TMP}/claude"
     PROJECTS_DIR="${CLAUDE_DIR}/projects"
     SESSIONS_DIR="${CLAUDE_DIR}/sessions"
-    CONFIG_FILE="${CLAUDE_DIR}/claude-spaces.conf"
-    NAMES_FILE="${CLAUDE_DIR}/claude-spaces-names.conf"
+    CS_CONFIG_DIR="${TEST_TMP}/config"
+    CS_DATA_DIR="${TEST_TMP}/data"
+    CONFIG_FILE="${CS_CONFIG_DIR}/config"
+    NAMES_FILE="${CS_DATA_DIR}/names"
+    HIDDEN_FILE="${CS_DATA_DIR}/hidden"
     STATE_DIR="${TEST_TMP}/state"
 
     : > "${CONFIG_FILE}"
-    : > "${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    : > "${HIDDEN_FILE}"
     : > "${NAMES_FILE}"
 
     MOCK_PWD="/tmp/cs-test-project-$$"
@@ -345,7 +350,7 @@ cs_test_reset() {
     rm -rf "${MOCK_PROJECT_DIR}"
     mkdir -p "${MOCK_PROJECT_DIR}"
     rm -f "${SESSIONS_DIR}"/*.json
-    : > "${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    : > "${HIDDEN_FILE}"
     : > "${NAMES_FILE}"
 
     sleep 0.05
@@ -572,7 +577,7 @@ test_hide_session() {
     [[ ${#ENTRIES_ID[@]} -eq 2 ]] || { echo "    expected 2 entries"; return 1; }
 
     # Hide session A (bypass confirm prompt)
-    echo "${sid_a}" >> "${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    echo "${sid_a}" >> "${HIDDEN_FILE}"
     cs_scan_sessions
     [[ ${#ENTRIES_ID[@]} -eq 1 ]] || { echo "    expected 1 entry after hide, got ${#ENTRIES_ID[@]}"; return 1; }
     local idx

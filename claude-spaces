@@ -18,8 +18,11 @@ SCRIPT_PATH="$(readlink -f "$0")"
 CLAUDE_DIR="${HOME}/.claude"
 PROJECTS_DIR="${CLAUDE_DIR}/projects"
 SESSIONS_DIR="${CLAUDE_DIR}/sessions"
-CONFIG_FILE="${CLAUDE_DIR}/claude-spaces.conf"
-NAMES_FILE="${CLAUDE_DIR}/claude-spaces-names.conf"
+CS_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/claude-spaces"
+CS_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/claude-spaces"
+CONFIG_FILE="${CS_CONFIG_DIR}/config"
+NAMES_FILE="${CS_DATA_DIR}/names"
+HIDDEN_FILE="${CS_DATA_DIR}/hidden"
 
 # ── Defaults ──────────────────────────────────────
 PICKER_WIDTH="30"
@@ -55,6 +58,7 @@ cs_exec_tmux() {
 
 # ── Config ────────────────────────────────────────
 cs_load_config() {
+    mkdir -p "${CS_CONFIG_DIR}" "${CS_DATA_DIR}"
     if [[ ! -f "${CONFIG_FILE}" ]]; then
         cs_create_default_config
     fi
@@ -227,11 +231,10 @@ declare -gA CUSTOM_NAMES
 
 cs_load_shared_maps() {
     HIDDEN_SET=()
-    local hidden_file="${CLAUDE_DIR}/claude-spaces-hidden.conf"
-    if [[ -f "${hidden_file}" ]]; then
+    if [[ -f "${HIDDEN_FILE}" ]]; then
         while IFS= read -r hid; do
             [[ -n "${hid}" ]] && HIDDEN_SET["${hid}"]=1
-        done < "${hidden_file}"
+        done < "${HIDDEN_FILE}"
     fi
     CUSTOM_NAMES=()
     if [[ -f "${NAMES_FILE}" ]]; then
@@ -2091,11 +2094,10 @@ cs_confirm() {
 
 cs_unhide_session() {
     local sid="$1"
-    local hidden_file="${CLAUDE_DIR}/claude-spaces-hidden.conf"
-    [[ -f "${hidden_file}" ]] || return 0
-    local tmp="${hidden_file}.tmp"
-    grep -vxF "${sid}" "${hidden_file}" > "${tmp}" 2>/dev/null || true
-    mv "${tmp}" "${hidden_file}"
+    [[ -f "${HIDDEN_FILE}" ]] || return 0
+    local tmp="${HIDDEN_FILE}.tmp"
+    grep -vxF "${sid}" "${HIDDEN_FILE}" > "${tmp}" 2>/dev/null || true
+    mv "${tmp}" "${HIDDEN_FILE}"
     unset "HIDDEN_SET[${sid}]"
 }
 
@@ -2114,7 +2116,7 @@ cs_confirm_hide() {
         removed_pane="${ENTRIES_PANE[${SELECTED}]}"
         cs_close_pane "${removed_pane}"
     fi
-    echo "${sid}" >> "${CLAUDE_DIR}/claude-spaces-hidden.conf"
+    echo "${sid}" >> "${HIDDEN_FILE}"
     cs_after_remove "${removed_pane}"
 }
 
@@ -2371,7 +2373,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     echo ""
     cs_help_text
     echo ""
-    echo "Config: ~/.claude/claude-spaces.conf"
+    echo "Config: ${CONFIG_FILE}"
     exit 0
 fi
 

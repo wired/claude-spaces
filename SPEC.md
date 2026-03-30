@@ -119,7 +119,7 @@ Focused state detected at render time via `_tmux display-message -t $PICKER_PANE
 claude-spaces takes full ownership of the tmux prefix key table on its dedicated
 server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 (colors, mouse, status) but all keybindings are managed by claude-spaces and
-configurable via `bind_*` keys in `claude-spaces.conf`.
+configurable via `bind_*` keys in the config file.
 
 ### Picker pane (direct keys)
 
@@ -207,7 +207,7 @@ Section headers are only shown when they have matching children.
 
 ## Configuration
 
-File: `~/.claude/claude-spaces.conf` (created on first run with commented defaults).
+File: `~/.config/claude-spaces/config` (created on first run with commented defaults; respects `$XDG_CONFIG_HOME`).
 
 ```ini
 # Picker pane width: characters (e.g. 30) or percentage (e.g. 20%)

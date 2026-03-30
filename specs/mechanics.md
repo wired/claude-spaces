@@ -57,7 +57,7 @@ claude-spaces takes full ownership of the tmux prefix key table. After sourcing
 the user's tmux.conf (for visuals/mouse), the picker:
 
 1. Captures the user's prefix via `show-options -gv prefix`
-2. Optionally overrides it from `claude-spaces.conf` (`prefix=` key)
+2. Optionally overrides it from the config file (`prefix=` key)
 3. Wipes the entire prefix table: `unbind-key -a -T prefix`
 4. Re-binds `send-prefix` for the captured prefix key
 5. Installs all claude-spaces bindings via `cs_install_keybindings`
@@ -68,7 +68,7 @@ and copy-mode bindings are preserved.
 On cleanup (exit/reset/re-exec), `cs_remove_keybindings` wipes the prefix
 table. Since the server is ephemeral, this is mainly for the `X` re-exec case.
 
-All prefix bindings are configurable via `bind_*` keys in `claude-spaces.conf`.
+All prefix bindings are configurable via `bind_*` keys in the config file.
 The `cs_bind` helper resolves overrides and supports comma-separated multi-key
 bindings. Compound bindings (focus picker + send trigger) bypass `cs_bind` and
 use direct `_tmux` calls with `\;` chaining.

@@ -13,7 +13,7 @@ Session data lives in `~/.claude/projects/<sanitized-path>/*.jsonl`. Metadata ex
 
 ### Display Name Resolution (priority order)
 
-1. Custom name from `~/.claude/claude-spaces-names.conf` (`session_id=name`)
+1. Custom name from `~/.local/share/claude-spaces/names` (`session_id=name`)
 2. First user message, cleaned:
    - First line only
    - Leading filler stripped: "I want to", "Can you", "Please", "Hey", "Hi", "Could you", "I need to", "Help me", "I would like to"
@@ -26,7 +26,7 @@ Files in `~/.claude/sessions/*.json` track running Claude processes. `kill -0 $p
 
 ### Hidden Sessions
 
-Hidden via `H`, stored in `~/.claude/claude-spaces-hidden.conf` (one ID per line). Applied globally across all projects (local and remote scans both filter against it).
+Hidden via `H`, stored in `~/.local/share/claude-spaces/hidden` (one ID per line). Applied globally across all projects (local and remote scans both filter against it).
 
 ## Scan Orchestration
 

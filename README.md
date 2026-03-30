@@ -143,7 +143,7 @@ The `> /dev/tty` is critical — without it the bell doesn't reach tmux. Bell st
 
 ## Configuration
 
-Config file: `~/.claude/claude-spaces.conf` (created on first run with commented defaults).
+Config file: `~/.config/claude-spaces/config` (created on first run with commented defaults; respects `$XDG_CONFIG_HOME`).
 
 ```ini
 # Picker pane width: characters (e.g. 30) or percentage (e.g. 20%)
@@ -186,8 +186,8 @@ Config file: `~/.claude/claude-spaces.conf` (created on first run with commented
 # bind_menu=:
 ```
 
-Custom session names: `~/.claude/claude-spaces-names.conf` (`session_id=name`)
-Hidden sessions: `~/.claude/claude-spaces-hidden.conf` (one ID per line)
+Custom session names: `~/.local/share/claude-spaces/names` (`session_id=name`; respects `$XDG_DATA_HOME`)
+Hidden sessions: `~/.local/share/claude-spaces/hidden` (one ID per line; respects `$XDG_DATA_HOME`)
 
 ## License
 

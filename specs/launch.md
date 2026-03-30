@@ -52,6 +52,8 @@ See [discovery.md](discovery.md) for how `switch_target` and `pending_load` are 
 
 | File                                      | Purpose                                     |
 |-------------------------------------------|---------------------------------------------|
-| `~/.claude/claude-spaces.conf`          | Configuration (key=value, comments with #)  |
-| `~/.claude/claude-spaces-names.conf`    | Custom session names (`session_id=name`)    |
-| `~/.claude/claude-spaces-hidden.conf`   | Hidden session IDs (one per line, `H` key)  |
+| `~/.config/claude-spaces/config`         | Configuration (key=value, comments with #)  |
+| `~/.local/share/claude-spaces/names`     | Custom session names (`session_id=name`)    |
+| `~/.local/share/claude-spaces/hidden`    | Hidden session IDs (one per line, `H` key)  |
+
+Paths respect `$XDG_CONFIG_HOME` and `$XDG_DATA_HOME`.
