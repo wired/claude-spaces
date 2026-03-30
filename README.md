@@ -82,6 +82,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | Key | Action |
 |-----|--------|
 | `j` / `k` / `↑` / `↓` | Move cursor (skips headers) |
+| `1`-`9`, `0` | Jump to Nth local session (0 = 10th) + focus |
 | `Enter` | Load + focus session (remote/inactive: switch project) |
 | `Space` | Load session (stay in picker) |
 | `H` / `L` | Load + focus session |
@@ -101,6 +102,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `` prefix + ` `` | Toggle terminal on/off |
 | `prefix + j` / `prefix + ↓` | Next session + focus |
 | `prefix + k` / `prefix + ↑` | Prev session + focus |
+| `prefix + 1`-`9`, `0` | Jump to Nth local session (0 = 10th) + focus |
 | `prefix + h` / `prefix + ←` | Select pane left |
 | `prefix + l` / `prefix + →` | Select pane right |
 | `prefix + /` | Focus picker + search |
@@ -163,6 +165,9 @@ Config file: `~/.config/claude-spaces/config` (created on first run with comment
 
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
 # terminal_height=30%
+
+# Show jump index next to first 10 local sessions
+# show_index=1
 
 # Override tmux prefix key (default: inherited from tmux.conf)
 # prefix=C-a

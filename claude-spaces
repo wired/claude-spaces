@@ -140,6 +140,7 @@ EOF
 cs_help_text() {
     echo "  Picker keys:"
     echo "    j/k, Up/Down   Navigate sessions"
+    echo "    1-9, 0         Jump to Nth session + focus"
     echo "    Enter          Load + focus session"
     echo "    Space          Load session (stay in picker)"
     echo "    H/L            Load + focus session"
@@ -1577,15 +1578,19 @@ cs_picker_render() {
             continue
         fi
 
-        # Per-type: indent, color, show_age, prefix, index suffix
-        local indent=0 line_color='\e[90m' show_age=1 line_prefix="" idx_suffix=""
+        # Per-type: indent, color, show_age, prefix, index
+        local indent=0 line_color='\e[90m' show_age=1 line_prefix="" idx_prefix=""
         case "${entry_type}" in
             local)
                 line_color='\e[90m'  # default: dormant (dim)
                 if [[ "${pane}" == "${cur_pane}" && -n "${cur_pane}" ]]; then
                     line_color='\e[1;32m'  # active: bold green
                     if [[ "${picker_focused}" == "0" ]]; then
-                        line_prefix="> "
+                        if [[ "${PICKER_SIDE}" == "left" ]]; then
+                            line_prefix="> "
+                        else
+                            line_prefix="< "
+                        fi
                     fi
                 elif [[ "${status}" == "managed" ]] && [[ -v "BELL_SET[${pane}]" ]]; then
                     line_color='\e[31m'  # bell: red
@@ -1594,8 +1599,15 @@ cs_picker_render() {
                 elif [[ "${status}" == "active_elsewhere" ]]; then
                     line_color='\e[9;90m'  # locked: strikethrough + dim
                 fi
-                if ((SHOW_INDEX && local_idx < 10)); then
-                    idx_suffix=" [$(( (++local_idx) % 10 ))]"
+                if ((SHOW_INDEX)); then
+                    if ((local_idx < 10)); then
+                        local digit=$(( (++local_idx) % 10 ))
+                        if [[ -z "${line_prefix}" ]]; then
+                            idx_prefix="${digit} "
+                        fi
+                    elif [[ -z "${line_prefix}" ]]; then
+                        idx_prefix="  "
+                    fi
                 fi
                 ;;
             project)
@@ -1615,7 +1627,7 @@ cs_picker_render() {
         esac
 
         # Compute available name width
-        local name_width=$((max_name - indent - ${#line_prefix} - ${#idx_suffix}))
+        local name_width=$((max_name - indent - ${#idx_prefix} - ${#line_prefix}))
         if ((! show_age)); then
             name_width=$((name_width + 4))
         fi
@@ -1630,15 +1642,17 @@ cs_picker_render() {
         ((indent > 0)) && printf -v indent_str '%*s' "${indent}" ""
 
         # Selection background (skip for focused or search field focused)
+        local sel_bg=""
         if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ "${picker_focused}" == "1" ]]; then
-            printf '\e[48;5;235m'
+            sel_bg='\e[48;5;235m'
+            printf '%b' "${sel_bg}"
         fi
 
         # Render line
         if ((show_age)); then
-            printf '%b%s%s%-*.*s%4s\e[90m%s' "${line_color}" "${indent_str}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}" "${idx_suffix}"
+            printf '%s\e[90m%s\e[0m%b%b%s%-*.*s%4s' "${indent_str}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}"
         else
-            printf '%b%s%s%-*.*s\e[90m%s' "${line_color}" "${indent_str}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${idx_suffix}"
+            printf '%s\e[90m%s\e[0m%b%b%s%-*.*s' "${indent_str}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}"
         fi
         printf '\e[0m'
     done

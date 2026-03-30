@@ -126,6 +126,7 @@ configurable via `bind_*` keys in the config file.
 | Key              | Action                                                      |
 |------------------|-------------------------------------------------------------|
 | `j` / `k` / `↑` / `↓` | Move cursor (skips headers/spacers)                  |
+| `1`-`9`, `0`     | Jump to Nth local session (0 = 10th) + focus                |
 | `Enter`          | Load + focus session (remote/inactive: switch project)      |
 | `Space`          | Load session (stay in picker)                               |
 | `H` / `L`       | Load + focus session                                        |
@@ -162,6 +163,7 @@ any non-matching key to cancel.
 | `` prefix + ` `` | Toggle terminal on/off                                   |
 | `prefix + j / ↓` | Next session + focus                                    |
 | `prefix + k / ↑` | Prev session + focus                                    |
+| `prefix + 1`-`9`, `0` | Jump to Nth local session (0 = 10th) + focus       |
 | `prefix + h / ←` | Select pane left                                        |
 | `prefix + l / →` | Select pane right                                       |
 | `prefix + /`     | Focus picker + search                                    |
@@ -230,6 +232,9 @@ File: `~/.config/claude-spaces/config` (created on first run with commented defa
 
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
 # terminal_height=30%
+
+# Show jump index next to first 10 local sessions
+# show_index=1
 
 # Override tmux prefix key (default: inherited from tmux.conf)
 # prefix=C-a
