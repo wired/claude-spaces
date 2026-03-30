@@ -134,7 +134,7 @@ configurable via `bind_*` keys in the config file.
 | `/`              | Search/filter sessions                                      |
 | `:`              | Command menu (new, rename, close, hide, delete, shutdown)   |
 | `Q`              | Detach (exit claude-spaces)                                 |
-| `X`              | Reload picker script in-place (`exec`)                      |
+| `R`              | Reload picker script in-place (`exec`)                      |
 
 ### Command menu
 
@@ -144,14 +144,13 @@ any non-matching key to cancel.
 
 | Key | Action |
 |-----|--------|
-| `n` | New session |
 | `r` | Rename |
-| `c` | Close (keeps session on disk) |
+| `x` | Close (with confirm) |
 | `h` | Hide (with confirm) |
-| `d` | Delete permanently (with confirm) |
+| `!` | Delete permanently (with confirm) |
+| `c` | New session |
+| `d` | Detach |
 | `s` | Shutdown (kill server) |
-| `x` | Reload picker |
-| `q` | Detach |
 
 ### Prefix key bindings (from any pane)
 
@@ -167,7 +166,9 @@ any non-matching key to cancel.
 | `prefix + h / ←` | Select pane left                                        |
 | `prefix + l / →` | Select pane right                                       |
 | `prefix + /`     | Focus picker + search                                    |
-| `prefix + +`     | Focus picker + new session                               |
+| `prefix + c`     | New session (create)                                     |
+| `prefix + x`     | Close session (with confirm)                             |
+| `prefix + r`     | Reload picker                                            |
 | `prefix + z`     | Zoom/maximize pane                                       |
 | `prefix + [`     | Copy mode                                                |
 | `prefix + ]`     | Paste buffer                                             |
@@ -253,7 +254,9 @@ File: `~/.config/claude-spaces/config` (created on first run with commented defa
 # bind_copy_mode=[
 # bind_paste=]
 # bind_search=/
-# bind_new_session=+
+# bind_new_session=c
+# bind_close=x
+# bind_reload=r
 # bind_refresh=Tab
 # bind_menu=:
 ```

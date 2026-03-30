@@ -130,7 +130,9 @@ cs_create_default_config() {
 # bind_copy_mode=[
 # bind_paste=]
 # bind_search=/
-# bind_new_session=+
+# bind_new_session=c
+# bind_close=x
+# bind_reload=r
 # bind_refresh=Tab
 # bind_menu=:
 EOF
@@ -147,13 +149,14 @@ cs_help_text() {
     echo "    h/l            Move between panes"
     echo "    /              Search sessions"
     echo "    :              Command menu"
-    echo "    Q              Detach    X  Reload picker"
+    echo "    Q              Detach    R  Reload picker"
     echo "  Prefix keys (from any pane):"
     echo "    j/k            Next/prev session + focus"
     echo "    f/Space        Focus picker"
     echo "    Enter          Focus Claude pane"
     echo "    t              Focus terminal"
     echo "    \`              Toggle terminal"
+    echo "    c  New session  x  Close  r  Reload"
     echo "    z              Zoom pane"
     echo "    :              Command menu"
     echo "    [/]            Copy/paste   d  Detach"
@@ -577,7 +580,7 @@ MENU_LABELS=()
 cs_menu_init() {
     local hide_label="View hidden"
     ((SHOW_HIDDEN)) && hide_label="Hide hidden"
-    MENU_KEYS=(r c h '!' "" n v d x s)
+    MENU_KEYS=(r x h '!' "" c v d s)
     MENU_LABELS=(
         "Rename"
         "Close"
@@ -587,7 +590,6 @@ cs_menu_init() {
         "New session"
         "${hide_label}"
         "Detach"
-        "Reload picker"
         "Shutdown"
     )
 }
@@ -1842,18 +1844,14 @@ cs_picker_loop() {
                     $'\e')
                         read -rsn2 -t 0.1 _ || true
                         MENU_ACTIVE=0; DIRTY=1 ;;
-                    n) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; DIRTY=1 ;;
                     r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
-                    c) MENU_ACTIVE=0; cs_close_selected; DIRTY=1 ;;
+                    x) MENU_ACTIVE=0; cs_confirm_close; DIRTY=1 ;;
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
                     v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
                     '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
+                    c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; DIRTY=1 ;;
                     d) MENU_ACTIVE=0; _tmux detach-client ;;
                     s) MENU_ACTIVE=0; cs_confirm_shutdown ;;
-                    x) MENU_ACTIVE=0
-                       stty echo 2>/dev/null || true
-                       printf '\e[?25h\e[0m'
-                       CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}" ;;
                     *) MENU_ACTIVE=0; DIRTY=1 ;;
                 esac
             elif ((SEARCH_ACTIVE)); then
@@ -1935,9 +1933,15 @@ cs_picker_loop() {
                     $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
                     $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; DIRTY=1 ;;
                     $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
+                    $'\x06') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_close; DIRTY=1 ;;
+                    $'\x0e')
+                        _tmux select-pane -t "${PICKER_PANE}"
+                        stty echo 2>/dev/null || true
+                        printf '\e[?25h\e[0m'
+                        CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}" ;;
                     [0-9]) cs_jump_to_local "${key}" ;;
                     $'\x12') cs_rescan; DIRTY=1 ;;
-                    X)
+                    R)
                         stty echo 2>/dev/null || true
                         printf '\e[?25h\e[0m'
                         CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}"
@@ -2170,6 +2174,20 @@ cs_close_selected() {
     cs_after_remove "${pane}"
 }
 
+cs_confirm_close() {
+    local n=${#ENTRIES_ID[@]}
+    ((n == 0)) && return 0
+    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
+
+    local status="${ENTRIES_STATUS[${SELECTED}]}"
+    local pane="${ENTRIES_PANE[${SELECTED}]}"
+    [[ "${status}" == "managed" && -n "${pane}" ]] || return 0
+
+    cs_confirm $'\e[33m Close? y/N ' || return 0
+    cs_close_pane "${pane}"
+    cs_after_remove "${pane}"
+}
+
 cs_confirm() {
     local prompt="$1"
     local height
@@ -2336,7 +2354,9 @@ cs_install_keybindings() {
 
     # Search and new-session: non-printable triggers, picker handles focus-steal
     cs_bind search / send-keys -t "${PICKER_PANE}" $'\x01'
-    cs_bind new_session + send-keys -t "${PICKER_PANE}" $'\x02'
+    cs_bind new_session c send-keys -t "${PICKER_PANE}" $'\x02'
+    cs_bind close x send-keys -t "${PICKER_PANE}" $'\x06'
+    cs_bind reload r send-keys -t "${PICKER_PANE}" $'\x0e'
 
     # Hardcoded (not configurable): arrow keys duplicate configurable keys
     _tmux bind-key Down send-keys -t "${PICKER_PANE}" "J"

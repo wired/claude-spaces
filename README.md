@@ -90,7 +90,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `/` | Search/filter sessions |
 | `:` | Command menu (new, rename, close, hide, delete, shutdown) |
 | `Q` | Detach (exit) |
-| `X` | Reload picker in-place (picks up code changes) |
+| `R` | Reload picker in-place (picks up code changes) |
 
 ### Prefix key bindings (from any pane)
 
@@ -106,7 +106,9 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + h` / `prefix + ←` | Select pane left |
 | `prefix + l` / `prefix + →` | Select pane right |
 | `prefix + /` | Focus picker + search |
-| `prefix + +` | Focus picker + new session |
+| `prefix + c` | New session (create) |
+| `prefix + x` | Close session (with confirm) |
+| `prefix + r` | Reload picker |
 | `prefix + z` | Zoom/maximize pane |
 | `prefix + [` | Copy mode |
 | `prefix + ]` | Paste buffer |
@@ -187,7 +189,9 @@ Config file: `~/.config/claude-spaces/config` (created on first run with comment
 # bind_copy_mode=[
 # bind_paste=]
 # bind_search=/
-# bind_new_session=+
+# bind_new_session=c
+# bind_close=x
+# bind_reload=r
 # bind_refresh=Tab
 # bind_menu=:
 ```
