@@ -1601,7 +1601,7 @@ cs_picker_render() {
         ((indent > 0)) && printf -v indent_str '%*s' "${indent}" ""
 
         # Selection background (skip for focused or search field focused)
-        if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ -z "${line_prefix}" ]]; then
+        if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ "${picker_focused}" == "1" ]]; then
             printf '\e[48;5;235m'
         fi
 
@@ -1807,10 +1807,14 @@ cs_picker_loop() {
                 case "${key}" in
                     j) cs_move_down; DIRTY=1 ;;
                     k) cs_move_up; DIRTY=1 ;;
-                    J) cs_move_down 1
+                    J) local _pf; _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+                       [[ "${_pf}" == "0" ]] && cs_sync_highlight_local
+                       cs_move_down 1
                        cs_activate_selected; cs_focus_session
                        DIRTY=1 ;;
-                    K) cs_move_up 1
+                    K) local _pf; _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+                       [[ "${_pf}" == "0" ]] && cs_sync_highlight_local
+                       cs_move_up 1
                        cs_activate_selected; cs_focus_session
                        DIRTY=1 ;;
                     H|L) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
