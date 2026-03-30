@@ -35,6 +35,7 @@ WINDOW_NAME_LEN=12
 TMUX_SERVER="cs${PWD//\//-}"
 TMUX_CONF="${HOME}/.tmux.conf"
 TERMINAL_HEIGHT="30%"
+SHOW_INDEX=1
 CS_PREFIX=""
 declare -gA BIND_OVERRIDES=()
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -76,6 +77,7 @@ cs_load_config() {
             window_name_len) WINDOW_NAME_LEN="${value}" ;;
             tmux_conf) TMUX_CONF="${value}" ;;
             terminal_height) TERMINAL_HEIGHT="${value}" ;;
+            show_index) SHOW_INDEX="${value}" ;;
             prefix) CS_PREFIX="${value}" ;;
             bind_*) BIND_OVERRIDES["${key}"]="${value}" ;;
         esac
@@ -107,6 +109,9 @@ cs_create_default_config() {
 
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
 # terminal_height=30%
+
+# Show jump index [1]-[0] next to first 10 local sessions
+# show_index=1
 
 # Override tmux prefix key (default: inherited from tmux.conf)
 # prefix=C-a
@@ -1548,7 +1553,10 @@ cs_picker_render() {
     cur_pane=$(cs_read_state current_pane)
     picker_focused=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
 
-    local i
+    local i local_idx=0
+    for ((i = 0; i < SCROLL && i < n; i++)); do
+        [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] && ((local_idx++))
+    done
     for ((i = SCROLL; i < SCROLL + avail && i < n; i++)); do
         local line=$((i - SCROLL + 2))
         printf '\e[%d;1H\e[K' "${line}"
@@ -1569,8 +1577,8 @@ cs_picker_render() {
             continue
         fi
 
-        # Per-type: indent, color, show_age, prefix
-        local indent=0 line_color='\e[90m' show_age=1 line_prefix=""
+        # Per-type: indent, color, show_age, prefix, index suffix
+        local indent=0 line_color='\e[90m' show_age=1 line_prefix="" idx_suffix=""
         case "${entry_type}" in
             local)
                 line_color='\e[90m'  # default: dormant (dim)
@@ -1585,6 +1593,9 @@ cs_picker_render() {
                     line_color=''  # running: white
                 elif [[ "${status}" == "active_elsewhere" ]]; then
                     line_color='\e[9;90m'  # locked: strikethrough + dim
+                fi
+                if ((SHOW_INDEX && local_idx < 10)); then
+                    idx_suffix=" [$(( (++local_idx) % 10 ))]"
                 fi
                 ;;
             project)
@@ -1604,7 +1615,7 @@ cs_picker_render() {
         esac
 
         # Compute available name width
-        local name_width=$((max_name - indent - ${#line_prefix}))
+        local name_width=$((max_name - indent - ${#line_prefix} - ${#idx_suffix}))
         if ((! show_age)); then
             name_width=$((name_width + 4))
         fi
@@ -1625,9 +1636,9 @@ cs_picker_render() {
 
         # Render line
         if ((show_age)); then
-            printf '%b%s%s%-*.*s%4s' "${line_color}" "${indent_str}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}"
+            printf '%b%s%s%-*.*s%4s\e[90m%s' "${line_color}" "${indent_str}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}" "${idx_suffix}"
         else
-            printf '%b%s%s%-*.*s' "${line_color}" "${indent_str}" "${line_prefix}" "${name_width}" "${name_width}" "${name}"
+            printf '%b%s%s%-*.*s\e[90m%s' "${line_color}" "${indent_str}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${idx_suffix}"
         fi
         printf '\e[0m'
     done
