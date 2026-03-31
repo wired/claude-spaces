@@ -158,8 +158,9 @@ any non-matching key to cancel.
 |------------------|-----------------------------------------------------------|
 | `prefix + Enter` | Focus Claude pane                                        |
 | `prefix + f` / `prefix + Space` | Focus picker                              |
-| `prefix + t`     | Focus terminal (opens if not visible)                    |
-| `` prefix + ` `` | Toggle terminal on/off                                   |
+| `` prefix + ` `` | Smart terminal (open/close/focus)                        |
+| `prefix + t`     | Toggle terminal on/off (unconditional)                    |
+| `prefix + a`     | Literal grave (`` ` ``)                                  |
 | `prefix + j / ↓` | Next session + focus                                    |
 | `prefix + k / ↑` | Prev session + focus                                    |
 | `prefix + 1`-`9`, `0` | Jump to Nth local session (0 = 10th) + focus       |
@@ -241,9 +242,9 @@ File: `~/.config/claude-spaces/config` (created on first run with commented defa
 # prefix=C-a
 
 # Keybinding overrides (comma-separated for multiple keys)
-# bind_toggle_terminal=`
+# bind_terminal=`
+# bind_toggle_terminal=t
 # bind_focus_claude=Enter
-# bind_focus_terminal=t
 # bind_nav_next=j
 # bind_nav_prev=k
 # bind_pane_left=h

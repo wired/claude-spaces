@@ -1156,7 +1156,7 @@ test_term_auto_create_on_focus() {
     pane_a=$(cs_read_state current_pane)
     cs_term_is_shown "${pane_a}" && { echo "    has terminal before focus"; return 1; }
 
-    cs_term_focus
+    cs_term_smart
     sleep 0.05
 
     cs_term_is_shown "${pane_a}" || { echo "    not shown after focus"; return 1; }
