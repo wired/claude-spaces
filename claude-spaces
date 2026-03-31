@@ -1855,6 +1855,7 @@ cs_picker_loop() {
     DIRTY=1
     LAST_FINGERPRINT=""
     declare -gA BELL_SET
+    WINDOW_FOCUSED=1
 
     PICKER_PANE=$(_tmux display-message -p '#{pane_id}')
     cs_rename_pane_window "${PICKER_PANE}" "cs:picker"
@@ -2076,6 +2077,7 @@ cs_picker_loop() {
             cs_check_bells
             if [[ -f "${STATE_DIR}/focus_in" ]]; then
                 rm -f "${STATE_DIR}/focus_in"
+                WINDOW_FOCUSED=1
                 local _fp
                 _fp=$(cs_read_state current_pane)
                 if [[ -n "${_fp}" ]] && [[ -v "BELL_SET[${_fp}]" ]]; then
@@ -2083,6 +2085,10 @@ cs_picker_loop() {
                     cs_sync_bells_active
                     DIRTY=1
                 fi
+            fi
+            if [[ -f "${STATE_DIR}/focus_out" ]]; then
+                rm -f "${STATE_DIR}/focus_out"
+                WINDOW_FOCUSED=0
             fi
             cs_rescan
             # Check if current session's terminal died externally
@@ -2395,13 +2401,15 @@ cs_install_bell_hook() {
     _tmux setw -g monitor-bell on
     # alert-bell fires with the window that belled — log its pane IDs
     _tmux set-hook -g alert-bell "run-shell 'tmux list-panes -t \"#{window_id}\" -F \"#{pane_id}\" >> \"${bells_file}\"'"
-    # focus-in clears active pane's bell (user is now looking at it)
+    # focus-in/out track window focus for bell suppression
     _tmux set-hook -g client-focus-in "run-shell 'touch \"${STATE_DIR}/focus_in\"'"
+    _tmux set-hook -g client-focus-out "run-shell 'touch \"${STATE_DIR}/focus_out\"'"
 }
 
 cs_remove_bell_hook() {
     _tmux set-hook -gu alert-bell 2>/dev/null || true
     _tmux set-hook -gu client-focus-in 2>/dev/null || true
+    _tmux set-hook -gu client-focus-out 2>/dev/null || true
 }
 
 cs_bind() {
@@ -2511,10 +2519,20 @@ cs_check_bells() {
         if ! [[ -v "BELL_SET[${pane_id}]" ]]; then
             BELL_SET["${pane_id}"]=1
             DIRTY=1
-            cs_sync_bells_active
         fi
     done < "${bells_file}"
     : > "${bells_file}"
+
+    # Suppress bell for active session when window is focused
+    if ((WINDOW_FOCUSED)); then
+        local cur_pane
+        cur_pane=$(cs_read_state current_pane)
+        if [[ -n "${cur_pane}" ]] && [[ -v "BELL_SET[${cur_pane}]" ]]; then
+            unset "BELL_SET[${cur_pane}]"
+        fi
+    fi
+
+    cs_sync_bells_active
 }
 
 cs_sync_bells_active() {
