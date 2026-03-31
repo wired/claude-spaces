@@ -382,13 +382,13 @@ cs_scan_sessions() {
     if [[ -d "${SESSIONS_DIR}" ]]; then
         for f in "${SESSIONS_DIR}"/*.json; do
             [[ -f "${f}" ]] || continue
-            local pid sid psline
-            psline=$(jq -r '[.pid, .sessionId] | @tsv' "${f}" 2>/dev/null) || continue
-            pid="${psline%%	*}"
-            sid="${psline#*	}"
-            if kill -0 "${pid}" 2>/dev/null; then
-                active_pids["${sid}"]="${pid}"
-            fi
+            local content pid sid
+            content=$(< "${f}") || continue
+            [[ "${content}" =~ \"pid\":[[:space:]]*([0-9]+) ]] || continue
+            pid="${BASH_REMATCH[1]}"
+            [[ "${content}" =~ \"sessionId\":[[:space:]]*\"([^\"]+)\" ]] || continue
+            sid="${BASH_REMATCH[1]}"
+            kill -0 "${pid}" 2>/dev/null && active_pids["${sid}"]="${pid}"
         done
     fi
 
@@ -399,7 +399,7 @@ cs_scan_sessions() {
         content=$(cat "${f}" 2>/dev/null)
         if [[ "${content}" == "new" ]]; then
             local pn
-            pn="%$(basename "${f}")"
+            pn="%${f##*/}"
             cs_pane_alive "${pn}" || continue
             local pp
             pp=$(_tmux display-message -t "${pn}" -p '#{pane_pid}' 2>/dev/null) || continue
@@ -421,7 +421,7 @@ cs_scan_sessions() {
     for f in "${STATE_DIR}"/panes/*; do
         [[ -f "${f}" ]] || continue
         local pane_num pane_id sid
-        pane_num="$(basename "${f}")"
+        pane_num="${f##*/}"
         pane_id="%${pane_num}"
         sid=$(cat "${f}" 2>/dev/null) || continue
         if cs_pane_alive "${pane_id}"; then
@@ -432,15 +432,18 @@ cs_scan_sessions() {
     done
 
     # Scan JSONL files
+    declare -A mtimes
+    while read -r mt fn; do
+        mtimes["${fn}"]="${mt}"
+    done < <(stat -c '%Y %n' "${project_dir}"/*.jsonl 2>/dev/null)
     for f in "${project_dir}"/*.jsonl; do
         [[ -f "${f}" ]] || continue
-        local sid
-        sid=$(basename "${f}" .jsonl)
+        local sid="${f##*/}"
+        sid="${sid%.jsonl}"
         [[ "${sid}" =~ ${UUID_RE} ]] || continue
         [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
 
-        local mtime
-        mtime=$(stat -c %Y "${f}")
+        local mtime="${mtimes[${f}]}"
 
         local name
         name=$(cs_resolve_name "${sid}" "${f}")
@@ -987,14 +990,17 @@ cs_scan_project_sessions() {
     fi
     # Collect into local arrays, then sort by mtime
     local -a r_ids=() r_names=() r_mtimes=() r_statuses=()
+    declare -A r_mtimes_map
+    while read -r mt fn; do
+        r_mtimes_map["${fn}"]="${mt}"
+    done < <(stat -c '%Y %n' "${project_dir}"/*.jsonl 2>/dev/null)
     for f in "${project_dir}"/*.jsonl; do
         [[ -f "${f}" ]] || continue
-        local sid
-        sid=$(basename "${f}" .jsonl)
+        local sid="${f##*/}"
+        sid="${sid%.jsonl}"
         [[ "${sid}" =~ ${UUID_RE} ]] || continue
         [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
-        local mtime
-        mtime=$(stat -c %Y "${f}")
+        local mtime="${r_mtimes_map[${f}]}"
         local name
         name=$(cs_resolve_name "${sid}" "${f}")
         [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
