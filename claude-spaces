@@ -44,7 +44,7 @@ CS_CLR_BELL='\e[31m'
 CS_CLR_RUNNING=''
 CS_CLR_DORMANT='\e[2m'
 CS_CLR_LOCKED='\e[9;2m'
-CS_CLR_SELECTION='\e[7m'
+CS_CLR_SELECTION='\e[48;5;237m'
 CS_CLR_CHROME='\e[2m'
 CS_CLR_SECTION='\e[2;1m'
 CS_CLR_PROMPT_WARN='\e[33m'
@@ -172,7 +172,7 @@ cs_create_default_config() {
 # color_running=
 # color_dormant=\e[2m
 # color_locked=\e[9;2m
-# color_selection=\e[7m
+# color_selection=\e[48;5;237m
 # color_chrome=\e[2m
 # color_section=\e[2;1m
 # color_prompt_warn=\e[33m
@@ -1757,7 +1757,10 @@ cs_picker_render() {
             printf '%b' "${sel_bg}"
         fi
 
-        # Render line
+        # Render line — bold line_color when selected
+        if [[ -n "${sel_bg}" ]]; then
+            line_color='\e[1m'"${line_color}"
+        fi
         local idx_color="${CS_CLR_CHROME}"
         [[ -n "${sel_bg}" ]] && idx_color="${line_color}"
         if ((show_age)); then
