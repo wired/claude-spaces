@@ -333,6 +333,7 @@ cs_test_reset() {
     rm -f "${STATE_DIR}/panes/"*
     rm -f "${STATE_DIR}/term/"*
     : > "${STATE_DIR}/bells"
+    rm -f "${STATE_DIR}/bells_active" "${STATE_DIR}/bells_active.tmp"
     echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
     echo $$ > "${STATE_DIR}/picker_pid"
 
@@ -566,6 +567,52 @@ test_bell_detection() {
     sleep 0.05
     [[ -z "${BELL_SET[${pane_a}]:-}" ]] || { echo "    BELL_SET not cleared after showing"; return 1; }
     cs_assert_consistent "bell_detection"
+}
+
+test_remote_bell() {
+    local sid="cccccccc-cccc-cccc-cccc-cccccccccccc"
+    local remote_state="${STATE_DIR}/mock_remote"
+    local remote_project="${MOCK_PROJECT_DIR}_remote"
+    mkdir -p "${remote_state}/panes" "${remote_project}"
+
+    # Create a session JSONL in the remote project dir
+    printf '{"type":"user","message":{"role":"user","content":"remote"},"sessionId":"%s"}\n' \
+        "${sid}" > "${remote_project}/${sid}.jsonl"
+
+    # Mark it as managed (has a pane file)
+    echo "${sid}" > "${remote_state}/panes/99"
+
+    # Write bells_active with the session UUID
+    echo "${sid}" > "${remote_state}/bells_active"
+
+    # Scan remote sessions
+    cs_entry_clear
+    cs_scan_project_sessions "${remote_project}" "/tmp/fake" "remote" "${remote_state}"
+
+    # Find the entry and check its status
+    local found=0
+    for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
+        if [[ "${ENTRIES_ID[${i}]}" == "${sid}" ]]; then
+            [[ "${ENTRIES_STATUS[${i}]}" == "bell" ]] || { echo "    expected status 'bell', got '${ENTRIES_STATUS[${i}]}'"; return 1; }
+            found=1
+            break
+        fi
+    done
+    ((found)) || { echo "    remote session not found in entries"; return 1; }
+
+    # Clear bells_active — status should revert to managed
+    : > "${remote_state}/bells_active"
+    cs_entry_clear
+    cs_scan_project_sessions "${remote_project}" "/tmp/fake" "remote" "${remote_state}"
+
+    for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
+        if [[ "${ENTRIES_ID[${i}]}" == "${sid}" ]]; then
+            [[ "${ENTRIES_STATUS[${i}]}" == "managed" ]] || { echo "    expected status 'managed' after clear, got '${ENTRIES_STATUS[${i}]}'"; return 1; }
+            break
+        fi
+    done
+
+    rm -rf "${remote_state}" "${remote_project}"
 }
 
 test_hide_session() {
@@ -1410,6 +1457,7 @@ main() {
     run_test "new then select other"        test_new_then_select_other
     run_test "new session cancelled"        test_new_cancelled
     run_test "bell detection"               test_bell_detection
+    run_test "remote bell"                  test_remote_bell
     run_test "hide session"                 test_hide_session
     run_test "delete session"               test_delete_session
     run_test "stale state recovery"         test_stale_recovery

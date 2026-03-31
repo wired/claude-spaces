@@ -49,7 +49,11 @@ Uses tmux's `alert-bell` hook. Requires a Stop hook in `~/.claude/settings.json`
 
 The `> /dev/tty` is critical. `#{window_bell_flag}` polling does NOT work (flag is momentary).
 
-Bell state clears when the session is brought to the foreground. The bell hook is installed on picker startup and removed on exit/reset.
+Bell state clears when the session is brought to the foreground, or when the terminal window regains focus (via `client-focus-in` hook, requires `focus-events on` which the picker sets automatically). Switching away from the active pane also clears its bell (outgoing clear in `cs_show_pane`). The bell hook is installed on picker startup and removed on exit/reset.
+
+### Cross-project bells
+
+When a bell fires, the owning picker writes `${STATE_DIR}/bells_active` — a list of session UUIDs with active bells, derived from the in-memory `BELL_SET` (pane-keyed) via `cs_sync_bells_active()`. Remote pickers read this file during `cs_scan_project_sessions()` and set `status="bell"` on matching entries, rendering them in the bell color. The file is updated on bell add and bell clear only (not per-cycle).
 
 ## Binding Lifecycle
 

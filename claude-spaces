@@ -988,6 +988,14 @@ cs_scan_project_sessions() {
             [[ -n "${psid}" && "${psid}" != "new" ]] && remote_managed["${psid}"]=1
         done
     fi
+    # Build remote bell set from bells_active file
+    local -A remote_bells
+    if [[ -n "${remote_state_dir}" && -s "${remote_state_dir}/bells_active" ]]; then
+        local _bsid
+        while IFS= read -r _bsid; do
+            [[ -n "${_bsid}" ]] && remote_bells["${_bsid}"]=1
+        done < "${remote_state_dir}/bells_active"
+    fi
     # Collect into local arrays, then sort by mtime
     local -a r_ids=() r_names=() r_mtimes=() r_statuses=()
     declare -A r_mtimes_map
@@ -1006,6 +1014,7 @@ cs_scan_project_sessions() {
         [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
         local rstatus="dormant"
         [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
+        [[ -v "remote_bells[${sid}]" ]] && rstatus="bell"
         r_ids+=("${sid}")
         r_names+=("${name}")
         r_mtimes+=("${mtime}")
@@ -1183,7 +1192,16 @@ cs_show_pane() {
     fi
 
     echo "${target_pane}" > "${STATE_DIR}/current_pane"
-    unset "BELL_SET[${target_pane}]" 2>/dev/null || true
+    local _bells_changed=0
+    if [[ -n "${cur_pane}" ]] && [[ -v "BELL_SET[${cur_pane}]" ]]; then
+        unset "BELL_SET[${cur_pane}]"
+        _bells_changed=1
+    fi
+    if [[ -v "BELL_SET[${target_pane}]" ]]; then
+        unset "BELL_SET[${target_pane}]"
+        _bells_changed=1
+    fi
+    ((_bells_changed)) && cs_sync_bells_active
 
     # Attach new session's terminal (if that session has term shown)
     local wp
@@ -1511,10 +1529,6 @@ cs_show_welcome() {
         cat << 'WELCOMEEOF'
 echo ""
 recs=""
-ba=$(_tmux show-options -gv bell-action 2>/dev/null)
-[[ "${ba}" == "any" ]] || recs+="    set-option -g bell-action any\n"
-mb=$(_tmux show-options -gvw monitor-bell 2>/dev/null)
-[[ "${mb}" == "on" ]] || recs+="    setw -g monitor-bell on\n"
 ek=$(_tmux show-options -sv extended-keys 2>/dev/null)
 [[ "${ek}" == "on" ]] || recs+="    set -s extended-keys on\n"
 if ! grep -q 'printf.*\\a.*dev/tty' ~/.claude/settings.json 2>/dev/null; then
@@ -1733,7 +1747,9 @@ cs_picker_render() {
                 ;;
             remote)
                 indent=2
-                if [[ "${status}" == "managed" ]]; then
+                if [[ "${status}" == "bell" ]]; then
+                    line_color="${CS_CLR_BELL}"
+                elif [[ "${status}" == "managed" ]]; then
                     line_color="${CS_CLR_RUNNING}"
                 else
                     line_color="${CS_CLR_DORMANT}"
@@ -2058,6 +2074,16 @@ cs_picker_loop() {
                 fi
             fi
             cs_check_bells
+            if [[ -f "${STATE_DIR}/focus_in" ]]; then
+                rm -f "${STATE_DIR}/focus_in"
+                local _fp
+                _fp=$(cs_read_state current_pane)
+                if [[ -n "${_fp}" ]] && [[ -v "BELL_SET[${_fp}]" ]]; then
+                    unset "BELL_SET[${_fp}]"
+                    cs_sync_bells_active
+                    DIRTY=1
+                fi
+            fi
             cs_rescan
             # Check if current session's terminal died externally
             # (must be after cs_rescan which refreshes the pane cache)
@@ -2363,12 +2389,19 @@ cs_rename_selected() {
 cs_install_bell_hook() {
     local bells_file="${STATE_DIR}/bells"
     : > "${bells_file}"
+    # Ensure bell detection works regardless of user's tmux.conf
+    _tmux set -s focus-events on
+    _tmux set -g bell-action any
+    _tmux setw -g monitor-bell on
     # alert-bell fires with the window that belled — log its pane IDs
     _tmux set-hook -g alert-bell "run-shell 'tmux list-panes -t \"#{window_id}\" -F \"#{pane_id}\" >> \"${bells_file}\"'"
+    # focus-in clears active pane's bell (user is now looking at it)
+    _tmux set-hook -g client-focus-in "run-shell 'touch \"${STATE_DIR}/focus_in\"'"
 }
 
 cs_remove_bell_hook() {
     _tmux set-hook -gu alert-bell 2>/dev/null || true
+    _tmux set-hook -gu client-focus-in 2>/dev/null || true
 }
 
 cs_bind() {
@@ -2471,20 +2504,33 @@ cs_check_bells() {
     local bells_file="${STATE_DIR}/bells"
     [[ -s "${bells_file}" ]] || return 0
 
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-
     # Read and clear
     local pane_id
     while IFS= read -r pane_id; do
         [[ -n "${pane_id}" ]] || continue
-        [[ "${pane_id}" == "${cur_pane}" ]] && continue
         if ! [[ -v "BELL_SET[${pane_id}]" ]]; then
             BELL_SET["${pane_id}"]=1
             DIRTY=1
+            cs_sync_bells_active
         fi
     done < "${bells_file}"
     : > "${bells_file}"
+}
+
+cs_sync_bells_active() {
+    local bells_file="${STATE_DIR}/bells_active"
+    if ((${#BELL_SET[@]} == 0)); then
+        [[ -f "${bells_file}" ]] && rm -f "${bells_file}"
+        return 0
+    fi
+    local pane_id sid
+    {
+        for pane_id in "${!BELL_SET[@]}"; do
+            sid=$(cat "${STATE_DIR}/panes/${pane_id#%}" 2>/dev/null) || continue
+            [[ -n "${sid}" && "${sid}" != "new" ]] && printf '%s\n' "${sid}"
+        done
+    } > "${bells_file}.tmp"
+    mv "${bells_file}.tmp" "${bells_file}"
 }
 
 # ── Reset ─────────────────────────────────────────
@@ -2538,6 +2584,9 @@ cs_launch() {
             fi
             _tmux set -g window-status-format ''
             _tmux set -g window-status-current-format ''
+            _tmux set -s focus-events on
+            _tmux set -g bell-action any
+            _tmux setw -g monitor-bell on
         fi
 
         # Block until detach (NOT exec — we need control back for project switching)
