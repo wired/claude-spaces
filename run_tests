@@ -810,6 +810,7 @@ test_discover_remote_servers() {
     local remote_server="cs-fake-remote-$$"
     local remote_sanitized="-fake-remote-$$"
     local base="${XDG_RUNTIME_DIR:-/tmp}"
+    local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
     local remote_state="${base}/claude-spaces/${remote_sanitized}"
     mkdir -p "${remote_state}"
     echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
@@ -827,7 +828,7 @@ test_discover_remote_servers() {
             break
         fi
     done
-    [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; rm -rf "${remote_state}" "/tmp/fake-remote-project"; return 1; }
+    [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; return 1; }
 
     # Should NOT include our own server
     for entry in "${REMOTE_SERVERS[@]}"; do
@@ -835,6 +836,7 @@ test_discover_remote_servers() {
         if [[ "${srv}" == "${TMUX_SERVER}" ]]; then
             echo "    own server found in remote list"
             command tmux -L "${remote_server}" kill-server 2>/dev/null
+            [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
             rm -rf "${remote_state}" "/tmp/fake-remote-project"
             return 1
         fi
@@ -842,6 +844,7 @@ test_discover_remote_servers() {
 
     # Cleanup
     command tmux -L "${remote_server}" kill-server 2>/dev/null
+    [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
     rm -rf "${remote_state}" "/tmp/fake-remote-project"
 }
 

@@ -926,7 +926,6 @@ cs_discover_servers() {
         name=$(basename "${sock}")
         [[ "${name}" == "${my_server}" ]] && continue
         [[ "${name}" == cs-test-* ]] && continue
-        command tmux -L "${name}" has-session 2>/dev/null || continue
         local sanitized="${name#cs}"
         local base="${XDG_RUNTIME_DIR:-/tmp}"
         local remote_state="${base}/claude-spaces/${sanitized}"
@@ -935,6 +934,7 @@ cs_discover_servers() {
             remote_path=$(cat "${remote_state}/project_path")
         fi
         [[ -n "${remote_path}" && -d "${remote_path}" ]] || continue
+        command tmux -L "${name}" has-session 2>/dev/null || continue
         REMOTE_SERVERS+=("${name}|${remote_path}")
     done
 }
