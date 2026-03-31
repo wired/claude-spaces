@@ -148,7 +148,7 @@ cs_create_default_config() {
 # Keybinding overrides (comma-separated for multiple keys)
 # bind_terminal=`
 # bind_toggle_terminal=t
-# bind_focus_claude=Enter
+# bind_focus_claude=Enter,i
 # bind_nav_next=j
 # bind_nav_prev=k
 # bind_pane_left=h
@@ -198,7 +198,7 @@ cs_help_text() {
     echo "  Prefix keys (from any pane):"
     echo "    j/k            Next/prev session + focus"
     echo "    Space          Picker/Claude toggle"
-    echo "    Enter          Focus Claude pane"
+    echo "    Enter/i        Focus Claude pane"
     echo "    \`              Terminal (smart toggle)"
     echo "    t              Toggle terminal on/off"
     echo "    a              Literal grave (\`)"
@@ -2438,7 +2438,7 @@ cs_install_keybindings() {
     _tmux bind-key a send-keys '`'
 
     # Focus claude pane (reuses existing | trigger)
-    cs_bind focus_claude Enter send-keys -t "${PICKER_PANE}" "|"
+    cs_bind focus_claude 'Enter,i' send-keys -t "${PICKER_PANE}" "|"
 
     # Picker navigation (sends J/K to picker = move+activate+focus)
     cs_bind nav_next j send-keys -t "${PICKER_PANE}" "J"

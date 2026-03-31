@@ -156,7 +156,7 @@ any non-matching key to cancel.
 
 | Key              | Action                                                    |
 |------------------|-----------------------------------------------------------|
-| `prefix + Enter` | Focus Claude pane                                        |
+| `prefix + Enter` / `prefix + i` | Focus Claude pane                         |
 | `prefix + Space` | Toggle picker / Claude pane                               |
 | `` prefix + ` `` | Smart terminal (open/close/focus)                        |
 | `prefix + t`     | Toggle terminal on/off (unconditional)                    |
@@ -244,7 +244,7 @@ File: `~/.config/claude-spaces/config` (created on first run with commented defa
 # Keybinding overrides (comma-separated for multiple keys)
 # bind_terminal=`
 # bind_toggle_terminal=t
-# bind_focus_claude=Enter
+# bind_focus_claude=Enter,i
 # bind_nav_next=j
 # bind_nav_prev=k
 # bind_pane_left=h
