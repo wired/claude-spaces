@@ -360,6 +360,9 @@ cs_resolve_name() {
     fi
     if [[ -z "${name}" || ${#name} -lt 3 ]]; then
         name="${sid:0:8}"
+    else
+        cs_set_kv "${NAMES_FILE}" "${sid}" "${name}"
+        CUSTOM_NAMES["${sid}"]="${name}"
     fi
     echo "${name}"
 }
