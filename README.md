@@ -21,9 +21,9 @@ Claude Code has no built-in session management — no way to list, switch betwee
 |                                    | ─ inactive ─                 |
 |                                    | old-project                  |
 |                                    |                              |
-|                                    | N:new C:cls H:hide D:DEL     |
-|                                    | F:manual-focus Q:detach      |
-|                                    | claude-spaces v0.8.1-dev         |
+|                                    | : menu  / search             |
+|                                    | Q:detach                     |
+|                                    | claude-spaces v0.8.1-dev       |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
 ```
@@ -42,6 +42,7 @@ Claude Code has no built-in session management — no way to list, switch betwee
 - bash 4+
 - tmux 3.0+
 - jq
+- coreutils (stat, date, sed, sort, head)
 
 ## Install
 
@@ -154,12 +155,14 @@ Config file: `~/.config/claude-spaces/config` (created on first run with comment
 # Picker pane width: characters (e.g. 30) or percentage (e.g. 20%)
 # picker_width=30
 
+# Sort order: bell = belled first, mtime = most recent first
+# sort_by=bell,mtime
+
+# Group sessions by project (for future use)
+# group_by=project
+
 # Picker pane position: "right" (default) or "left"
 # picker_side=right
-
-# Sessions modified within this many minutes sort by name at the top;
-# older sessions sort by most recent first below them.
-# recent_threshold=10
 
 # Max length for tmux window names
 # window_name_len=12

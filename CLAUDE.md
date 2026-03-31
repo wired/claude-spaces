@@ -22,7 +22,7 @@ Controlled by `CS_PICKER` and `CS_STATE_DIR` env vars:
 - **Launcher mode** (default): `cs_launch()` — create/attach tmux session, loop for project switching
 - **Picker mode** (`CS_PICKER=1`): `cs_picker_loop()` — TUI event loop
 
-The `X` key re-execs the picker in-place, picking up code changes instantly.
+The `R` key re-execs the picker in-place, picking up code changes instantly.
 
 ### Dedicated tmux server per project
 
