@@ -37,6 +37,21 @@ TERMINAL_HEIGHT="30%"
 SHOW_INDEX=1
 CS_PREFIX=""
 declare -gA BIND_OVERRIDES=()
+# ── Color defaults (terminal-safe ANSI) ──────────
+CS_CLR_HEADER_BG='\e[7m'
+CS_CLR_ACTIVE='\e[1;32m'
+CS_CLR_BELL='\e[31m'
+CS_CLR_RUNNING=''
+CS_CLR_DORMANT='\e[2m'
+CS_CLR_LOCKED='\e[9;2m'
+CS_CLR_SELECTION='\e[7m'
+CS_CLR_CHROME='\e[2m'
+CS_CLR_SECTION='\e[2;1m'
+CS_CLR_PROMPT_WARN='\e[33m'
+CS_CLR_PROMPT_DANGER='\e[31;1m'
+CS_CLR_BELL_MENU='\e[1;33m'
+CS_CLR_SEARCH_ACTIVE='\e[7m\e[1m'
+CS_CLR_BOLD='\e[1m'
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 
 # ── tmux wrapper ─────────────────────────────────
@@ -78,6 +93,20 @@ cs_load_config() {
             terminal_height) TERMINAL_HEIGHT="${value}" ;;
             show_index) SHOW_INDEX="${value}" ;;
             prefix) CS_PREFIX="${value}" ;;
+            color_header_bg) CS_CLR_HEADER_BG="${value}" ;;
+            color_active) CS_CLR_ACTIVE="${value}" ;;
+            color_bell) CS_CLR_BELL="${value}" ;;
+            color_running) CS_CLR_RUNNING="${value}" ;;
+            color_dormant) CS_CLR_DORMANT="${value}" ;;
+            color_locked) CS_CLR_LOCKED="${value}" ;;
+            color_selection) CS_CLR_SELECTION="${value}" ;;
+            color_chrome) CS_CLR_CHROME="${value}" ;;
+            color_section) CS_CLR_SECTION="${value}" ;;
+            color_prompt_warn) CS_CLR_PROMPT_WARN="${value}" ;;
+            color_prompt_danger) CS_CLR_PROMPT_DANGER="${value}" ;;
+            color_bell_menu) CS_CLR_BELL_MENU="${value}" ;;
+            color_search_active) CS_CLR_SEARCH_ACTIVE="${value}" ;;
+            color_bold) CS_CLR_BOLD="${value}" ;;
             bind_*) BIND_OVERRIDES["${key}"]="${value}" ;;
         esac
     done < "${CONFIG_FILE}"
@@ -135,6 +164,22 @@ cs_create_default_config() {
 # bind_reload=r
 # bind_refresh=Tab
 # bind_menu=:
+
+# Color overrides (ANSI escape sequences, e.g. \e[1;32m)
+# color_header_bg=\e[7m
+# color_active=\e[1;32m
+# color_bell=\e[31m
+# color_running=
+# color_dormant=\e[2m
+# color_locked=\e[9;2m
+# color_selection=\e[7m
+# color_chrome=\e[2m
+# color_section=\e[2;1m
+# color_prompt_warn=\e[33m
+# color_prompt_danger=\e[31;1m
+# color_bell_menu=\e[1;33m
+# color_search_active=\e[7m\e[1m
+# color_bold=\e[1m
 EOF
 }
 
@@ -1500,15 +1545,15 @@ cs_render_header() {
     local title=" ${title_path} "
     local pad=$(( (width - ${#title}) / 2 ))
     ((pad < 0)) && pad=0
-    printf '\e[1;1H\e[48;5;245;30m%*s\e[0m' "${width}" ""
-    printf '\e[1;%dH\e[48;5;245;30m%s\e[0m' "$((pad + 1))" "${title}"
+    printf '\e[1;1H%b%*s\e[0m' "${CS_CLR_HEADER_BG}" "${width}" ""
+    printf '\e[1;%dH%b%s\e[0m' "$((pad + 1))" "${CS_CLR_HEADER_BG}" "${title}"
 }
 
 cs_print_centered() {
     local line="$1" text="$2" w="$3"
     local pad=$(( (w - ${#text}) / 2 ))
     ((pad < 0)) && pad=0
-    printf '\e[%d;1H\e[K\e[90m%*s%s\e[0m' "${line}" "${pad}" "" "${text}"
+    printf '\e[%d;1H\e[K%b%*s%s\e[0m' "${line}" "${CS_CLR_CHROME}" "${pad}" "" "${text}"
 }
 
 # ── Picker TUI ────────────────────────────────────
@@ -1526,7 +1571,7 @@ cs_menu_render() {
         local name="${ENTRIES_NAME[${SELECTED}]}"
         local status="${ENTRIES_STATUS[${SELECTED}]}"
         local color='\e[0m'
-        [[ "${status}" == "bell" ]] && color='\e[1;33m'
+        [[ "${status}" == "bell" ]] && color="${CS_CLR_BELL_MENU}"
         printf '\e[%d;1H\e[K%b  %-*.*s\e[0m' "${row}" "${color}" "$((width - 2))" "$((width - 2))" "${name}"
     else
         printf '\e[%d;1H\e[K' "${row}"
@@ -1541,7 +1586,7 @@ cs_menu_render() {
         if [[ -z "${MENU_KEYS[${i}]}" ]]; then
             printf '\e[%d;1H\e[K' "${row}"
         else
-            printf '\e[%d;1H\e[K  \e[1m%s\e[0m  \e[90m%s\e[0m' "${row}" "${MENU_KEYS[${i}]}" "${MENU_LABELS[${i}]}"
+            printf '\e[%d;1H\e[K  %b%s\e[0m  %b%s\e[0m' "${row}" "${CS_CLR_BOLD}" "${MENU_KEYS[${i}]}" "${CS_CLR_CHROME}" "${MENU_LABELS[${i}]}"
         fi
     done
 
@@ -1550,7 +1595,7 @@ cs_menu_render() {
     printf '\e[%d;1H\e[J' "${row}"
 
     # Bottom line: Esc hint
-    printf '\e[%d;1H\e[90mEsc: cancel\e[0m\e[K' "${height}"
+    printf '\e[%d;1H%bEsc: cancel\e[0m\e[K' "${height}" "${CS_CLR_CHROME}"
 }
 
 cs_picker_render() {
@@ -1585,7 +1630,7 @@ cs_picker_render() {
     if ((n == 0)); then
         local empty_msg="No sessions found."
         ((SEARCH_ACTIVE)) && empty_msg="No matches."
-        printf '\e[2;1H\e[K\e[90m  %s\e[0m' "${empty_msg}"
+        printf '\e[2;1H\e[K%b  %s\e[0m' "${CS_CLR_CHROME}" "${empty_msg}"
         # Clear remaining lines
         local cl
         for ((cl = 3; cl < height; cl++)); do
@@ -1594,10 +1639,10 @@ cs_picker_render() {
         if ((SEARCH_ACTIVE)); then
             printf '\e[%d;1H\e[K' "${height}"
             if ((SEARCH_FIELD_FOCUSED)); then
-                printf '\e[%d;1H\e[48;5;235m\e[1m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+                printf '\e[%d;1H%b/%s\e[K\e[0m' "${height}" "${CS_CLR_SEARCH_ACTIVE}" "${SEARCH_TERM}"
                 printf '\e[%d;%dH\e[?25h' "${height}" "$((2 + ${#SEARCH_TERM}))"
             else
-                printf '\e[%d;1H\e[90m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+                printf '\e[%d;1H%b/%s\e[K\e[0m' "${height}" "${CS_CLR_CHROME}" "${SEARCH_TERM}"
             fi
         else
             cs_print_centered "$((height - 1))" "N:new X:rld" "${width}"
@@ -1638,17 +1683,17 @@ cs_picker_render() {
             continue
         fi
         if [[ "${entry_type}" == "header" ]]; then
-            printf '\e[90;1m─ %s ─\e[0m' "${name}"
+            printf '%b─ %s ─\e[0m' "${CS_CLR_SECTION}" "${name}"
             continue
         fi
 
         # Per-type: indent, color, show_age, prefix, index
-        local indent=0 line_color='\e[90m' show_age=1 line_prefix="" idx_prefix=""
+        local indent=0 line_color="${CS_CLR_DORMANT}" show_age=1 line_prefix="" idx_prefix=""
         case "${entry_type}" in
             local)
-                line_color='\e[90m'  # default: dormant (dim)
+                line_color="${CS_CLR_DORMANT}"
                 if [[ "${pane}" == "${cur_pane}" && -n "${cur_pane}" ]]; then
-                    line_color='\e[1;32m'  # active: bold green
+                    line_color="${CS_CLR_ACTIVE}"
                     if [[ "${picker_focused}" == "0" ]]; then
                         if [[ "${PICKER_SIDE}" == "left" ]]; then
                             line_prefix="> "
@@ -1657,11 +1702,11 @@ cs_picker_render() {
                         fi
                     fi
                 elif [[ "${status}" == "managed" ]] && [[ -v "BELL_SET[${pane}]" ]]; then
-                    line_color='\e[31m'  # bell: red
+                    line_color="${CS_CLR_BELL}"
                 elif [[ "${status}" == "managed" ]]; then
-                    line_color=''  # running: white
+                    line_color="${CS_CLR_RUNNING}"
                 elif [[ "${status}" == "active_elsewhere" ]]; then
-                    line_color='\e[9;90m'  # locked: strikethrough + dim
+                    line_color="${CS_CLR_LOCKED}"
                 fi
                 if ((SHOW_INDEX)); then
                     if ((local_idx < 10)); then
@@ -1675,18 +1720,18 @@ cs_picker_render() {
                 fi
                 ;;
             project)
-                line_color='' ; show_age=0
+                line_color="${CS_CLR_RUNNING}" ; show_age=0
                 ;;
             remote)
                 indent=2
                 if [[ "${status}" == "managed" ]]; then
-                    line_color=''  # running: white
+                    line_color="${CS_CLR_RUNNING}"
                 else
-                    line_color='\e[90m'  # dormant: dim
+                    line_color="${CS_CLR_DORMANT}"
                 fi
                 ;;
             inactive)
-                line_color='\e[90m' ; show_age=0
+                line_color="${CS_CLR_DORMANT}" ; show_age=0
                 ;;
         esac
 
@@ -1708,15 +1753,17 @@ cs_picker_render() {
         # Selection background (skip for focused or search field focused)
         local sel_bg=""
         if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ "${picker_focused}" == "1" ]]; then
-            sel_bg='\e[48;5;235m'
+            sel_bg="${CS_CLR_SELECTION}"
             printf '%b' "${sel_bg}"
         fi
 
         # Render line
+        local idx_color="${CS_CLR_CHROME}"
+        [[ -n "${sel_bg}" ]] && idx_color="${line_color}"
         if ((show_age)); then
-            printf '%s\e[90m%s\e[0m%b%b%s%-*.*s%4s' "${indent_str}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}"
+            printf '%s%b%s\e[0m%b%b%s%-*.*s%4s' "${indent_str}" "${idx_color}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}"
         else
-            printf '%s\e[90m%s\e[0m%b%b%s%-*.*s' "${indent_str}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}"
+            printf '%s%b%s\e[0m%b%b%s%-*.*s' "${indent_str}" "${idx_color}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}"
         fi
         printf '\e[0m'
     done
@@ -1732,7 +1779,7 @@ cs_picker_render() {
     # Scroll indicator
     if ((n > avail)); then
         local pct=$(( (SCROLL * 100) / (n - avail) ))
-        printf '\e[%d;1H\e[K\e[90m%d%%\e[0m' "$((last_entry_line + 1))" "${pct}"
+        printf '\e[%d;1H\e[K%b%d%%\e[0m' "$((last_entry_line + 1))" "${CS_CLR_CHROME}" "${pct}"
     else
         printf '\e[%d;1H\e[K' "$((last_entry_line + 1))"
     fi
@@ -1745,10 +1792,10 @@ cs_picker_render() {
         done
         printf '\e[%d;1H\e[K' "${height}"
         if ((SEARCH_FIELD_FOCUSED)); then
-            printf '\e[%d;1H\e[48;5;235m\e[1m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+            printf '\e[%d;1H%b/%s\e[K\e[0m' "${height}" "${CS_CLR_SEARCH_ACTIVE}" "${SEARCH_TERM}"
             printf '\e[%d;%dH\e[?25h' "${height}" "$((2 + ${#SEARCH_TERM}))"
         else
-            printf '\e[%d;1H\e[90m/%s\e[K\e[0m' "${height}" "${SEARCH_TERM}"
+            printf '\e[%d;1H%b/%s\e[K\e[0m' "${height}" "${CS_CLR_CHROME}" "${SEARCH_TERM}"
         fi
     else
         # Centered footer (context-sensitive)
@@ -2198,7 +2245,7 @@ cs_confirm_close() {
     local pane="${ENTRIES_PANE[${SELECTED}]}"
     [[ "${status}" == "managed" && -n "${pane}" ]] || return 0
 
-    cs_confirm $'\e[33m Close? y/N ' || return 0
+    cs_confirm "${CS_CLR_PROMPT_WARN} Close? y/N " || return 0
     cs_close_pane "${pane}"
     cs_after_remove "${pane}"
 }
@@ -2207,7 +2254,7 @@ cs_confirm() {
     local prompt="$1"
     local height
     height=$(tput lines)
-    printf '\e[%d;1H\e[K%s\e[0m' "${height}" "${prompt}"
+    printf '\e[%d;1H\e[K%b\e[0m' "${height}" "${prompt}"
     local confirm=""
     read -rsn1 confirm
     [[ "${confirm}" == "y" ]]
@@ -2230,7 +2277,7 @@ cs_confirm_hide() {
     local sid="${ENTRIES_ID[${SELECTED}]}"
     [[ -v "HIDDEN_SET[${sid}]" ]] && return 0
 
-    cs_confirm $'\e[33m Hide? y/N ' || return 0
+    cs_confirm "${CS_CLR_PROMPT_WARN} Hide? y/N " || return 0
 
     local removed_pane=""
     if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
@@ -2247,7 +2294,7 @@ cs_confirm_delete() {
     [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
     [[ "${ENTRIES_STATUS[${SELECTED}]}" == "active_elsewhere" ]] && return 0
 
-    cs_confirm $'\e[31;1m DELETE from disk? y/N ' || return 0
+    cs_confirm "${CS_CLR_PROMPT_DANGER} DELETE from disk? y/N " || return 0
 
     local removed_pane=""
     if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
@@ -2258,7 +2305,7 @@ cs_confirm_delete() {
 }
 
 cs_confirm_shutdown() {
-    cs_confirm $'\e[31;1m Shutdown? y/N ' || return 0
+    cs_confirm "${CS_CLR_PROMPT_DANGER} Shutdown? y/N " || return 0
     stty echo 2>/dev/null || true
     printf '\e[?25h\e[0m'
     cs_remove_bell_hook
