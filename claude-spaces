@@ -1864,7 +1864,7 @@ cs_picker_loop() {
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
                     v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
                     '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
-                    c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; DIRTY=1 ;;
+                    c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     d) MENU_ACTIVE=0; _tmux detach-client ;;
                     s) MENU_ACTIVE=0; cs_confirm_shutdown ;;
                     *) MENU_ACTIVE=0; DIRTY=1 ;;
@@ -1946,7 +1946,7 @@ cs_picker_loop() {
                     '`') cs_term_smart; DIRTY=1 ;;
                     '|') cs_focus_session ;;
                     $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
-                    $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; DIRTY=1 ;;
+                    $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
                     $'\x06') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_close; DIRTY=1 ;;
                     $'\x0e')
