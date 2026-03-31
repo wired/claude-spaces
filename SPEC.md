@@ -232,8 +232,8 @@ File: `~/.config/claude-spaces/config` (created on first run with commented defa
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
 
-# Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
-# terminal_height=30%
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 40%)
+# terminal_height=40%
 
 # Show jump index next to first 10 local sessions
 # show_index=1
