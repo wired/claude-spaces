@@ -153,7 +153,7 @@ cs_create_default_config() {
 # bind_nav_prev=k
 # bind_pane_left=h
 # bind_pane_right=l
-# bind_focus_picker=f,Space
+# bind_focus_picker=Space
 # bind_detach=d
 # bind_zoom=z
 # bind_copy_mode=[
@@ -197,7 +197,7 @@ cs_help_text() {
     echo "    Q              Detach    R  Reload picker"
     echo "  Prefix keys (from any pane):"
     echo "    j/k            Next/prev session + focus"
-    echo "    f/Space        Focus picker"
+    echo "    Space          Picker/Claude toggle"
     echo "    Enter          Focus Claude pane"
     echo "    \`              Terminal (smart toggle)"
     echo "    t              Toggle terminal on/off"
@@ -1971,16 +1971,16 @@ cs_picker_loop() {
                        cs_activate_selected; cs_focus_session
                        DIRTY=1 ;;
                     H|L) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
-                    h) _tmux select-pane -L 2>/dev/null || true ;;
-                    l) _tmux select-pane -R 2>/dev/null || true ;;
+                    h) _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
+                    l) _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
                     $'\e')
                         local seq=""
                         read -rsn2 -t 0.1 seq || true
                         case "${seq}" in
                             '[A') cs_move_up; DIRTY=1 ;;
                             '[B') cs_move_down; DIRTY=1 ;;
-                            '[C') _tmux select-pane -R 2>/dev/null || true ;;
-                            '[D') _tmux select-pane -L 2>/dev/null || true ;;
+                            '[C') _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
+                            '[D') _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
                         esac
                         ;;
                     '')
@@ -1994,7 +1994,7 @@ cs_picker_loop() {
                     Q) _tmux detach-client ;;
                     '~') cs_term_toggle; DIRTY=1 ;;
                     '`') cs_term_smart; DIRTY=1 ;;
-                    '|') cs_focus_session ;;
+                    '|') cs_focus_session; DIRTY=1 ;;
                     $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
                     $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
@@ -2004,6 +2004,16 @@ cs_picker_loop() {
                         stty echo 2>/dev/null || true
                         printf '\e[?25h\e[0m'
                         CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}" ;;
+                    $'\x0f')
+                        local _pf
+                        _pf=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
+                        if [[ "${_pf}" == "${PICKER_PANE}" ]]; then
+                            cs_focus_session
+                        else
+                            _tmux select-pane -t "${PICKER_PANE}"
+                        fi
+                        DIRTY=1
+                        ;;
                     [0-9]) cs_jump_to_local "${key}" ;;
                     $'\x12') cs_rescan; DIRTY=1 ;;
                     R)
@@ -2396,8 +2406,8 @@ cs_install_keybindings() {
     cs_bind pane_left h select-pane -L
     cs_bind pane_right l select-pane -R
 
-    # Focus picker
-    cs_bind focus_picker 'f,Space' select-pane -t "${PICKER_PANE}"
+    # Smart focus: picker↔claude toggle
+    cs_bind focus_picker Space send-keys -t "${PICKER_PANE}" $'\x0f'
 
     # Detach
     cs_bind detach d detach-client

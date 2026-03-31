@@ -157,7 +157,7 @@ any non-matching key to cancel.
 | Key              | Action                                                    |
 |------------------|-----------------------------------------------------------|
 | `prefix + Enter` | Focus Claude pane                                        |
-| `prefix + f` / `prefix + Space` | Focus picker                              |
+| `prefix + Space` | Toggle picker / Claude pane                               |
 | `` prefix + ` `` | Smart terminal (open/close/focus)                        |
 | `prefix + t`     | Toggle terminal on/off (unconditional)                    |
 | `prefix + a`     | Literal grave (`` ` ``)                                  |
@@ -249,7 +249,7 @@ File: `~/.config/claude-spaces/config` (created on first run with commented defa
 # bind_nav_prev=k
 # bind_pane_left=h
 # bind_pane_right=l
-# bind_focus_picker=f,Space
+# bind_focus_picker=Space
 # bind_detach=d
 # bind_zoom=z
 # bind_copy_mode=[
