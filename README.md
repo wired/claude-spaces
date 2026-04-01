@@ -1,10 +1,13 @@
 # claude-spaces
 
-tmux-based session picker for Claude Code. Persistent side panel listing all sessions for the current project, with cross-server discovery of other projects and seamless switching between them.
+Session management for Claude Code.
 
-Claude Code has no built-in session management — no way to list, switch between, or revisit past sessions without manually tracking IDs. claude-spaces fills that gap: persistent session tracking, background activity alerts, and multi-project switching, all without leaving the terminal.
+<!-- hero GIF -->
 
-## Layout
+Claude Code tracks sessions but gives you no way to see them. No list, no
+switching, no way to tell what's running in the background. claude-spaces adds
+all of that — a persistent tmux side panel that shows every session across
+every project, with instant switching and background activity alerts.
 
 ```
 +------------------------------------+------------------------------+
@@ -23,56 +26,56 @@ Claude Code has no built-in session management — no way to list, switch betwee
 |                                    |                              |
 |                                    | : menu  / search             |
 |                                    | Q:detach                     |
-|                                    | claude-spaces v0.8.1-dev       |
+|                                    | claude-spaces v0.9.0         |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
 ```
 
-## Features
-
-- Dedicated tmux server per project — isolated keybindings, bell hooks, window state
-- Cross-server discovery — see and switch to sessions in other projects
-- Inactive project discovery — resume projects that aren't currently running
-- Bell detection — background sessions that finish are highlighted in red
-- Custom session names, hide/delete, rename
-- Auto-refresh with fingerprint-based dirty checking
-
-## Requirements
-
-- bash 4+
-- tmux 3.0+
-- jq
-- coreutils (stat, date, sed, sort, head)
-
 ## Install
 
 ```
-make install
+brew tap wired/tap && brew install claude-spaces   # macOS / Homebrew
+yay -S claude-spaces                                # Arch (AUR)
+make install                                        # /usr/local/bin (may need sudo)
+PREFIX=~/.local make install                        # ~/.local/bin
 ```
 
-Or to a custom location:
+Requires bash 4+, tmux 3.0+, jq.
+
+## Quick Start
 
 ```
-PREFIX=~/.local make install
+claude-spaces              # launch
+claude-spaces --reset      # kill all managed panes, clear state
+claude-spaces --help
 ```
 
-### Development
+Run it from any project directory. It creates a dedicated tmux server, opens a
+session picker on the right, and launches Claude Code on the left.
 
-Symlink to `~/.local/bin` so edits are live:
+## Features
 
-```
-make dev
-```
+**Session picker** — all sessions for the current project in a persistent side
+panel. Navigate with `j`/`k`, jump with `1`-`0`, search with `/`.
 
-## Usage
+**Cross-project discovery** — sessions from other running projects appear
+automatically. Hit Enter to switch. Inactive projects (not currently running)
+are discovered and can be resumed.
 
-```
-claude-spaces          # Launch picker (inside or outside tmux)
-claude-spaces --reset  # Kill all managed panes, clear state
-claude-spaces --help   # Show help
-```
+**Bell detection** — when Claude finishes in a background session, the picker
+highlights it in red. Never miss a completed task again.
 
-## Keybinds
+**Per-session terminal** — each session gets its own shell pane below it.
+Toggle with `` prefix + ` ``, resize freely — height is saved.
+
+**Search and filter** — type `/` to filter sessions by name across all
+sections. Matches update as you type.
+
+**Isolated per-project servers** — each project gets its own tmux server. No
+cross-contamination of keybindings, window state, or bell hooks.
+
+<details>
+<summary><strong>Keybinds</strong></summary>
 
 claude-spaces takes full ownership of the tmux prefix key table on its dedicated
 server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
@@ -104,11 +107,11 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + a` | Literal grave (`` ` ``) |
 | `prefix + j` / `prefix + ↓` | Next session + focus |
 | `prefix + k` / `prefix + ↑` | Prev session + focus |
-| `prefix + 1`-`9`, `0` | Jump to Nth local session (0 = 10th) + focus |
+| `prefix + 1`-`9`, `0` | Jump to Nth local session + focus |
 | `prefix + h` / `prefix + ←` | Select pane left |
 | `prefix + l` / `prefix + →` | Select pane right |
 | `prefix + /` | Focus picker + search |
-| `prefix + c` | New session (create) |
+| `prefix + c` | New session |
 | `prefix + x` | Close session (with confirm) |
 | `prefix + r` | Reload picker |
 | `prefix + z` | Zoom/maximize pane |
@@ -116,17 +119,19 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + ]` | Paste buffer |
 | `prefix + PgUp` | Copy mode + scroll up |
 | `prefix + d` | Detach |
-| `prefix + :` | Command menu (focus picker + open) |
+| `prefix + :` | Command menu |
 | `prefix + Tab` | Refresh/rescan |
 | `prefix + F12` | tmux command prompt (escape hatch) |
 | `prefix + M-↑/↓` | Resize pane vertically |
 | `prefix + M-←/→` | Resize pane horizontally |
 
-## Bell Detection
+</details>
 
-Background sessions that finish can ring the terminal bell, highlighting them in red in the picker. This requires a Claude Code Stop hook.
+<details>
+<summary><strong>Bell Detection</strong></summary>
 
-Add to `~/.claude/settings.json`:
+Background sessions that finish can ring the terminal bell, highlighting them
+in red in the picker. Add a Claude Code Stop hook to `~/.claude/settings.json`:
 
 ```json
 {
@@ -145,24 +150,27 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-The `> /dev/tty` is critical — without it the bell doesn't reach tmux. Bell state clears when the session is brought to the foreground.
+The `> /dev/tty` is critical — without it the bell doesn't reach tmux. Bell
+state clears when the session is brought to the foreground.
 
-## Configuration
+</details>
 
-Config file: `~/.config/claude-spaces/config` (created on first run with commented defaults; respects `$XDG_CONFIG_HOME`).
+<details>
+<summary><strong>Configuration</strong></summary>
+
+Config file: `~/.config/claude-spaces/config` (created on first run with
+commented defaults; respects `$XDG_CONFIG_HOME`).
 
 ```ini
 # Picker pane width: characters (e.g. 30) or percentage (e.g. 20%)
 # picker_width=30
 
-# Sort order: bell = belled first, mtime = most recent first
-# sort_by=bell,mtime
-
-# Group sessions by project (for future use)
-# group_by=project
-
 # Picker pane position: "right" (default) or "left"
 # picker_side=right
+
+# Sessions modified within this many minutes sort by name at the top;
+# older sessions sort by most recent first below them.
+# recent_threshold=10
 
 # Max length for tmux window names
 # window_name_len=12
@@ -200,8 +208,12 @@ Config file: `~/.config/claude-spaces/config` (created on first run with comment
 # bind_menu=:
 ```
 
-Custom session names: `~/.local/share/claude-spaces/names` (`session_id=name`; respects `$XDG_DATA_HOME`)
-Hidden sessions: `~/.local/share/claude-spaces/hidden` (one ID per line; respects `$XDG_DATA_HOME`)
+Custom session names: `~/.local/share/claude-spaces/names` (`session_id=name`;
+respects `$XDG_DATA_HOME`)
+Hidden sessions: `~/.local/share/claude-spaces/hidden` (one ID per line;
+respects `$XDG_DATA_HOME`)
+
+</details>
 
 ## License
 
