@@ -4,6 +4,10 @@ Parent: [SPEC.md](../SPEC.md)
 
 - **Two-tier sort**: Active sessions (< 10m) sorted alphabetically (stable), inactive sorted by mtime
 - **Unhide**: UI to restore hidden sessions
+- **Menu action safety**: Rescan runs while the command menu is open, which can shift
+  SELECTED if the original entry disappears from disk. Menu actions could then target
+  the wrong session. Fix: snapshot the selected entry ID on menu open and pass it to
+  action handlers instead of reading SELECTED at execution time.
 - **Session forking**: Use `claude --fork-session` to branch from an existing session
 - **Search/filter**: Type to filter session list
 - **Idle detection**: Show whether Claude is working or waiting for input

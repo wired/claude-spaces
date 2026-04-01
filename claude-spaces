@@ -632,19 +632,29 @@ MENU_LABELS=()
 cs_menu_init() {
     local hide_label="View hidden"
     ((SHOW_HIDDEN)) && hide_label="Hide hidden"
-    MENU_KEYS=(r x h o '!' "" c v d s)
-    MENU_LABELS=(
-        "Rename"
-        "Close"
-        "Hide"
-        "Hide this & older"
-        "Delete"
-        ""
-        "New session"
-        "${hide_label}"
-        "Detach"
-        "Shutdown"
-    )
+    if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
+        MENU_KEYS=(r x h o '!' "" c v d s)
+        MENU_LABELS=(
+            "Rename"
+            "Close"
+            "Hide"
+            "Hide this & older"
+            "Delete"
+            ""
+            "New session"
+            "${hide_label}"
+            "Detach"
+            "Shutdown"
+        )
+    else
+        MENU_KEYS=(c v d s)
+        MENU_LABELS=(
+            "New session"
+            "${hide_label}"
+            "Detach"
+            "Shutdown"
+        )
+    fi
 }
 
 cs_menu_enter() {
