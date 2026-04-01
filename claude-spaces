@@ -33,7 +33,7 @@ PICKER_SIDE="right"
 WINDOW_NAME_LEN=12
 TMUX_SERVER="cs${PWD//\//-}"
 TMUX_CONF="${HOME}/.tmux.conf"
-TERMINAL_HEIGHT="40%"
+TERMINAL_HEIGHT="35%"
 SHOW_INDEX=1
 CS_PREFIX=""
 declare -gA BIND_OVERRIDES=()
@@ -138,8 +138,8 @@ cs_create_default_config() {
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
 
-# Terminal pane height: characters (e.g. 15) or percentage (e.g. 30%)
-# terminal_height=40%
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
+# terminal_height=35%
 
 # Show jump index [1]-[0] next to first 10 local sessions
 # show_index=1
@@ -1442,7 +1442,7 @@ cs_handle_winch() {
             local pct
             pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
             [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
-            [[ -z "${pct}" ]] && pct=40
+            [[ -z "${pct}" ]] && pct=35
             local term_h sess_h
             term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
             sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
@@ -2038,6 +2038,7 @@ cs_picker_loop() {
                         DIRTY=1
                         ;;
                     ' ') cs_activate_selected; DIRTY=1 ;;
+                    a|i) cs_focus_session; DIRTY=1 ;;
                     /) cs_search_enter; DIRTY=1 ;;
                     ':') cs_menu_enter ;;
                     Q) _tmux detach-client ;;

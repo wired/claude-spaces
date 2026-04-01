@@ -182,8 +182,8 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
 
-# Terminal pane height: characters (e.g. 15) or percentage (e.g. 40%)
-# terminal_height=40%
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
+# terminal_height=35%
 
 # Show jump index next to first 10 local sessions
 # show_index=1
