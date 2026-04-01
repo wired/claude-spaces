@@ -163,7 +163,11 @@ cs_create_default_config() {
 # bind_search=/
 # bind_new_session=c
 # bind_close=x
-# bind_reload=r
+# bind_rename=r
+# bind_hide=h
+# bind_delete=!
+# bind_shutdown=s
+# bind_reload=R
 # bind_refresh=Tab
 # bind_menu=:
 
@@ -205,7 +209,9 @@ cs_help_text() {
     echo "    \`              Terminal (smart toggle)"
     echo "    t              Toggle terminal on/off"
     echo "    a              Literal grave (\`)"
-    echo "    c  New session  x  Close  r  Reload"
+    echo "    c  New   x  Close   r  Rename"
+    echo "    h  Hide  !  Delete  s  Shutdown"
+    echo "    R  Reload picker"
     echo "    z              Zoom pane"
     echo "    :              Command menu"
     echo "    [/]            Copy/paste   d  Detach"
@@ -1959,7 +1965,7 @@ cs_picker_loop() {
                     '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
                     c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     d) MENU_ACTIVE=0; _tmux detach-client ;;
-                    s) MENU_ACTIVE=0; cs_confirm_shutdown ;;
+                    s) MENU_ACTIVE=0; cs_confirm_shutdown; DIRTY=1 ;;
                     *) MENU_ACTIVE=0; DIRTY=1 ;;
                 esac
             elif ((SEARCH_ACTIVE)); then
@@ -2039,6 +2045,10 @@ cs_picker_loop() {
                     '`') cs_term_smart; DIRTY=1 ;;
                     '|') cs_focus_session; DIRTY=1 ;;
                     $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
+                    $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
+                    $'\x14') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_hide; DIRTY=1 ;;
+                    $'\x15') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_delete; DIRTY=1 ;;
+                    $'\x16') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_shutdown; DIRTY=1 ;;
                     $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
                     $'\x06') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_close; DIRTY=1 ;;
@@ -2541,7 +2551,11 @@ cs_install_keybindings() {
     cs_bind search / send-keys -t "${PICKER_PANE}" $'\x01'
     cs_bind new_session c send-keys -t "${PICKER_PANE}" $'\x02'
     cs_bind close x send-keys -t "${PICKER_PANE}" $'\x06'
-    cs_bind reload r send-keys -t "${PICKER_PANE}" $'\x0e'
+    cs_bind rename r send-keys -t "${PICKER_PANE}" $'\x10'
+    cs_bind hide h send-keys -t "${PICKER_PANE}" $'\x14'
+    cs_bind delete '!' send-keys -t "${PICKER_PANE}" $'\x15'
+    cs_bind shutdown s send-keys -t "${PICKER_PANE}" $'\x16'
+    cs_bind reload R send-keys -t "${PICKER_PANE}" $'\x0e'
 
     # Hardcoded (not configurable): arrow keys duplicate configurable keys
     _tmux bind-key Down send-keys -t "${PICKER_PANE}" "J"

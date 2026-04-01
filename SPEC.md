@@ -169,6 +169,10 @@ Default key assignments are documented in README.md. The available actions:
 | Search | `bind_search` | Focus picker + enter search mode |
 | New session | `bind_new_session` | Create new Claude session |
 | Close session | `bind_close` | Close with confirm prompt |
+| Rename session | `bind_rename` | Rename selected session |
+| Hide session | `bind_hide` | Hide with confirm prompt |
+| Delete session | `bind_delete` | Delete permanently with confirm |
+| Shutdown | `bind_shutdown` | Kill tmux server |
 | Reload picker | `bind_reload` | Re-exec picker in-place |
 | Zoom | `bind_zoom` | Zoom/maximize current pane |
 | Copy mode | `bind_copy_mode` | Enter tmux copy mode |

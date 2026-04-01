@@ -113,7 +113,11 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + /` | Focus picker + search |
 | `prefix + c` | New session |
 | `prefix + x` | Close session (with confirm) |
-| `prefix + r` | Reload picker |
+| `prefix + r` | Rename session |
+| `prefix + h` | Hide session (with confirm) |
+| `prefix + !` | Delete session (with confirm) |
+| `prefix + s` | Shutdown (kill server) |
+| `prefix + R` | Reload picker |
 | `prefix + z` | Zoom/maximize pane |
 | `prefix + [` | Copy mode |
 | `prefix + ]` | Paste buffer |
@@ -203,7 +207,11 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # bind_search=/
 # bind_new_session=c
 # bind_close=x
-# bind_reload=r
+# bind_rename=r
+# bind_hide=h
+# bind_delete=!
+# bind_shutdown=s
+# bind_reload=R
 # bind_refresh=Tab
 # bind_menu=:
 ```
