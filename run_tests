@@ -633,6 +633,44 @@ test_hide_session() {
     cs_assert_consistent "hide_session"
 }
 
+test_hide_older() {
+    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    local sid_c="cccccccc-cccc-cccc-cccc-cccccccccccc"
+    cs_create_mock_session "${sid_a}" "old session"
+    cs_create_mock_session "${sid_b}" "middle session"
+    cs_create_mock_session "${sid_c}" "new session"
+
+    # Backdate A and B so they're older than C
+    touch -t 202601010000 "${MOCK_PROJECT_DIR}/${sid_a}.jsonl"
+    touch -t 202602010000 "${MOCK_PROJECT_DIR}/${sid_b}.jsonl"
+    # C keeps current time (newest)
+
+    cs_scan_sessions
+    [[ ${#ENTRIES_ID[@]} -eq 3 ]] || { echo "    expected 3 entries, got ${#ENTRIES_ID[@]}"; return 1; }
+
+    # Select B (middle) — hide B and everything older (A)
+    local idx
+    idx=$(find_entry_index "${sid_b}")
+    SELECTED=${idx}
+    cs_hide_older <<< "y"
+
+    cs_scan_sessions
+    [[ ${#ENTRIES_ID[@]} -eq 1 ]] || { echo "    expected 1 entry after hide_older, got ${#ENTRIES_ID[@]}"; return 1; }
+
+    # C (newest) should survive
+    idx=$(find_entry_index "${sid_c}")
+    [[ "${idx}" != "-1" ]] || { echo "    new session should not be hidden"; return 1; }
+
+    # A and B should be hidden
+    idx=$(find_entry_index "${sid_a}")
+    [[ "${idx}" == "-1" ]] || { echo "    old session should be hidden"; return 1; }
+    idx=$(find_entry_index "${sid_b}")
+    [[ "${idx}" == "-1" ]] || { echo "    middle session should be hidden"; return 1; }
+
+    cs_assert_consistent "hide_older"
+}
+
 test_delete_session() {
     local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     cs_create_mock_session "${sid}" "to delete"
@@ -1459,6 +1497,7 @@ main() {
     run_test "bell detection"               test_bell_detection
     run_test "remote bell"                  test_remote_bell
     run_test "hide session"                 test_hide_session
+    run_test "hide this & older"            test_hide_older
     run_test "delete session"               test_delete_session
     run_test "stale state recovery"         test_stale_recovery
     run_test "locked session blocked"       test_locked_session_blocked

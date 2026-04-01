@@ -147,6 +147,7 @@ any non-matching key to cancel.
 | `r` | Rename |
 | `x` | Close (with confirm) |
 | `h` | Hide (with confirm) |
+| `o` | Hide this & older (with confirm) |
 | `!` | Delete permanently (with confirm) |
 | `c` | New session |
 | `d` | Detach |

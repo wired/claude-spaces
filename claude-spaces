@@ -632,11 +632,12 @@ MENU_LABELS=()
 cs_menu_init() {
     local hide_label="View hidden"
     ((SHOW_HIDDEN)) && hide_label="Hide hidden"
-    MENU_KEYS=(r x h '!' "" c v d s)
+    MENU_KEYS=(r x h o '!' "" c v d s)
     MENU_LABELS=(
         "Rename"
         "Close"
         "Hide"
+        "Hide this & older"
         "Delete"
         ""
         "New session"
@@ -1938,6 +1939,7 @@ cs_picker_loop() {
                     r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
                     x) MENU_ACTIVE=0; cs_confirm_close; DIRTY=1 ;;
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
+                    o) MENU_ACTIVE=0; cs_hide_older; DIRTY=1 ;;
                     v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
                     '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
                     c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
@@ -2340,6 +2342,48 @@ cs_confirm_hide() {
     fi
     echo "${sid}" >> "${HIDDEN_FILE}"
     cs_after_remove "${removed_pane}"
+}
+
+cs_hide_older() {
+    local n=${#ENTRIES_ID[@]}
+    ((n == 0)) && return 0
+    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
+
+    local cutoff_mtime="${ENTRIES_MTIME[${SELECTED}]}"
+
+    # Count how many will be hidden
+    local count=0
+    for ((i = 0; i < n; i++)); do
+        [[ "${ENTRIES_TYPE[i]}" == "local" ]] || continue
+        ((ENTRIES_MTIME[i] > cutoff_mtime)) && continue
+        [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]] && continue
+        ((count++))
+    done
+    ((count == 0)) && return 0
+
+    cs_confirm "${CS_CLR_PROMPT_WARN} Hide ${count} sessions? y/N " || return 0
+
+    # Track whether the current pane gets closed (for welcome screen)
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    local removed_current=""
+
+    for ((i = 0; i < n; i++)); do
+        [[ "${ENTRIES_TYPE[i]}" == "local" ]] || continue
+        ((ENTRIES_MTIME[i] > cutoff_mtime)) && continue
+        [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]] && continue
+
+        # Close managed pane if any
+        if [[ "${ENTRIES_STATUS[i]}" == "managed" && -n "${ENTRIES_PANE[i]}" ]]; then
+            cs_close_pane "${ENTRIES_PANE[i]}"
+            [[ "${ENTRIES_PANE[i]}" == "${cur_pane}" ]] && removed_current="${cur_pane}"
+        fi
+
+        echo "${ENTRIES_ID[i]}" >> "${HIDDEN_FILE}"
+        HIDDEN_SET["${ENTRIES_ID[i]}"]=1
+    done
+
+    cs_after_remove "${removed_current}"
 }
 
 cs_confirm_delete() {
