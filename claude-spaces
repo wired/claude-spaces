@@ -1669,7 +1669,7 @@ cs_picker_render() {
     fi
 
     # Hide cursor, home position (no full clear — paint over to avoid flash)
-    printf '\e[?25l\e[H'
+    printf '\e[?25l\e]112\a\e[H'
 
     # Header (or search bar when searching)
     if ((SEARCH_ACTIVE)); then
@@ -1692,7 +1692,7 @@ cs_picker_render() {
         if ((SEARCH_ACTIVE)); then
             printf '\e[%d;1H\e[K' "${height}"
             if ((SEARCH_FIELD_FOCUSED)); then
-                printf '\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
+                printf '\e]12;#ffffff\a\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
             fi
         else
             printf '\e[%d;1H\e[K' "${height}"
@@ -1845,7 +1845,7 @@ cs_picker_render() {
             printf '\e[%d;1H\e[K' "${cl}"
         done
         if ((SEARCH_FIELD_FOCUSED)); then
-            printf '\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
+            printf '\e]12;#ffffff\a\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
         fi
     else
         # Centered footer (context-sensitive)
