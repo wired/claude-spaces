@@ -90,3 +90,4 @@ README.md documents keybinds, configuration options, and bell detection setup.
 When changing keybinds, config keys, or user-facing features in the source, update
 README.md to match. SPEC.md is the authoritative overview; specs/ subfiles have detailed
 mechanics. When updating spec content, check both SPEC.md and the relevant subfile for drift.
+When completing a feature listed in specs/future.md, remove or update its entry.
