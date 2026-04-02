@@ -23,7 +23,17 @@ if ((BASH_VERSINFO[0] < 4)); then
 fi
 
 VERSION="0.9.1-dev"
-SCRIPT_PATH="$(readlink -f "$0")"
+_cs_realpath() {
+  local p="$1"
+  local dir
+  while [[ -L "$p" ]]; do
+    dir="$(cd "$(dirname "$p")" && pwd)"
+    p="$(readlink "$p")"
+    [[ "$p" != /* ]] && p="$dir/$p"
+  done
+  echo "$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
+}
+SCRIPT_PATH="$(_cs_realpath "$0")"
 CLAUDE_DIR="${HOME}/.claude"
 PROJECTS_DIR="${CLAUDE_DIR}/projects"
 SESSIONS_DIR="${CLAUDE_DIR}/sessions"
@@ -238,6 +248,13 @@ cs_preflight() {
     command -v claude &>/dev/null || { echo "ERROR: claude not found. Install from https://docs.anthropic.com/en/docs/claude-code"; ok=0; }
     ((ok)) || exit 1
 }
+
+# ── Portability ───────────────────────────────────
+if stat -c '%Y' / &>/dev/null; then
+  _cs_stat() { stat -c '%Y %n' "$@"; }
+else
+  _cs_stat() { stat -f '%m %N' "$@"; }
+fi
 
 # ── State ─────────────────────────────────────────
 cs_sanitize_path() {
@@ -460,7 +477,7 @@ cs_scan_sessions() {
     declare -A mtimes
     while read -r mt fn; do
         mtimes["${fn}"]="${mt}"
-    done < <(stat -c '%Y %n' "${project_dir}"/*.jsonl 2>/dev/null)
+    done < <(_cs_stat "${project_dir}"/*.jsonl 2>/dev/null)
     for f in "${project_dir}"/*.jsonl; do
         [[ -f "${f}" ]] || continue
         local sid="${f##*/}"
@@ -1036,7 +1053,7 @@ cs_scan_project_sessions() {
     declare -A r_mtimes_map
     while read -r mt fn; do
         r_mtimes_map["${fn}"]="${mt}"
-    done < <(stat -c '%Y %n' "${project_dir}"/*.jsonl 2>/dev/null)
+    done < <(_cs_stat "${project_dir}"/*.jsonl 2>/dev/null)
     for f in "${project_dir}"/*.jsonl; do
         [[ -f "${f}" ]] || continue
         local sid="${f##*/}"
