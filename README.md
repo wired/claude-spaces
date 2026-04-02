@@ -110,11 +110,13 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `` prefix + ` `` | Smart terminal (open/close/focus) |
 | `prefix + t` | Toggle terminal on/off (unconditional) |
 | `prefix + a` | Literal grave (`` ` ``) |
-| `prefix + j` / `prefix + ↓` | Next session + focus |
-| `prefix + k` / `prefix + ↑` | Prev session + focus |
+| `prefix + h` / `prefix + ←` / `prefix + S-←` | Select pane left |
+| `prefix + j` / `prefix + ↓` | Select pane down |
+| `prefix + k` / `prefix + ↑` | Select pane up |
+| `prefix + l` / `prefix + →` / `prefix + S-→` | Select pane right |
+| `prefix + J` / `prefix + S-↓` | Next session + focus |
+| `prefix + K` / `prefix + S-↑` | Prev session + focus |
 | `prefix + 1`-`9`, `0` | Jump to Nth local session + focus |
-| `prefix + h` / `prefix + ←` | Select pane left |
-| `prefix + l` / `prefix + →` | Select pane right |
 | `prefix + /` | Focus picker + search |
 | `prefix + c` | New session |
 | `prefix + x` | Close session (with confirm) |
@@ -199,10 +201,12 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # bind_terminal=`
 # bind_toggle_terminal=t
 # bind_focus_claude=Enter,i
-# bind_nav_next=j
-# bind_nav_prev=k
-# bind_pane_left=h
-# bind_pane_right=l
+# bind_nav_next=J,S-Down
+# bind_nav_prev=K,S-Up
+# bind_pane_left=h,Left,S-Left
+# bind_pane_right=l,Right,S-Right
+# bind_pane_up=k,Up
+# bind_pane_down=j,Down
 # bind_focus_picker=Space
 # bind_detach=d
 # bind_zoom=z

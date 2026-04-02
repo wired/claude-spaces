@@ -136,7 +136,7 @@ Default key assignments are documented in README.md. The available actions:
 | Terminal (smart) | `bind_terminal` | Closed→open, focused→close, unfocused→focus |
 | Terminal toggle | `bind_toggle_terminal` | Unconditional show/hide |
 | Nav next/prev | `bind_nav_next`, `bind_nav_prev` | Move + activate + focus session |
-| Pane left/right | `bind_pane_left`, `bind_pane_right` | Directional pane movement |
+| Pane movement | `bind_pane_left`, `bind_pane_right`, `bind_pane_up`, `bind_pane_down` | Directional pane movement |
 | Search | `bind_search` | Focus picker + enter search mode |
 | New session | `bind_new_session` | Create new Claude session |
 | Close session | `bind_close` | Close with confirm prompt |
@@ -151,9 +151,8 @@ Default key assignments are documented in README.md. The available actions:
 | Menu | `bind_menu` | Focus picker + open command menu |
 | Refresh | `bind_refresh` | Force rescan |
 
-Hardcoded (not configurable): arrow keys (duplicate nav/pane), PgUp (copy mode
-+ scroll), 1-9/0 (jump to Nth session), M-arrows (resize), F12 (tmux command
-prompt), `a` (literal grave).
+Hardcoded (not configurable): PgUp (copy mode + scroll), 1-9/0 (jump to Nth
+session), M-arrows (resize), F12 (tmux command prompt), `a` (literal grave).
 
 > See [specs/mechanics.md](specs/mechanics.md) for pane swap sequence, bell detection, and binding lifecycle.
 

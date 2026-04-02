@@ -38,7 +38,7 @@ Terminal height is saved per-session before parking (`term/<num>.height`).
 
 ### Focus behavior
 
-Swaps keep focus on the picker. User explicitly focuses via `h`/`l`/arrows or second `Enter`.
+Swaps keep focus on the picker. User explicitly focuses via `hjkl`/arrows or second `Enter`.
 
 ## Bell Detection
 
