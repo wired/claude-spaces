@@ -2,7 +2,7 @@
 
 Session management for Claude Code.
 
-<!-- hero GIF -->
+![claude-spaces-v0 9 0](https://github.com/user-attachments/assets/f58f3c2e-81c9-4f42-8d8e-96619755e88a)
 
 Claude Code tracks sessions but gives you no way to see them. No list, no
 switching, no way to tell what's running in the background. claude-spaces adds
