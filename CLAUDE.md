@@ -12,7 +12,7 @@ with cross-server discovery and seamless project switching.
 - `run_tests` — integration tests (evals function definitions up to the `# ── Entrypoint` marker, mocks Claude with sleep panes)
 - `SPEC.md` — specification overview (layout, keybinds, state machine, config, architecture)
 - `specs/` — detailed specs (discovery, launch, mechanics, testing, future work)
-- `Makefile` — `make install`, `make dev` (symlink), `make test`
+- `Makefile` — `make install`, `make dev` (symlink), `make test`, `make release V=x.y.z`, `make update-packages V=x.y.z`
 
 ## Architecture
 
@@ -73,15 +73,16 @@ each operation. Requires a real tmux — nothing is mocked at the tmux level.
 
 ## Versioning
 
-Version string lives in four places: `claude-spaces` (header comment + `VERSION=`), `README.md`
-(layout diagram), `SPEC.md` (layout diagram). All four must stay in sync.
+Version string lives in two places: `claude-spaces` (header comment + `VERSION=`) and `README.md`
+(layout diagram). Both must stay in sync. Use `make release V=x.y.z` to automate.
 
 Strategy: **bump-on-open, default patch.**
 
 - After tagging a release (e.g. `v0.8.0`), immediately bump master to `0.8.1-dev`.
 - Default next version is always a patch (Z) bump. Y and X bumps are intentional choices
   for significant features or stability milestones.
-- To release: drop the `-dev` suffix, commit, tag, then bump to next patch-dev.
+- To release: `make release V=x.y.z` (drops `-dev`, commits, tags, pushes, bumps to next patch-dev).
+- Then update package repos: `make update-packages V=x.y.z` (fetches tarball SHA, updates AUR + Homebrew, commits).
 - No CHANGELOG file — `git log` is the changelog.
 
 ## Documentation
