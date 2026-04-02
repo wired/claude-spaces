@@ -70,7 +70,9 @@ create them yourself.
 highlights it in red. Never miss a completed task again.
 
 **Per-session terminal** — each session gets its own shell pane below it.
-Toggle with `` prefix + ` ``, resize freely — height is saved.
+`` prefix + ` `` opens the terminal and toggles focus between it and the Claude
+pane (it never closes it). `prefix + t` toggles terminal visibility on/off.
+Resize freely — height is saved per-session.
 
 **Search and filter** — type `/` to filter sessions by name across all
 sections. Matches update as you type.
@@ -107,7 +109,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 |-----|--------|
 | `prefix + Enter` / `prefix + i` | Focus Claude pane |
 | `prefix + Space` | Toggle picker / Claude pane |
-| `` prefix + ` `` | Smart terminal (open/close/focus) |
+| `` prefix + ` `` | Smart terminal (open/focus toggle) |
 | `prefix + t` | Toggle terminal on/off (unconditional) |
 | `prefix + a` | Literal grave (`` ` ``) |
 | `prefix + h` / `prefix + ←` / `prefix + S-←` | Select pane left |

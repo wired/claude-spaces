@@ -1445,7 +1445,7 @@ cs_term_toggle() {
     fi
 }
 
-# Smart terminal: closed→open+focus, open+focused→close, open+unfocused→focus.
+# Smart terminal: closed→open+focus, focused→focus claude, unfocused→focus.
 cs_term_smart() {
     local cur_pane
     cur_pane=$(cs_read_state current_pane)
@@ -1467,9 +1467,8 @@ cs_term_smart() {
         local active_pane
         active_pane=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
         if [[ "${active_pane}" == "${term_pane}" ]]; then
-            # Open + focused → close
-            cs_term_hide "${cur_pane}"
-            _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+            # Focused → focus claude
+            _tmux select-pane -t "${cur_pane}" 2>/dev/null || true
         else
             # Open + not focused → focus
             [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true

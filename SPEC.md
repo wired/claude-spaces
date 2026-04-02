@@ -133,7 +133,7 @@ Default key assignments are documented in README.md. The available actions:
 |--------|-----------|-------------|
 | Focus Claude | `bind_focus_claude` | Focus the Claude session pane |
 | Focus toggle | `bind_focus_picker` | Toggle between picker and Claude pane |
-| Terminal (smart) | `bind_terminal` | Closed→open, focused→close, unfocused→focus |
+| Terminal (smart) | `bind_terminal` | Closed→open, focused→focus claude, unfocused→focus |
 | Terminal toggle | `bind_toggle_terminal` | Unconditional show/hide |
 | Nav next/prev | `bind_nav_next`, `bind_nav_prev` | Move + activate + focus session |
 | Pane movement | `bind_pane_left`, `bind_pane_right`, `bind_pane_up`, `bind_pane_down` | Directional pane movement |
