@@ -360,7 +360,7 @@ cs_resolve_name() {
     fi
     local name
     name=$(head -20 "${jsonl}" | jq -r '
-        select(.type == "user" and (.message.content | type) == "string")
+        select(.type == "user" and (.message.content | type) == "string" and (((.message.content | startswith("<local-command-")) or (.message.content | startswith("<command-"))) | not))
         | .message.content
         | split("\n")[0]
     ' 2>/dev/null | head -1)
