@@ -55,7 +55,7 @@ cs_server_name() {
   sum=$(printf '%s' "$1" | cksum | cut -d' ' -f1)
   tail="${1: -30}"
   tail="${tail//\//-}"
-  printf 'cs%s-%s' "$tail" "$sum"
+  printf 'cs-%s-%s' "$tail" "$sum"
 }
 TMUX_SERVER=$(cs_server_name "$PWD")
 TMUX_CONF="${HOME}/.tmux.conf"

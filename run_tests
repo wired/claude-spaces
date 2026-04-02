@@ -50,7 +50,7 @@ phase_arg_checks() {
 
 # ── Source functions ──────────────────────────────
 load_functions() {
-    eval "$(sed -n '1,/^# ── Entrypoint/p' "${SCRIPT_UNDER_TEST}" | head -n -1)"
+    eval "$(sed -n '1,/^# ── Entrypoint/p' "${SCRIPT_UNDER_TEST}" | sed '$d')"
 }
 
 # ── Mock overrides ───────────────────────────────
