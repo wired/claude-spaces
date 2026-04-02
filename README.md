@@ -13,7 +13,7 @@ every project, with instant switching and background activity alerts.
 +------------------------------------+------------------------------+
 |                                    | ~wired/                      |
 |  Active claude session             | write a wrapper...       5m  |
-|  or welcome screen                 | sessions                14h |
+|  or welcome screen                 | sessions                14h  |
 |                                    | configure verbose...     4h  |
 |                                    |                              |
 |                                    | ─ other projects ─           |
