@@ -114,7 +114,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + c` | New session |
 | `prefix + x` | Close session (with confirm) |
 | `prefix + r` | Rename session |
-| `prefix + h` | Hide session (with confirm) |
+| `prefix + H` | Hide session (with confirm) |
 | `prefix + !` | Delete session (with confirm) |
 | `prefix + s` | Shutdown (kill server) |
 | `prefix + R` | Reload picker |
@@ -208,7 +208,7 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # bind_new_session=c
 # bind_close=x
 # bind_rename=r
-# bind_hide=h
+# bind_hide=H
 # bind_delete=!
 # bind_shutdown=s
 # bind_reload=R
