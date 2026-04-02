@@ -1,7 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ══════════════════════════════════════════════════
 # claude-spaces-test — integration tests
 # ══════════════════════════════════════════════════
+
+# Re-exec under bash 4+ on macOS if needed
+if ((BASH_VERSINFO[0] < 4)); then
+  for _bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+    [[ -x "$_bash" ]] && exec "$_bash" "$0" "$@"
+  done
+  echo "ERROR: bash 4+ required (found ${BASH_VERSION}). On macOS: brew install bash and add Homebrew's bin to your PATH before /bin"
+  exit 1
+fi
 
 SCRIPT_UNDER_TEST="${SCRIPT_UNDER_TEST:-$(dirname "$(readlink -f "$0")")/claude-spaces}"
 
