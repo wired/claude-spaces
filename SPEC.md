@@ -12,37 +12,7 @@ claude-spaces --help   # Show help
 
 ## Layout
 
-```
-+------------------------------------+------------------------------+
-|                                    | ~wired/                      |
-|  Active claude session             | write a wrapper...       5m  |
-|  or welcome screen                 | sessions                14h |
-|                                    | configure verbose...     4h  |
-|                                    |                              |
-|                                    | ─ other projects ─           |
-|                                    | on-point-camera              |
-|                                    |   test-framework          2h |
-|                                    |   camera firmware          3h|
-|                                    |                              |
-|                                    | ─ inactive ─                 |
-|                                    | old-project                  |
-|                                    |                              |
-|                                    | ::menu  /:search             |
-|                                    | Q:detach                     |
-|                                    | claude-spaces v0.9.2-dev     |
-+------------------------------------+------------------------------+
-         left slot                    picker (30 cols default)
-```
-
-With optional terminal pane (toggled via `` prefix+` ``):
-```
-+------------------------------------+------------------------------+
-|  Active claude session             |                              |
-|                                    |  Picker pane                 |
-+------------------------------------+  (full height, pinned)       |
-|  Terminal pane (shell)             |                              |
-+------------------------------------+------------------------------+
-```
+See README.md for the layout diagram.
 
 Terminal pane is per-session: each session independently tracks whether its terminal is visible. Swapping sessions preserves each session's terminal state.
 
