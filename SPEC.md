@@ -36,6 +36,10 @@ The `R` key re-execs the picker, picking up code changes instantly.
 
 Paint-over (`\e[K` per line) instead of full clear. Dirty flag prevents unnecessary re-renders. Fingerprint comparison (IDs, statuses, mtimes, types, picker focus) skips identical frames. Unified render path with per-type variables (indent, color, show_age).
 
+### Display name disambiguation
+
+When multiple projects share the same leaf directory name (e.g., two `api` directories), `cs_compute_display_names` computes a minimal unique suffix for each project path. If the suffix exceeds two components, it compresses the middle: `aaaa/.../my-project`. If compression would re-introduce a collision, the uncompressed suffix is used instead. Display names are used in the picker header, the "other projects" / "inactive" entry names, the tmux session name (via `rename-session`), and the welcome pane. Recomputed only when the set of known project paths changes (gated by `LAST_PATH_SET` fingerprint).
+
 ## Scoping
 
 Sessions are scoped to `$PWD`. The script scans `~/.claude/projects/<sanitized-pwd>/` for session files. The sanitized path replaces `/` with `-` (e.g., `/home/wired` → `-home-wired`).

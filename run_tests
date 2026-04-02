@@ -3,12 +3,12 @@
 # claude-spaces-test — integration tests
 # ══════════════════════════════════════════════════
 
-# Re-exec under bash 4+ on macOS if needed
-if ((BASH_VERSINFO[0] < 4)); then
+# Re-exec under bash 4.3+ on macOS if needed
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3))); then
   for _bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
     [[ -x "$_bash" ]] && exec "$_bash" "$0" "$@"
   done
-  echo "ERROR: bash 4+ required (found ${BASH_VERSION}). On macOS: brew install bash and add Homebrew's bin to your PATH before /bin"
+  echo "ERROR: bash 4.3+ required (found ${BASH_VERSION}). On macOS: brew install bash and add Homebrew's bin to your PATH before /bin"
   exit 1
 fi
 
@@ -826,6 +826,56 @@ test_clean_message() {
     [[ "${result}" == "first line" ]] || { echo "    multiline not stripped: '${result}'"; return 1; }
 }
 
+test_display_names_single_path() {
+    REMOTE_SERVERS=()
+    INACTIVE_PROJECTS=()
+    cs_compute_display_names
+    [[ "${DISPLAY_NAMES[${PWD}]}" == "${PWD##*/}" ]] || { echo "    expected '${PWD##*/}', got '${DISPLAY_NAMES[${PWD}]}'"; return 1; }
+}
+
+test_display_names_different_leaves() {
+    REMOTE_SERVERS=("srv|/home/user/project-a")
+    INACTIVE_PROJECTS=("san|/home/user/project-b")
+    cs_compute_display_names
+    [[ "${DISPLAY_NAMES[/home/user/project-a]}" == "project-a" ]] || { echo "    expected 'project-a', got '${DISPLAY_NAMES[/home/user/project-a]}'"; return 1; }
+    [[ "${DISPLAY_NAMES[/home/user/project-b]}" == "project-b" ]] || { echo "    expected 'project-b', got '${DISPLAY_NAMES[/home/user/project-b]}'"; return 1; }
+}
+
+test_display_names_same_leaf_different_parent() {
+    REMOTE_SERVERS=("srv|/home/user/client-a/api")
+    INACTIVE_PROJECTS=("san|/home/user/client-b/api")
+    cs_compute_display_names
+    [[ "${DISPLAY_NAMES[/home/user/client-a/api]}" == "client-a/api" ]] || { echo "    expected 'client-a/api', got '${DISPLAY_NAMES[/home/user/client-a/api]}'"; return 1; }
+    [[ "${DISPLAY_NAMES[/home/user/client-b/api]}" == "client-b/api" ]] || { echo "    expected 'client-b/api', got '${DISPLAY_NAMES[/home/user/client-b/api]}'"; return 1; }
+}
+
+test_display_names_deep_divergence() {
+    REMOTE_SERVERS=("srv|/home/user/aaaa/otherwise/same/but/very/long/path/my-project")
+    INACTIVE_PROJECTS=("san|/home/user/bbbb/otherwise/same/but/very/long/path/my-project")
+    cs_compute_display_names
+    [[ "${DISPLAY_NAMES[/home/user/aaaa/otherwise/same/but/very/long/path/my-project]}" == "aaaa/.../my-project" ]] || { echo "    expected 'aaaa/.../my-project', got '${DISPLAY_NAMES[/home/user/aaaa/otherwise/same/but/very/long/path/my-project]}'"; return 1; }
+    [[ "${DISPLAY_NAMES[/home/user/bbbb/otherwise/same/but/very/long/path/my-project]}" == "bbbb/.../my-project" ]] || { echo "    expected 'bbbb/.../my-project', got '${DISPLAY_NAMES[/home/user/bbbb/otherwise/same/but/very/long/path/my-project]}'"; return 1; }
+}
+
+test_display_names_three_way_collision() {
+    REMOTE_SERVERS=("s1|/home/user/aaaa/foo/bar" "s2|/home/user/bbbb/foo/bar")
+    INACTIVE_PROJECTS=("san|/home/user/bbbb/baz/bar")
+    cs_compute_display_names
+    [[ "${DISPLAY_NAMES[/home/user/aaaa/foo/bar]}" == "aaaa/.../bar" ]] || { echo "    expected 'aaaa/.../bar', got '${DISPLAY_NAMES[/home/user/aaaa/foo/bar]}'"; return 1; }
+    [[ "${DISPLAY_NAMES[/home/user/bbbb/foo/bar]}" == "bbbb/foo/bar" ]] || { echo "    expected 'bbbb/foo/bar', got '${DISPLAY_NAMES[/home/user/bbbb/foo/bar]}'"; return 1; }
+    [[ "${DISPLAY_NAMES[/home/user/bbbb/baz/bar]}" == "bbbb/baz/bar" ]] || { echo "    expected 'bbbb/baz/bar', got '${DISPLAY_NAMES[/home/user/bbbb/baz/bar]}'"; return 1; }
+}
+
+test_display_names_compression() {
+    local result
+    result=$(cs_compress_suffix "my-project")
+    [[ "${result}" == "my-project" ]] || { echo "    1-component: expected 'my-project', got '${result}'"; return 1; }
+    result=$(cs_compress_suffix "client-a/api")
+    [[ "${result}" == "client-a/api" ]] || { echo "    2-component: expected 'client-a/api', got '${result}'"; return 1; }
+    result=$(cs_compress_suffix "aaaa/otherwise/same/my-project")
+    [[ "${result}" == "aaaa/.../my-project" ]] || { echo "    4-component: expected 'aaaa/.../my-project', got '${result}'"; return 1; }
+}
+
 test_active_elsewhere_detection() {
     local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     cs_create_mock_session "${sid}" "active elsewhere"
@@ -1497,6 +1547,12 @@ main() {
     run_test "selection fallback to pane"  test_selection_fallback_to_pane
     run_test "custom session names"         test_custom_names
     run_test "clean message"                test_clean_message
+    run_test "display names: single"        test_display_names_single_path
+    run_test "display names: diff leaves"   test_display_names_different_leaves
+    run_test "display names: same leaf"     test_display_names_same_leaf_different_parent
+    run_test "display names: deep div"      test_display_names_deep_divergence
+    run_test "display names: three-way"     test_display_names_three_way_collision
+    run_test "display names: compression"   test_display_names_compression
     run_test "active-elsewhere detection"   test_active_elsewhere_detection
     run_test "project path persistence"    test_project_path_persistence
     run_test "discover remote servers"     test_discover_remote_servers

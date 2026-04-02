@@ -46,6 +46,14 @@ Uses cached `_tmux list-panes -a` result (`LIVE_PANES`), refreshed once per scan
 Pure bash string matching. Do NOT use `tmux display-message -t PANE_ID` — it silently
 falls back to the current pane on miss.
 
+### Display name disambiguation
+
+`cs_compute_display_names` computes minimal unique suffixes for project paths (stored in
+`DISPLAY_NAMES` associative array). Used by: header, other projects list, inactive list,
+tmux session name (via `rename-session`), welcome pane. Recomputed only when the project set changes
+(`LAST_PATH_SET` fingerprint). Deep paths compress to `first/.../leaf`; if compression
+would re-introduce collisions, the uncompressed suffix is used.
+
 ## Things that are easy to break
 
 - **Atomic pane swap**: the break-pane + join-pane + resize-pane sequence must be a single
@@ -69,7 +77,7 @@ each operation. Requires a real tmux — nothing is mocked at the tmux level.
 - All functions prefixed `cs_`
 - `_tmux` for all tmux calls (never bare `tmux`)
 - Config in `${XDG_CONFIG_HOME:-~/.config}/claude-spaces/config`, data (names, hidden) in `${XDG_DATA_HOME:-~/.local/share}/claude-spaces/`
-- Bash 4+ required (associative arrays)
+- Bash 4.3+ required (associative arrays, namerefs)
 
 ## Versioning
 

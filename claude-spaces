@@ -13,12 +13,12 @@
 #   claude-spaces          Launch picker (inside or outside tmux)
 #   claude-spaces --reset  Kill all managed panes, clear state
 
-# Re-exec under bash 4+ on macOS if needed
-if ((BASH_VERSINFO[0] < 4)); then
+# Re-exec under bash 4.3+ on macOS if needed (namerefs require 4.3)
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3))); then
   for _bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
     [[ -x "$_bash" ]] && exec "$_bash" "$0" "$@"
   done
-  echo "ERROR: bash 4+ required (found ${BASH_VERSION}). On macOS: brew install bash and add Homebrew's bin to your PATH before /bin"
+  echo "ERROR: bash 4.3+ required (found ${BASH_VERSION}). On macOS: brew install bash and add Homebrew's bin to your PATH before /bin"
   exit 1
 fi
 
@@ -362,6 +362,123 @@ cs_load_shared_maps() {
     fi
 }
 
+# ── Display Name Disambiguation ──────────────────
+declare -gA DISPLAY_NAMES
+
+cs_compress_suffix() {
+    local suffix="$1"
+    local stripped="${suffix//[!\/]/}"
+    local slashes=${#stripped}
+    if ((slashes <= 1)); then
+        echo "${suffix}"
+    else
+        echo "${suffix%%/*}/.../${suffix##*/}"
+    fi
+}
+
+cs_resolve_collision_group() {
+    local -n _grp=$1
+    local n=${#_grp[@]}
+    local -a comp_strs=()
+    local gi
+    for ((gi=0; gi<n; gi++)); do
+        local -a _parts
+        IFS='/' read -ra _parts <<< "${_grp[gi]}"
+        local -a _filtered=()
+        local _c
+        for _c in "${_parts[@]}"; do
+            [[ -n "${_c}" ]] && _filtered+=("${_c}")
+        done
+        local IFS=$'\n'
+        comp_strs+=("${_filtered[*]}")
+    done
+    local depth=1
+    while true; do
+        local -A suffix_map
+        suffix_map=()
+        local -a suffixes=()
+        for ((gi=0; gi<n; gi++)); do
+            local -a comps
+            mapfile -t comps <<< "${comp_strs[gi]}"
+            local nc=${#comps[@]}
+            local suffix=""
+            local di start=$((nc - depth))
+            ((start < 0)) && start=0
+            for ((di=start; di<nc; di++)); do
+                [[ -n "${suffix}" ]] && suffix+="/"
+                suffix+="${comps[di]}"
+            done
+            suffixes+=("${suffix}")
+            suffix_map["${suffix}"]=$(( ${suffix_map["${suffix}"]:-0} + 1 ))
+        done
+        local all_unique=1
+        for ((gi=0; gi<n; gi++)); do
+            ((suffix_map["${suffixes[gi]}"] > 1)) && { all_unique=0; break; }
+        done
+        if ((all_unique)); then
+            # Compress, then check for display collisions
+            local -a compressed=()
+            local -A comp_count
+            comp_count=()
+            for ((gi=0; gi<n; gi++)); do
+                local _cs
+                _cs=$(cs_compress_suffix "${suffixes[gi]}")
+                compressed+=("${_cs}")
+                comp_count["${_cs}"]=$(( ${comp_count["${_cs}"]:-0} + 1 ))
+            done
+            for ((gi=0; gi<n; gi++)); do
+                if ((comp_count["${compressed[gi]}"] > 1)); then
+                    DISPLAY_NAMES["${_grp[gi]}"]="${suffixes[gi]}"
+                else
+                    DISPLAY_NAMES["${_grp[gi]}"]="${compressed[gi]}"
+                fi
+            done
+            return
+        fi
+        ((depth++))
+        if ((depth > 50)); then
+            for ((gi=0; gi<n; gi++)); do
+                DISPLAY_NAMES["${_grp[gi]}"]="${_grp[gi]}"
+            done
+            return
+        fi
+    done
+}
+
+cs_compute_display_names() {
+    DISPLAY_NAMES=()
+    local -a all_paths=()
+    local -A seen
+    local _p
+    for _p in "${PWD}" \
+              "${REMOTE_SERVERS[@]/#*|/}" \
+              "${INACTIVE_PROJECTS[@]/#*|/}"; do
+        [[ -z "${_p}" || -v "seen[${_p}]" ]] && continue
+        seen["${_p}"]=1
+        all_paths+=("${_p}")
+    done
+    local -A leaf_count
+    for _p in "${all_paths[@]}"; do
+        local _leaf="${_p##*/}"
+        leaf_count["${_leaf}"]=$(( ${leaf_count["${_leaf}"]:-0} + 1 ))
+    done
+    local -A leaf_done
+    for _p in "${all_paths[@]}"; do
+        local _leaf="${_p##*/}"
+        if ((leaf_count["${_leaf}"] == 1)); then
+            DISPLAY_NAMES["${_p}"]="${_leaf}"
+        elif [[ ! -v "leaf_done[${_leaf}]" ]]; then
+            leaf_done["${_leaf}"]=1
+            local -a group=()
+            local _q
+            for _q in "${all_paths[@]}"; do
+                [[ "${_q##*/}" == "${_leaf}" ]] && group+=("${_q}")
+            done
+            cs_resolve_collision_group group
+        fi
+    done
+}
+
 cs_cache_clear() {
     CACHED_ENTRIES_ID=(); CACHED_ENTRIES_NAME=(); CACHED_ENTRIES_MTIME=()
     CACHED_ENTRIES_STATUS=(); CACHED_ENTRIES_PANE=(); CACHED_ENTRIES_TYPE=()
@@ -685,6 +802,7 @@ REMOTE_SERVERS=()
 INACTIVE_PROJECTS=()
 cs_cache_clear
 LAST_REMOTE_SCAN=0
+LAST_PATH_SET=""
 
 # ── Command Menu ─────────────────────────────────
 MENU_ACTIVE=0
@@ -1118,6 +1236,20 @@ cs_build_all_entries() {
         cs_discover_inactive
         LAST_REMOTE_SCAN=$(date +%s)
 
+        # Recompute display names if project set changed
+        local _path_set="${PWD}"
+        for entry in "${REMOTE_SERVERS[@]}"; do
+            _path_set+=$'\n'"${entry#*|}"
+        done
+        for entry in "${INACTIVE_PROJECTS[@]}"; do
+            _path_set+=$'\n'"${entry#*|}"
+        done
+        if [[ "${_path_set}" != "${LAST_PATH_SET}" ]]; then
+            LAST_PATH_SET="${_path_set}"
+            cs_compute_display_names
+            [[ -z "${CS_TESTING:-}" ]] && _tmux rename-session "${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}" 2>/dev/null || true
+        fi
+
         # Rebuild cache
         cs_cache_clear
 
@@ -1131,7 +1263,7 @@ cs_build_all_entries() {
             for entry in "${REMOTE_SERVERS[@]}"; do
                 local srv="${entry%%|*}"
                 local rpath="${entry#*|}"
-                local leaf="${rpath##*/}"
+                local leaf="${DISPLAY_NAMES[${rpath}]:-${rpath##*/}}"
                 local sanitized
                 sanitized=$(cs_sanitize_path "${rpath}")
                 cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
@@ -1149,7 +1281,7 @@ cs_build_all_entries() {
             for entry in "${INACTIVE_PROJECTS[@]}"; do
                 local sanitized="${entry%%|*}"
                 local ipath="${entry#*|}"
-                local leaf="${ipath##*/}"
+                local leaf="${DISPLAY_NAMES[${ipath}]:-${ipath##*/}}"
                 cs_entry_append "__inactive_${sanitized}__" "${leaf}" "0" "" "" "inactive" "${ipath}"
             done
         fi
@@ -1575,7 +1707,8 @@ cs_show_welcome() {
         echo 'echo ""'
         echo 'echo "  claude-spaces"'
         echo 'echo "  ─────────────────"'
-        echo "echo \"  Project: ${PWD}\""
+        local _wname="${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}"
+        echo "echo \"  Project: ${_wname} (${PWD})\""
         echo "echo \"  Sessions: ${n}\""
         echo 'echo ""'
         echo 'echo "  Select a session in the picker (→)"'
@@ -1627,7 +1760,14 @@ cs_render_header_bar() {
 
 cs_render_header() {
     local width="$1"
-    local title_path="${PWD/#${HOME}/\~$(whoami)}"
+    local dname="${DISPLAY_NAMES[${PWD}]:-}"
+    local leaf="${PWD##*/}"
+    local title_path
+    if [[ -n "${dname}" && "${dname}" != "${leaf}" ]]; then
+        title_path="${dname}"
+    else
+        title_path="${PWD/#${HOME}/\~$(whoami)}"
+    fi
     local max_title=$((width - 2))
     if ((${#title_path} > max_title)); then
         title_path="...${title_path: -$((max_title - 3))}"
@@ -1834,7 +1974,12 @@ cs_picker_render() {
         fi
 
         # Truncate name
-        if ((${#name} > name_width)); then
+        if [[ "${entry_type}" == "project" || "${entry_type}" == "inactive" ]]; then
+            name_width=$((name_width - 2))
+            if ((${#name} > name_width)); then
+                name="...${name: -$((name_width - 3))}"
+            fi
+        elif ((${#name} > name_width)); then
             name="${name:0:$((name_width - 3))}..."
         fi
 
@@ -2696,7 +2841,7 @@ cs_launch() {
         local session_name
         session_name="cs$(cs_sanitize_path "${PWD}")"
 
-        if ! _tmux has-session -t "${session_name}" 2>/dev/null; then
+        if ! _tmux has-session 2>/dev/null; then
             _tmux new-session -d -s "${session_name}" \
                 "CS_PICKER=1 CS_STATE_DIR=${STATE_DIR@Q} exec ${SCRIPT_PATH@Q}"
             if [[ -n "${TMUX_CONF}" && -f "${TMUX_CONF}" ]]; then
@@ -2712,7 +2857,7 @@ cs_launch() {
         fi
 
         # Block until detach (NOT exec — we need control back for project switching)
-        command tmux -L "${TMUX_SERVER}" attach-session -t "${session_name}"
+        command tmux -L "${TMUX_SERVER}" attach-session
 
         # Check for project switch
         if [[ -f "${STATE_DIR}/switch_target" ]]; then
