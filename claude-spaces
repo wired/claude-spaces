@@ -241,6 +241,12 @@ cs_help_text() {
     echo "    z              Zoom pane"
     echo "    :              Command menu"
     echo "    [/]            Copy/paste   d  Detach"
+    echo ""
+    echo "  Bell detection (highlights finished sessions):"
+    echo "    Add to hooks in ~/.claude/settings.json:"
+    echo '    "Stop": [{"hooks": [{"type": "command", "command": "printf '"'"'\\a'"'"' > /dev/tty"}]}]'
+    echo ""
+    echo "  Full README: https://github.com/wired/claude-spaces"
 }
 
 # ── Preflight ─────────────────────────────────────
@@ -1576,7 +1582,11 @@ cs_show_welcome() {
         echo 'echo "  or press :n for a new session."'
         echo 'echo ""'
         cs_help_text | while IFS= read -r line; do
+            line="${line//\\/\\\\}"
+            line="${line//\"/\\\"}"
             line="${line//\`/\\\`}"
+            line="${line//\$/\\\$}"
+            line="${line//>/\\>}"
             echo "echo \"${line}\""
         done
         cat << 'WELCOMEEOF'
