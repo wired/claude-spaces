@@ -56,11 +56,15 @@ session picker on the right, and launches Claude Code on the left.
 ## Features
 
 **Session picker** — all sessions for the current project in a persistent side
-panel. Navigate with `j`/`k`, jump with `1`-`0`, search with `/`.
+panel. Navigate with `j`/`k`, jump with `1`-`0`, search with `/`. You can also
+use the tmux prefix for even faster navigation
 
 **Cross-project discovery** — sessions from other running projects appear
 automatically. Hit Enter to switch. Inactive projects (not currently running)
 are discovered and can be resumed.
+
+This allows you to use claude-spaces with worktrees as well, you just have to
+create them yourself.
 
 **Bell detection** — when Claude finishes in a background session, the picker
 highlights it in red. Never miss a completed task again.

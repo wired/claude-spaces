@@ -1,7 +1,7 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════
 # claude-spaces — tmux session picker for Claude Code
-# Version 0.8.1-dev
+# Version 0.9.0
 #
 # Copyright (c) 2026 Alex Alexander <alex.alexander@gmail.com>
 # Licensed under MIT
@@ -13,7 +13,7 @@
 #   claude-spaces          Launch picker (inside or outside tmux)
 #   claude-spaces --reset  Kill all managed panes, clear state
 
-VERSION="0.8.1-dev"
+VERSION="0.9.0"
 SCRIPT_PATH="$(readlink -f "$0")"
 CLAUDE_DIR="${HOME}/.claude"
 PROJECTS_DIR="${CLAUDE_DIR}/projects"

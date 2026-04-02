@@ -29,7 +29,7 @@ claude-spaces --help   # Show help
 |                                    |                              |
 |                                    | ::menu  /:search             |
 |                                    | Q:detach                     |
-|                                    | claude-spaces v0.8.1-dev       |
+|                                    | claude-spaces v0.9.0       |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
 ```
