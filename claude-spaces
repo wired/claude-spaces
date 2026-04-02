@@ -283,6 +283,16 @@ cs_init_state() {
 
 cs_read_state() { cat "${STATE_DIR}/$1" 2>/dev/null || true; }
 
+_cs_find_session_pid() {
+  local pid="$1"
+  [[ -f "${SESSIONS_DIR}/${pid}.json" ]] && { echo "${pid}"; return 0; }
+  local child
+  for child in $(pgrep -P "${pid}" 2>/dev/null); do
+    _cs_find_session_pid "${child}" && return 0
+  done
+  return 1
+}
+
 cs_rename_pane_window() {
     local pane="$1" name="$2"
     if ((${#name} > WINDOW_NAME_LEN)); then
@@ -446,6 +456,7 @@ cs_scan_sessions() {
             cs_pane_alive "${pn}" || continue
             local pp
             pp=$(_tmux display-message -t "${pn}" -p '#{pane_pid}' 2>/dev/null) || continue
+            pp=$(_cs_find_session_pid "${pp}") || continue
             if [[ -f "${SESSIONS_DIR}/${pp}.json" ]]; then
                 local rsid
                 rsid=$(jq -r '.sessionId' "${SESSIONS_DIR}/${pp}.json" 2>/dev/null)
@@ -1535,7 +1546,10 @@ cs_close_pane() {
     rm -f "${STATE_DIR}/panes/${pane_id#%}"
 
     # Remove Claude's stale session tracking file
-    [[ -n "${pane_pid}" ]] && rm -f "${SESSIONS_DIR}/${pane_pid}.json"
+    if [[ -n "${pane_pid}" ]]; then
+        local _spid
+        _spid=$(_cs_find_session_pid "${pane_pid}") && rm -f "${SESSIONS_DIR}/${_spid}.json"
+    fi
 
     # Clean up new_pane if this was the new session
     local np
