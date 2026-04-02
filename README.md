@@ -93,7 +93,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `a` / `i` | Focus Claude pane |
 | `h` / `l` / `←` / `→` | Move between panes |
 | `/` | Search/filter sessions |
-| `:` | Command menu (new, rename, close, hide, delete, shutdown) |
+| `:` | Command menu (new, rename, close, hide, shutdown) |
 | `Q` | Detach (exit) |
 | `R` | Reload picker in-place (picks up code changes) |
 
@@ -116,7 +116,6 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + x` | Close session (with confirm) |
 | `prefix + r` | Rename session |
 | `prefix + H` | Hide session (with confirm) |
-| `prefix + !` | Delete session (with confirm) |
 | `prefix + s` | Shutdown (kill server) |
 | `prefix + R` | Reload picker |
 | `prefix + z` | Zoom/maximize pane |
@@ -210,7 +209,6 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # bind_close=x
 # bind_rename=r
 # bind_hide=H
-# bind_delete=!
 # bind_shutdown=s
 # bind_reload=R
 # bind_refresh=Tab

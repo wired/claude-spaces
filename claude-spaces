@@ -162,7 +162,6 @@ cs_create_default_config() {
 # bind_close=x
 # bind_rename=r
 # bind_hide=H
-# bind_delete=!
 # bind_shutdown=s
 # bind_reload=R
 # bind_refresh=Tab
@@ -208,7 +207,7 @@ cs_help_text() {
     echo "    t              Toggle terminal on/off"
     echo "    a              Literal grave (\`)"
     echo "    c  New   x  Close   r  Rename"
-    echo "    H  Hide  !  Delete  s  Shutdown"
+    echo "    H  Hide  s  Shutdown"
     echo "    R  Reload picker"
     echo "    z              Zoom pane"
     echo "    :              Command menu"
@@ -641,13 +640,12 @@ cs_menu_init() {
     local hide_label="View hidden"
     ((SHOW_HIDDEN)) && hide_label="Hide hidden"
     if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-        MENU_KEYS=(r x h o '!' "" c v d s)
+        MENU_KEYS=(r x h o "" c v d s)
         MENU_LABELS=(
             "Rename"
             "Close"
             "Hide"
             "Hide this & older"
-            "Delete"
             ""
             "New session"
             "${hide_label}"
@@ -1509,23 +1507,6 @@ cs_close_pane() {
     [[ "${np}" == "${pane_id}" ]] && rm -f "${STATE_DIR}/new_pane"
 }
 
-cs_delete_session() {
-    local session_id="$1" idx="$2"
-
-    if [[ "${ENTRIES_STATUS[${idx}]}" == "managed" && -n "${ENTRIES_PANE[${idx}]}" ]]; then
-        cs_close_pane "${ENTRIES_PANE[${idx}]}"
-    fi
-
-    local project_dir
-    project_dir=$(cs_get_project_dir)
-    rm -f "${project_dir}/${session_id}.jsonl"
-    rm -rf "${project_dir:?}/${session_id:?}" 2>/dev/null || true
-
-    if [[ -f "${NAMES_FILE}" ]]; then
-        sed -i "/^${session_id}=/d" "${NAMES_FILE}"
-    fi
-}
-
 # ── Welcome Pane ──────────────────────────────────
 cs_show_welcome() {
     local n=${#ENTRIES_ID[@]}
@@ -1962,7 +1943,6 @@ cs_picker_loop() {
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
                     o) MENU_ACTIVE=0; cs_hide_older; DIRTY=1 ;;
                     v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
-                    '!') MENU_ACTIVE=0; cs_confirm_delete; DIRTY=1 ;;
                     c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     d) MENU_ACTIVE=0; _tmux detach-client ;;
                     s) MENU_ACTIVE=0; cs_confirm_shutdown; DIRTY=1 ;;
@@ -2048,7 +2028,6 @@ cs_picker_loop() {
                     $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
                     $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
                     $'\x14') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_hide; DIRTY=1 ;;
-                    $'\x15') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_delete; DIRTY=1 ;;
                     $'\x16') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_shutdown; DIRTY=1 ;;
                     $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
                     $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
@@ -2415,22 +2394,6 @@ cs_hide_older() {
     cs_after_remove "${removed_current}"
 }
 
-cs_confirm_delete() {
-    local n=${#ENTRIES_ID[@]}
-    ((n == 0)) && return 0
-    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
-    [[ "${ENTRIES_STATUS[${SELECTED}]}" == "active_elsewhere" ]] && return 0
-
-    cs_confirm "${CS_CLR_PROMPT_DANGER}" "DELETE from disk? y/N" || return 0
-
-    local removed_pane=""
-    if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
-        removed_pane="${ENTRIES_PANE[${SELECTED}]}"
-    fi
-    cs_delete_session "${ENTRIES_ID[${SELECTED}]}" "${SELECTED}"
-    cs_after_remove "${removed_pane}"
-}
-
 cs_confirm_shutdown() {
     cs_confirm "${CS_CLR_PROMPT_DANGER}" "Shutdown? y/N" || return 0
     stty echo 2>/dev/null || true
@@ -2557,7 +2520,6 @@ cs_install_keybindings() {
     cs_bind close x send-keys -t "${PICKER_PANE}" $'\x06'
     cs_bind rename r send-keys -t "${PICKER_PANE}" $'\x10'
     cs_bind hide H send-keys -t "${PICKER_PANE}" $'\x14'
-    cs_bind delete '!' send-keys -t "${PICKER_PANE}" $'\x15'
     cs_bind shutdown s send-keys -t "${PICKER_PANE}" $'\x16'
     cs_bind reload R send-keys -t "${PICKER_PANE}" $'\x0e'
 

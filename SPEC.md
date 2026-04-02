@@ -133,7 +133,7 @@ configurable via `bind_*` keys in the config file.
 | `a` / `i`       | Focus Claude pane                                           |
 | `h` / `l` / `←` / `→` | Move between panes (directional)                     |
 | `/`              | Search/filter sessions                                      |
-| `:`              | Command menu (new, rename, close, hide, delete, shutdown)   |
+| `:`              | Command menu (new, rename, close, hide, shutdown)           |
 | `Q`              | Detach (exit claude-spaces)                                 |
 | `R`              | Reload picker script in-place (`exec`)                      |
 
@@ -150,7 +150,6 @@ any non-matching key to cancel.
 | `h` | Hide (with confirm) |
 | `o` | Hide this & older (with confirm) |
 | `v` | Toggle show/hide hidden sessions |
-| `!` | Delete permanently (with confirm) |
 | `c` | New session |
 | `d` | Detach |
 | `s` | Shutdown (kill server) |
@@ -173,7 +172,6 @@ Default key assignments are documented in README.md. The available actions:
 | Close session | `bind_close` | Close with confirm prompt |
 | Rename session | `bind_rename` | Rename selected session |
 | Hide session | `bind_hide` | Hide with confirm prompt |
-| Delete session | `bind_delete` | Delete permanently with confirm |
 | Shutdown | `bind_shutdown` | Kill tmux server |
 | Reload picker | `bind_reload` | Re-exec picker in-place |
 | Zoom | `bind_zoom` | Zoom/maximize current pane |

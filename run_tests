@@ -671,27 +671,6 @@ test_hide_older() {
     cs_assert_consistent "hide_older"
 }
 
-test_delete_session() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "to delete"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
-
-    cs_rescan
-    local idx
-    idx=$(find_entry_index "${sid}")
-    SELECTED=${idx}
-
-    local pane="${ENTRIES_PANE[${idx}]}"
-    cs_delete_session "${sid}" "${idx}"
-    cs_after_remove "${pane}"
-    sleep 0.05
-
-    [[ ! -f "${MOCK_PROJECT_DIR}/${sid}.jsonl" ]] || { echo "    JSONL not deleted"; return 1; }
-    cs_assert_consistent "delete_session"
-}
-
 cs_create_mock_active_session() {
     local sid="$1" pid="$2"
     printf '{"pid":%s,"sessionId":"%s","cwd":"/tmp","startedAt":0,"kind":"interactive","entrypoint":"cli"}\n' \
@@ -1066,7 +1045,6 @@ test_guard_local_only_actions() {
     # These should all be no-ops (return immediately)
     cs_close_selected
     cs_confirm_hide < /dev/null
-    cs_confirm_delete < /dev/null
     cs_rename_selected < /dev/null
 
     # If we got here without errors, the guards worked
@@ -1498,7 +1476,6 @@ main() {
     run_test "remote bell"                  test_remote_bell
     run_test "hide session"                 test_hide_session
     run_test "hide this & older"            test_hide_older
-    run_test "delete session"               test_delete_session
     run_test "stale state recovery"         test_stale_recovery
     run_test "locked session blocked"       test_locked_session_blocked
     run_test "show pane safety"             test_show_pane_safety
