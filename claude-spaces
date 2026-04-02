@@ -1940,7 +1940,7 @@ cs_picker_loop() {
     cs_install_keybindings
     cs_install_bell_hook
 
-    stty -echo 2>/dev/null || true
+    stty -echo discard undef lnext undef 2>/dev/null || true
     trap 'stty echo 2>/dev/null; printf "\e[?25h\e[0m"; cs_remove_bell_hook; cs_remove_keybindings' EXIT
 
     cs_build_all_entries
@@ -2460,7 +2460,7 @@ cs_rename_selected() {
     printf '\e[?25h'
     local rename_val=""
     read -r rename_val
-    stty -echo 2>/dev/null || true
+    stty -echo discard undef lnext undef 2>/dev/null || true
     printf '\e[?25l\e[0m'
 
     if [[ -n "${rename_val}" ]]; then
