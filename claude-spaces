@@ -1861,6 +1861,8 @@ cs_picker_loop() {
     WINDOW_FOCUSED=1
 
     PICKER_PANE=$(_tmux display-message -p '#{pane_id}')
+    WINCH_PENDING=0
+    trap 'WINCH_PENDING=1' WINCH
     cs_rename_pane_window "${PICKER_PANE}" "cs:picker"
     echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
     echo $$ > "${STATE_DIR}/picker_pid"
@@ -1904,7 +1906,6 @@ cs_picker_loop() {
 
     stty -echo 2>/dev/null || true
     trap 'stty echo 2>/dev/null; printf "\e[?25h\e[0m"; cs_remove_bell_hook; cs_remove_keybindings' EXIT
-    trap 'cs_handle_winch' WINCH
 
     cs_build_all_entries
     cs_search_save_full
@@ -2118,6 +2119,10 @@ cs_picker_loop() {
                 LAST_FINGERPRINT="${fp}"
                 DIRTY=1
             fi
+        fi
+        if ((WINCH_PENDING)); then
+            WINCH_PENDING=0
+            cs_handle_winch
         fi
         if ((DIRTY)); then
             cs_picker_render
