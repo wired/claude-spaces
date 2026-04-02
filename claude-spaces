@@ -2704,6 +2704,7 @@ cs_launch() {
             fi
             _tmux set -g window-status-format ''
             _tmux set -g window-status-current-format ''
+            _tmux set -g status-left-length 50
             _tmux set -s focus-events on
             _tmux set -s extended-keys on
             _tmux set -g bell-action any
