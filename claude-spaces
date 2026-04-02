@@ -1582,8 +1582,6 @@ cs_show_welcome() {
         cat << 'WELCOMEEOF'
 echo ""
 recs=""
-ek=$(_tmux show-options -sv extended-keys 2>/dev/null)
-[[ "${ek}" == "on" ]] || recs+="    set -s extended-keys on\n"
 if ! grep -q 'printf.*\\a.*dev/tty' ~/.claude/settings.json 2>/dev/null; then
     recs+="    Add Stop hook in ~/.claude/settings.json\n"
 fi
@@ -2697,6 +2695,7 @@ cs_launch() {
             _tmux set -g window-status-format ''
             _tmux set -g window-status-current-format ''
             _tmux set -s focus-events on
+            _tmux set -s extended-keys on
             _tmux set -g bell-action any
             _tmux setw -g monitor-bell on
         fi
