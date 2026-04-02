@@ -878,6 +878,8 @@ test_discover_remote_servers() {
     local remote_state="${base}/claude-spaces/${remote_sanitized}"
     mkdir -p "${remote_state}"
     echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
+    mkdir -p "${base}/claude-spaces/.servers"
+    ln -snf "${remote_state}" "${base}/claude-spaces/.servers/${remote_server}"
     mkdir -p "/tmp/fake-remote-project"
     command tmux -L "${remote_server}" new-session -d -s test "sleep 99999"
     sleep 0.05
@@ -892,7 +894,7 @@ test_discover_remote_servers() {
             break
         fi
     done
-    [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; return 1; }
+    [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; rm -f "${base}/claude-spaces/.servers/${remote_server}"; return 1; }
 
     # Should NOT include our own server
     for entry in "${REMOTE_SERVERS[@]}"; do
@@ -902,6 +904,7 @@ test_discover_remote_servers() {
             command tmux -L "${remote_server}" kill-server 2>/dev/null
             [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
             rm -rf "${remote_state}" "/tmp/fake-remote-project"
+            rm -f "${base}/claude-spaces/.servers/${remote_server}"
             return 1
         fi
     done
@@ -910,6 +913,7 @@ test_discover_remote_servers() {
     command tmux -L "${remote_server}" kill-server 2>/dev/null
     [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
     rm -rf "${remote_state}" "/tmp/fake-remote-project"
+    rm -f "${base}/claude-spaces/.servers/${remote_server}"
 }
 
 test_discover_inactive_projects() {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ══════════════════════════════════════════════════
 # claude-spaces — tmux session picker for Claude Code
 # Version 0.9.0
@@ -12,6 +12,15 @@
 # Usage:
 #   claude-spaces          Launch picker (inside or outside tmux)
 #   claude-spaces --reset  Kill all managed panes, clear state
+
+# Re-exec under bash 4+ on macOS if needed
+if ((BASH_VERSINFO[0] < 4)); then
+  for _bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+    [[ -x "$_bash" ]] && exec "$_bash" "$0" "$@"
+  done
+  echo "ERROR: bash 4+ required (found ${BASH_VERSION}). On macOS: brew install bash and add Homebrew's bin to your PATH before /bin"
+  exit 1
+fi
 
 VERSION="0.9.0"
 SCRIPT_PATH="$(readlink -f "$0")"
@@ -31,7 +40,14 @@ RECENT_THRESHOLD=10
 GROUP_BY="project"
 PICKER_SIDE="right"
 WINDOW_NAME_LEN=12
-TMUX_SERVER="cs${PWD//\//-}"
+cs_server_name() {
+  local sum tail
+  sum=$(printf '%s' "$1" | cksum | cut -d' ' -f1)
+  tail="${1: -30}"
+  tail="${tail//\//-}"
+  printf 'cs%s-%s' "$tail" "$sum"
+}
+TMUX_SERVER=$(cs_server_name "$PWD")
 TMUX_CONF="${HOME}/.tmux.conf"
 TERMINAL_HEIGHT="35%"
 SHOW_INDEX=1
@@ -242,6 +258,9 @@ cs_init_state() {
     fi
     mkdir -p "${STATE_DIR}/panes" "${STATE_DIR}/term"
     echo "${PWD}" > "${STATE_DIR}/project_path"
+    # Server → state dir mapping for cross-server discovery
+    mkdir -p "${base}/claude-spaces/.servers"
+    ln -snf "${STATE_DIR}" "${base}/claude-spaces/.servers/${TMUX_SERVER}"
 }
 
 cs_read_state() { cat "${STATE_DIR}/$1" 2>/dev/null || true; }
@@ -944,9 +963,8 @@ cs_discover_servers() {
         name=$(basename "${sock}")
         [[ "${name}" == "${my_server}" ]] && continue
         [[ "${name}" == cs-test-* ]] && continue
-        local sanitized="${name#cs}"
         local base="${XDG_RUNTIME_DIR:-/tmp}"
-        local remote_state="${base}/claude-spaces/${sanitized}"
+        local remote_state="${base}/claude-spaces/.servers/${name}"
         local remote_path=""
         if [[ -f "${remote_state}/project_path" ]]; then
             remote_path=$(cat "${remote_state}/project_path")
@@ -964,8 +982,7 @@ cs_discover_inactive() {
     local -A active_set
     active_set["$(cs_sanitize_path "${PWD}")"]=1
     for entry in "${REMOTE_SERVERS[@]}"; do
-        local srv="${entry%%|*}"
-        active_set["${srv#cs}"]=1
+        active_set["$(cs_sanitize_path "${entry#*|}")"]=1
     done
     for dir in "${PROJECTS_DIR}"/*/; do
         [[ -d "${dir}" ]] || continue
@@ -1077,10 +1094,11 @@ cs_build_all_entries() {
                 local srv="${entry%%|*}"
                 local rpath="${entry#*|}"
                 local leaf="${rpath##*/}"
-                local sanitized="${srv#cs}"
+                local sanitized
+                sanitized=$(cs_sanitize_path "${rpath}")
                 cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
 
-                local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/${sanitized}"
+                local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${srv}"
                 cs_scan_project_sessions "${PROJECTS_DIR}/${sanitized}" "${rpath}" "remote" "${remote_state}"
             done
         fi
@@ -2625,6 +2643,7 @@ cs_reset() {
     cs_remove_keybindings
 
     rm -rf "${STATE_DIR}"
+    rm -f "${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${TMUX_SERVER}"
     _tmux kill-server 2>/dev/null || true
     echo "Reset complete."
 }
@@ -2661,7 +2680,7 @@ cs_launch() {
             rm -f "${STATE_DIR}/switch_target"
             if [[ -d "${target_path}" ]]; then
                 cd "${target_path}" || break
-                TMUX_SERVER="cs${PWD//\//-}"
+                TMUX_SERVER=$(cs_server_name "$PWD")
                 continue
             fi
         fi
