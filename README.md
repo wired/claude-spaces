@@ -90,6 +90,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `Enter` | Load + focus session (remote/inactive: switch project) |
 | `Space` | Load session (stay in picker) |
 | `H` / `L` | Load + focus session |
+| `a` / `i` | Focus Claude pane |
 | `h` / `l` / `←` / `→` | Move between panes |
 | `/` | Search/filter sessions |
 | `:` | Command menu (new, rename, close, hide, delete, shutdown) |

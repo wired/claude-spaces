@@ -195,6 +195,7 @@ cs_help_text() {
     echo "    Enter          Load + focus session"
     echo "    Space          Load session (stay in picker)"
     echo "    H/L            Load + focus session"
+    echo "    a/i            Focus Claude pane"
     echo "    h/l            Move between panes"
     echo "    /              Search sessions"
     echo "    :              Command menu"

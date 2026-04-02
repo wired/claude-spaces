@@ -130,6 +130,7 @@ configurable via `bind_*` keys in the config file.
 | `Enter`          | Load + focus session (remote/inactive: switch project)      |
 | `Space`          | Load session (stay in picker)                               |
 | `H` / `L`       | Load + focus session                                        |
+| `a` / `i`       | Focus Claude pane                                           |
 | `h` / `l` / `←` / `→` | Move between panes (directional)                     |
 | `/`              | Search/filter sessions                                      |
 | `:`              | Command menu (new, rename, close, hide, delete, shutdown)   |
@@ -148,6 +149,7 @@ any non-matching key to cancel.
 | `x` | Close (with confirm) |
 | `h` | Hide (with confirm) |
 | `o` | Hide this & older (with confirm) |
+| `v` | Toggle show/hide hidden sessions |
 | `!` | Delete permanently (with confirm) |
 | `c` | New session |
 | `d` | Detach |
