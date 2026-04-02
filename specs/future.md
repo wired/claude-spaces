@@ -2,10 +2,6 @@
 
 Parent: [SPEC.md](../SPEC.md)
 
-- **Menu action safety**: Rescan runs while the command menu is open, which can shift
-  SELECTED if the original entry disappears from disk. Menu actions could then target
-  the wrong session. Fix: snapshot the selected entry ID on menu open and pass it to
-  action handlers instead of reading SELECTED at execution time.
 - **Session forking**: Use `claude --fork-session` to branch from an existing session
 - **tmux capture-pane preview**: Show last few lines of a session without switching to it
 

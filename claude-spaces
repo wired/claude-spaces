@@ -631,6 +631,7 @@ LAST_REMOTE_SCAN=0
 
 # ── Command Menu ─────────────────────────────────
 MENU_ACTIVE=0
+MENU_TARGET_ID=""
 SHOW_HIDDEN=0
 MENU_KEYS=()
 MENU_LABELS=()
@@ -665,6 +666,7 @@ cs_menu_init() {
 
 cs_menu_enter() {
     MENU_ACTIVE=1
+    MENU_TARGET_ID="${ENTRIES_ID[${SELECTED}]}"
     cs_menu_init
     DIRTY=1
 }
@@ -2116,6 +2118,9 @@ cs_picker_loop() {
                 WINDOW_FOCUSED=0
             fi
             cs_rescan
+            if ((MENU_ACTIVE)) && [[ "${ENTRIES_ID[${SELECTED}]:-}" != "${MENU_TARGET_ID}" ]]; then
+                MENU_ACTIVE=0; DIRTY=1
+            fi
             # Check if current session's terminal died externally
             # (must be after cs_rescan which refreshes the pane cache)
             local _cur_pane
