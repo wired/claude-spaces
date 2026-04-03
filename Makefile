@@ -33,6 +33,7 @@ release:
 		echo "[dry-run] git commit Bump version to $${NEXT}-dev"; \
 		echo "[dry-run] git push"; \
 	else \
+		set -e; \
 		sed -i 's/# Version $(V)-dev/# Version $(V)/' claude-spaces; \
 		sed -i 's/VERSION="$(V)-dev"/VERSION="$(V)"/' claude-spaces; \
 		sed -i 's/v$(V)-dev/v$(V)/' README.md; \
@@ -63,6 +64,7 @@ update-packages:
 		echo "[dry-run] Update $(BREW_DIR)/Formula/claude-spaces.rb: v$(V), sha256=$${SHA}"; \
 		echo "[dry-run] Commit both repos: claude-spaces v$(V)"; \
 	else \
+		set -e; \
 		echo "SHA256: $${SHA}"; \
 		sed -i 's/pkgver=.*/pkgver=$(V)/' $(AUR_DIR)/PKGBUILD; \
 		sed -i "s/sha256sums=('.*')/sha256sums=('$${SHA}')/" $(AUR_DIR)/PKGBUILD; \
