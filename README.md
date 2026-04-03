@@ -1,6 +1,6 @@
 # claude-spaces
 
-![Tests](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
+![Tests](https://github.com/wired/claude-spaces/actions/workflows/ci.yml/badge.svg)
 
 Session management for Claude Code.
 
