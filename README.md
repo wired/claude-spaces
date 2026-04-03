@@ -52,6 +52,9 @@ make install                                        # /usr/local/bin (may need s
 PREFIX=~/.local make install                        # ~/.local/bin
 ```
 
+You can also just clone and run directly if all dependencies are met.
+It will warn you.
+
 Requires bash 4.3+, tmux 3.0+, jq.
 
 ## Quick Start
