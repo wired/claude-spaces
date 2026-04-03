@@ -28,7 +28,7 @@ every project, with instant switching and background activity alerts.
 |                                    | old-project                  |
 |                                    |                              |
 |                                    | : menu  / search             |
-|                                    | Q:detach                     |
+|                                    | Q:detach  ?:help             |
 |                                    | claude-spaces v0.9.7-dev     |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
@@ -64,6 +64,31 @@ claude-spaces --help
 
 Run it from any project directory. It creates a dedicated tmux server, opens a
 session picker on the right, and launches Claude Code on the left.
+
+## Prefix key
+
+claude-spaces inherits your tmux prefix from `tmux.conf` and works with any
+prefix. That said, the keybindings are designed around `` ` `` (backtick):
+
+- `` prefix + ` `` — smart terminal toggle (open, then toggle focus)
+- `prefix + a` — sends a literal `` ` `` (so you don't lose the character)
+
+If you'd like to try it, add to your `~/.tmux.conf`:
+
+```
+set-option -g prefix `
+bind-key a send-prefix
+```
+
+Or, to only use `` ` `` as prefix inside claude-spaces, add to
+`~/.config/claude-spaces/config`:
+
+~~~ini
+prefix=`
+~~~
+
+All prefix bindings are configurable via the same config file
+(see Configuration).
 
 ## Features
 
@@ -117,6 +142,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `h` / `l` / `←` / `→` | Move between panes |
 | `/` | Search/filter sessions |
 | `:` | Command menu (new, rename, close, hide, shutdown) |
+| `?` | Show help screen |
 | `Q` | Detach (exit) |
 | `R` | Reload picker in-place (picks up code changes) |
 
@@ -150,6 +176,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + PgUp` | Copy mode + scroll up |
 | `prefix + d` | Detach |
 | `prefix + :` | Command menu |
+| `prefix + ?` | Show help screen |
 | `prefix + Tab` | Refresh/rescan |
 | `prefix + F12` | tmux command prompt (escape hatch) |
 | `prefix + M-↑/↓` | Resize pane vertically |
