@@ -46,7 +46,7 @@ projects.
 ## Install
 
 ```
-brew tap wired/tap && brew install claude-spaces   # macOS / Homebrew
+brew tap wired/tap && brew install claude-spaces    # macOS / Homebrew
 yay -S claude-spaces                                # Arch (AUR)
 make install                                        # /usr/local/bin (may need sudo)
 PREFIX=~/.local make install                        # ~/.local/bin
