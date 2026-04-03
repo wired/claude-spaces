@@ -1,6 +1,7 @@
 # claude-spaces
 
 ![Tests](https://github.com/wired/claude-spaces/actions/workflows/ci.yml/badge.svg)
+![AUR](https://img.shields.io/aur/version/claude-spaces)
 
 Session management for Claude Code.
 
