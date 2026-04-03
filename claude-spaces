@@ -42,6 +42,7 @@ CS_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/claude-spaces"
 CONFIG_FILE="${CS_CONFIG_DIR}/config"
 NAMES_FILE="${CS_DATA_DIR}/names"
 HIDDEN_FILE="${CS_DATA_DIR}/hidden"
+PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
 
 # ── Defaults ──────────────────────────────────────
 PICKER_WIDTH="30"
@@ -270,10 +271,11 @@ cs_sanitize_path() {
     local p="${1//\//-}"
     echo "${p//_/-}"
 }
+PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
 
 cs_init_state() {
-    local sanitized
-    sanitized=$(cs_sanitize_path "${PWD}")
+    PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
+    local sanitized="${PWD_SANITIZED}"
     local base="${XDG_RUNTIME_DIR:-/tmp}"
     STATE_DIR="${base}/claude-spaces/${sanitized}"
     # If picker pane from previous run is dead, wipe stale state
@@ -345,6 +347,7 @@ cs_entry_clear() {
 
 declare -gA HIDDEN_SET
 declare -gA CUSTOM_NAMES
+declare -gA PROJECT_NAMES
 
 cs_load_shared_maps() {
     HIDDEN_SET=()
@@ -359,6 +362,13 @@ cs_load_shared_maps() {
             [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
             CUSTOM_NAMES["${nkey}"]="${nval}"
         done < "${NAMES_FILE}"
+    fi
+    PROJECT_NAMES=()
+    if [[ -f "${PROJECT_NAMES_FILE}" ]]; then
+        while IFS='=' read -r nkey nval; do
+            [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
+            PROJECT_NAMES["${nkey}"]="${nval}"
+        done < "${PROJECT_NAMES_FILE}"
     fi
 }
 
@@ -815,9 +825,10 @@ cs_menu_init() {
     local hide_label="View hidden"
     ((SHOW_HIDDEN)) && hide_label="Hide hidden"
     if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-        MENU_KEYS=(r x h o "" c v d s)
+        MENU_KEYS=(r p x h o "" c v d s)
         MENU_LABELS=(
             "Rename"
+            "Rename project"
             "Close"
             "Hide"
             "Hide this & older"
@@ -828,8 +839,10 @@ cs_menu_init() {
             "Shutdown"
         )
     else
-        MENU_KEYS=(c v d s)
+        MENU_KEYS=(p "" c v d s)
         MENU_LABELS=(
+            "Rename project"
+            ""
             "New session"
             "${hide_label}"
             "Detach"
@@ -1247,7 +1260,7 @@ cs_build_all_entries() {
         if [[ "${_path_set}" != "${LAST_PATH_SET}" ]]; then
             LAST_PATH_SET="${_path_set}"
             cs_compute_display_names
-            [[ -z "${CS_TESTING:-}" ]] && _tmux rename-session "${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}" 2>/dev/null || true
+            [[ -z "${CS_TESTING:-}" ]] && _tmux rename-session "${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}" 2>/dev/null || true
         fi
 
         # Rebuild cache
@@ -1263,9 +1276,9 @@ cs_build_all_entries() {
             for entry in "${REMOTE_SERVERS[@]}"; do
                 local srv="${entry%%|*}"
                 local rpath="${entry#*|}"
-                local leaf="${DISPLAY_NAMES[${rpath}]:-${rpath##*/}}"
                 local sanitized
                 sanitized=$(cs_sanitize_path "${rpath}")
+                local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${rpath}]:-${rpath##*/}}}"
                 cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
 
                 local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${srv}"
@@ -1281,7 +1294,7 @@ cs_build_all_entries() {
             for entry in "${INACTIVE_PROJECTS[@]}"; do
                 local sanitized="${entry%%|*}"
                 local ipath="${entry#*|}"
-                local leaf="${DISPLAY_NAMES[${ipath}]:-${ipath##*/}}"
+                local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${ipath}]:-${ipath##*/}}}"
                 cs_entry_append "__inactive_${sanitized}__" "${leaf}" "0" "" "" "inactive" "${ipath}"
             done
         fi
@@ -1707,7 +1720,7 @@ cs_show_welcome() {
         echo 'echo ""'
         echo 'echo "  claude-spaces"'
         echo 'echo "  ─────────────────"'
-        local _wname="${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}"
+        local _wname="${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}"
         echo "echo \"  Project: ${_wname} (${PWD})\""
         echo "echo \"  Sessions: ${n}\""
         echo 'echo ""'
@@ -1760,13 +1773,18 @@ cs_render_header_bar() {
 
 cs_render_header() {
     local width="$1"
-    local dname="${DISPLAY_NAMES[${PWD}]:-}"
-    local leaf="${PWD##*/}"
+    local pname="${PROJECT_NAMES[${PWD_SANITIZED}]:-}"
     local title_path
-    if [[ -n "${dname}" && "${dname}" != "${leaf}" ]]; then
-        title_path="${dname}"
+    if [[ -n "${pname}" ]]; then
+        title_path="${pname}"
     else
-        title_path="${PWD/#${HOME}/\~$(whoami)}"
+        local dname="${DISPLAY_NAMES[${PWD}]:-}"
+        local leaf="${PWD##*/}"
+        if [[ -n "${dname}" && "${dname}" != "${leaf}" ]]; then
+            title_path="${dname}"
+        else
+            title_path="${PWD/#${HOME}/\~$(whoami)}"
+        fi
     fi
     local max_title=$((width - 2))
     if ((${#title_path} > max_title)); then
@@ -2145,6 +2163,7 @@ cs_picker_loop() {
                         read -rsn2 -t 0.1 _ || true
                         MENU_ACTIVE=0; DIRTY=1 ;;
                     r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
+                    p) MENU_ACTIVE=0; cs_rename_project; DIRTY=1 ;;
                     x) MENU_ACTIVE=0; cs_confirm_close; DIRTY=1 ;;
                     h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
                     o) MENU_ACTIVE=0; cs_hide_older; DIRTY=1 ;;
@@ -2233,6 +2252,7 @@ cs_picker_loop() {
                     '|') cs_focus_session; DIRTY=1 ;;
                     $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
                     $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
+                    $'\x19') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_project; DIRTY=1 ;;
                     $'\x14') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_hide; DIRTY=1 ;;
                     $'\x16') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_shutdown; DIRTY=1 ;;
                     $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
@@ -2367,6 +2387,14 @@ cs_move_up() {
             SELECTED=$(( (SELECTED - 1 + n) % n ))
         done
     fi
+}
+
+cs_del_kv() {
+    local file="$1" key="$2"
+    [[ -f "${file}" ]] || return 0
+    local tmp="${file}.tmp"
+    grep -v "^${key}=" "${file}" > "${tmp}" 2>/dev/null || true
+    mv "${tmp}" "${file}"
 }
 
 cs_set_kv() {
@@ -2534,6 +2562,41 @@ cs_confirm() {
     [[ "${confirm}" == "y" ]]
 }
 
+cs_read_line() {
+    local initial="${1:-}"
+    CS_INPUT_RESULT="${initial}"
+    printf '%s' "${CS_INPUT_RESULT}"
+    while IFS= read -rsn1 ch; do
+        case "${ch}" in
+            $'\e')
+                read -rsn2 -t 0.1 _ || true
+                if [[ -z "${CS_INPUT_RESULT}" ]]; then
+                    return 1
+                fi
+                local _len=${#CS_INPUT_RESULT}
+                printf '%*s' "${_len}" "" | tr ' ' $'\b'
+                printf '%*s' "${_len}" ""
+                printf '%*s' "${_len}" "" | tr ' ' $'\b'
+                CS_INPUT_RESULT=""
+                ;;
+            $'\x7f'|$'\b')
+                if ((${#CS_INPUT_RESULT} > 0)); then
+                    CS_INPUT_RESULT="${CS_INPUT_RESULT%?}"
+                    printf '\b \b'
+                fi
+                ;;
+            "") return 0 ;;
+            *)
+                if [[ "${ch}" == [[:print:]] ]]; then
+                    CS_INPUT_RESULT+="${ch}"
+                    printf '%s' "${ch}"
+                fi
+                ;;
+        esac
+    done
+    return 1
+}
+
 cs_unhide_session() {
     local sid="$1"
     [[ -f "${HIDDEN_FILE}" ]] || return 0
@@ -2625,17 +2688,46 @@ cs_rename_selected() {
 
     cs_render_header_bar "\e[7m${CS_CLR_PROMPT_WARN}" "Name: " "${width}"
     printf '\e[1;7H\e[7m%b' "${CS_CLR_PROMPT_WARN}"
-    stty echo 2>/dev/null || true
     printf '\e[?25h'
-    local rename_val=""
-    read -r rename_val
-    stty -echo discard undef lnext undef 2>/dev/null || true
+    if cs_read_line; then
+        if [[ -n "${CS_INPUT_RESULT}" ]]; then
+            cs_set_kv "${NAMES_FILE}" "${sid}" "${CS_INPUT_RESULT}"
+            cs_rescan
+        fi
+    fi
     printf '\e[?25l\e[0m'
+}
 
-    if [[ -n "${rename_val}" ]]; then
-        cs_set_kv "${NAMES_FILE}" "${sid}" "${rename_val}"
+cs_rename_project() {
+    local target_path=""
+    local entry_type="${ENTRIES_TYPE[${SELECTED}]:-}"
+    local sanitized=""
+    case "${entry_type}" in
+        local|"") target_path="${PWD}"; sanitized="${PWD_SANITIZED}" ;;
+        project|remote|inactive) target_path="${ENTRIES_PATH[${SELECTED}]}"; sanitized=$(cs_sanitize_path "${target_path}") ;;
+        *) return 0 ;;
+    esac
+    [[ -n "${target_path}" ]] || return 0
+
+    local old_name="${PROJECT_NAMES[${sanitized}]:-}"
+    local width
+    width=$(tput cols)
+    cs_render_header_bar "\e[7m${CS_CLR_PROMPT_WARN}" "Project: " "${width}"
+    printf '\e[1;10H\e[7m%b' "${CS_CLR_PROMPT_WARN}"
+    printf '\e[?25h'
+    if cs_read_line "${old_name}"; then
+        if [[ -n "${CS_INPUT_RESULT}" ]]; then
+            cs_set_kv "${PROJECT_NAMES_FILE}" "${sanitized}" "${CS_INPUT_RESULT}"
+            PROJECT_NAMES["${sanitized}"]="${CS_INPUT_RESULT}"
+        elif [[ -n "${old_name}" ]]; then
+            cs_del_kv "${PROJECT_NAMES_FILE}" "${sanitized}"
+            unset "PROJECT_NAMES[${sanitized}]"
+        fi
+        LAST_REMOTE_SCAN=0
+        LAST_PATH_SET=""
         cs_rescan
     fi
+    printf '\e[?25l\e[0m'
 }
 
 cs_install_bell_hook() {
@@ -2731,6 +2823,7 @@ cs_install_keybindings() {
     cs_bind new_session c send-keys -t "${PICKER_PANE}" $'\x02'
     cs_bind close x send-keys -t "${PICKER_PANE}" $'\x06'
     cs_bind rename r send-keys -t "${PICKER_PANE}" $'\x10'
+    cs_bind rename_project p send-keys -t "${PICKER_PANE}" $'\x19'
     cs_bind hide H send-keys -t "${PICKER_PANE}" $'\x14'
     cs_bind shutdown s send-keys -t "${PICKER_PANE}" $'\x16'
     cs_bind reload R send-keys -t "${PICKER_PANE}" $'\x0e'

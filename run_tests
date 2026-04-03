@@ -286,11 +286,13 @@ cs_test_setup() {
     CONFIG_FILE="${CS_CONFIG_DIR}/config"
     NAMES_FILE="${CS_DATA_DIR}/names"
     HIDDEN_FILE="${CS_DATA_DIR}/hidden"
+    PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
     STATE_DIR="${TEST_TMP}/state"
 
     : > "${CONFIG_FILE}"
     : > "${HIDDEN_FILE}"
     : > "${NAMES_FILE}"
+    : > "${PROJECT_NAMES_FILE}"
 
     MOCK_PWD="/tmp/cs-test-project-$$"
     mkdir -p "${MOCK_PWD}"
@@ -362,6 +364,8 @@ cs_test_reset() {
     rm -f "${SESSIONS_DIR}"/*.json
     : > "${HIDDEN_FILE}"
     : > "${NAMES_FILE}"
+    : > "${PROJECT_NAMES_FILE}"
+    PROJECT_NAMES=()
 
     sleep 0.05
 }
@@ -874,6 +878,48 @@ test_display_names_compression() {
     [[ "${result}" == "client-a/api" ]] || { echo "    2-component: expected 'client-a/api', got '${result}'"; return 1; }
     result=$(cs_compress_suffix "aaaa/otherwise/same/my-project")
     [[ "${result}" == "aaaa/.../my-project" ]] || { echo "    4-component: expected 'aaaa/.../my-project', got '${result}'"; return 1; }
+}
+
+test_project_rename_override() {
+    REMOTE_SERVERS=("srv|/home/user/client-a/api")
+    INACTIVE_PROJECTS=()
+    cs_compute_display_names
+    # Without override, should use display name
+    local san
+    san=$(cs_sanitize_path "/home/user/client-a/api")
+    [[ "${PROJECT_NAMES[${san}]:-}" == "" ]] || { echo "    should have no override yet"; return 1; }
+    # Set override
+    PROJECT_NAMES["${san}"]="backend"
+    local leaf="${PROJECT_NAMES[${san}]:-${DISPLAY_NAMES[/home/user/client-a/api]:-api}}"
+    [[ "${leaf}" == "backend" ]] || { echo "    expected 'backend', got '${leaf}'"; return 1; }
+}
+
+test_project_rename_clear() {
+    local san
+    san=$(cs_sanitize_path "/home/user/my-project")
+    PROJECT_NAMES["${san}"]="custom"
+    [[ "${PROJECT_NAMES[${san}]}" == "custom" ]] || { echo "    set failed"; return 1; }
+    unset "PROJECT_NAMES[${san}]"
+    [[ "${PROJECT_NAMES[${san}]:-}" == "" ]] || { echo "    clear failed"; return 1; }
+}
+
+test_project_rename_header_lookup() {
+    PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
+    PROJECT_NAMES["${PWD_SANITIZED}"]="my-custom-name"
+    local pname="${PROJECT_NAMES[${PWD_SANITIZED}]:-}"
+    [[ "${pname}" == "my-custom-name" ]] || { echo "    expected 'my-custom-name', got '${pname}'"; return 1; }
+    unset "PROJECT_NAMES[${PWD_SANITIZED}]"
+}
+
+test_del_kv() {
+    local tmpfile="${TEST_TMP}/test_kv"
+    echo "key1=val1" > "${tmpfile}"
+    echo "key2=val2" >> "${tmpfile}"
+    echo "key3=val3" >> "${tmpfile}"
+    cs_del_kv "${tmpfile}" "key2"
+    grep -q "^key1=" "${tmpfile}" || { echo "    key1 missing"; return 1; }
+    grep -q "^key2=" "${tmpfile}" && { echo "    key2 not deleted"; return 1; }
+    grep -q "^key3=" "${tmpfile}" || { echo "    key3 missing"; return 1; }
 }
 
 test_active_elsewhere_detection() {
@@ -1553,6 +1599,10 @@ main() {
     run_test "display names: deep div"      test_display_names_deep_divergence
     run_test "display names: three-way"     test_display_names_three_way_collision
     run_test "display names: compression"   test_display_names_compression
+    run_test "project rename: override"     test_project_rename_override
+    run_test "project rename: clear"        test_project_rename_clear
+    run_test "project rename: header"       test_project_rename_header_lookup
+    run_test "del_kv"                       test_del_kv
     run_test "active-elsewhere detection"   test_active_elsewhere_detection
     run_test "project path persistence"    test_project_path_persistence
     run_test "discover remote servers"     test_discover_remote_servers

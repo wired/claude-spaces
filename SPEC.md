@@ -119,7 +119,8 @@ any non-matching key to cancel.
 
 | Key | Action |
 |-----|--------|
-| `r` | Rename |
+| `r` | Rename session |
+| `p` | Rename project |
 | `x` | Close (with confirm) |
 | `h` | Hide (with confirm) |
 | `o` | Hide this & older (with confirm) |
@@ -145,6 +146,7 @@ Default key assignments are documented in README.md. The available actions:
 | New session | `bind_new_session` | Create new Claude session |
 | Close session | `bind_close` | Close with confirm prompt |
 | Rename session | `bind_rename` | Rename selected session |
+| Rename project | `bind_rename_project` | Rename project of selected entry |
 | Hide session | `bind_hide` | Hide with confirm prompt |
 | Shutdown | `bind_shutdown` | Kill tmux server |
 | Reload picker | `bind_reload` | Re-exec picker in-place |

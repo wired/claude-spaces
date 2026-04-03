@@ -49,10 +49,13 @@ falls back to the current pane on miss.
 ### Display name disambiguation
 
 `cs_compute_display_names` computes minimal unique suffixes for project paths (stored in
-`DISPLAY_NAMES` associative array). Used by: header, other projects list, inactive list,
-tmux session name (via `rename-session`), welcome pane. Recomputed only when the project set changes
-(`LAST_PATH_SET` fingerprint). Deep paths compress to `first/.../leaf`; if compression
-would re-introduce collisions, the uncompressed suffix is used.
+`DISPLAY_NAMES` associative array). Users can override with custom names via `prefix+p`
+or `:` menu → `p` (stored in `PROJECT_NAMES` keyed by sanitized path, persisted in
+`${CS_DATA_DIR}/project_names`). Lookup priority: `PROJECT_NAMES` → `DISPLAY_NAMES` → leaf.
+Used by: header, other projects list, inactive list, tmux session name (via `rename-session`),
+welcome pane. Display names recomputed only when the project set changes (`LAST_PATH_SET`
+fingerprint). Deep paths compress to `first/.../leaf`; if compression would re-introduce
+collisions, the uncompressed suffix is used.
 
 ## Things that are easy to break
 
