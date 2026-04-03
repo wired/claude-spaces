@@ -556,6 +556,23 @@ cs_resolve_name() {
     echo "${name}"
 }
 
+cs_check_new_pane() {
+    local new_p
+    new_p=$(cs_read_state new_pane)
+    if [[ -n "${new_p}" ]]; then
+        if ! cs_pane_alive "${new_p}"; then
+            rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}"
+            local cp
+            cp=$(cs_read_state current_pane)
+            if [[ "${cp}" == "${new_p}" ]]; then
+                echo "" > "${STATE_DIR}/current_pane"
+            fi
+        else
+            cs_entry_prepend "__new__" "(new session)" "$(date +%s)" "managed" "${new_p}" "local" ""
+        fi
+    fi
+}
+
 cs_scan_sessions() {
     cs_refresh_pane_cache
     local project_dir
@@ -564,7 +581,10 @@ cs_scan_sessions() {
     cs_entry_clear
     cs_load_shared_maps
 
-    [[ -d "${project_dir}" ]] || return 0
+    if [[ ! -d "${project_dir}" ]]; then
+        cs_check_new_pane
+        return 0
+    fi
 
     # Build active-elsewhere set: sessionId -> pid
     declare -A active_pids
@@ -654,23 +674,7 @@ cs_scan_sessions() {
 
     cs_sort_entries
 
-    # Handle unresolved new pane
-    local new_p
-    new_p=$(cs_read_state new_pane)
-    if [[ -n "${new_p}" ]]; then
-        if ! cs_pane_alive "${new_p}"; then
-            # Pane died (user cancelled) — clean up
-            rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}"
-            local cp
-            cp=$(cs_read_state current_pane)
-            if [[ "${cp}" == "${new_p}" ]]; then
-                echo "" > "${STATE_DIR}/current_pane"
-            fi
-        else
-            # Still uninitialized — prepend to list
-            cs_entry_prepend "__new__" "(new session)" "$(date +%s)" "managed" "${new_p}" "local" ""
-        fi
-    fi
+    cs_check_new_pane
 }
 
 cs_sort_entries() {
