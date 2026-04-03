@@ -1,5 +1,7 @@
 # claude-spaces
 
+![Tests](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
+
 Session management for Claude Code.
 
 ![claude-spaces-v0 9 0](https://github.com/user-attachments/assets/f58f3c2e-81c9-4f42-8d8e-96619755e88a)
