@@ -29,7 +29,7 @@ every project, with instant switching and background activity alerts.
 |                                    |                              |
 |                                    | : menu  / search             |
 |                                    | Q:detach                     |
-|                                    | claude-spaces v0.9.6-dev     |
+|                                    | claude-spaces v0.9.6     |
 +------------------------------------+------------------------------+
          left slot                    picker (30 cols default)
 ```
