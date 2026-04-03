@@ -2405,14 +2405,13 @@ cs_del_kv() {
 
 cs_set_kv() {
   local file="$1" key="$2" value="$3"
-  # Escape sed special characters in value
   local safe="${value//\\/\\\\}"
   safe="${safe//|/\\|}"
   safe="${safe//&/\\&}"
   if grep -q "^${key}=" "${file}" 2>/dev/null; then
-    sed -i "s|^${key}=.*|${key}=${safe}|" "${file}"
+    sed "s|^${key}=.*|${key}=${safe}|" "${file}" > "${file}.tmp" && mv "${file}.tmp" "${file}"
   elif grep -q "^# ${key}=" "${file}" 2>/dev/null; then
-    sed -i "s|^# ${key}=.*|${key}=${safe}|" "${file}"
+    sed "s|^# ${key}=.*|${key}=${safe}|" "${file}" > "${file}.tmp" && mv "${file}.tmp" "${file}"
   else
     echo "${key}=${value}" >> "${file}"
   fi
