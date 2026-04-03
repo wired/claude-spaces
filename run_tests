@@ -24,1611 +24,1611 @@ FAIL_COUNT=0
 
 # ── Phase 1: shellcheck ──────────────────────────
 phase_shellcheck() {
-    echo "Running shellcheck..."
-    if ! shellcheck -S warning "${SCRIPT_UNDER_TEST}"; then
-        echo -e "${RED}shellcheck failed${RESET}"
-        exit 1
-    fi
-    echo -e "${GREEN}shellcheck passed${RESET}"
-    echo ""
+  echo "Running shellcheck..."
+  if ! shellcheck -S warning "${SCRIPT_UNDER_TEST}"; then
+    echo -e "${RED}shellcheck failed${RESET}"
+    exit 1
+  fi
+  echo -e "${GREEN}shellcheck passed${RESET}"
+  echo ""
 }
 
 phase_arg_checks() {
-    echo "Running arg checks..."
-    local errors=0
-    for func_sig in "cs_entry_append:7" "cs_entry_prepend:7"; do
-        local func="${func_sig%%:*}"
-        local expected="${func_sig##*:}"
-        while IFS=: read -r linenum content; do
-            local count
-            count=$(echo "${content}" | grep -o '"' | wc -l)
-            count=$((count / 2))
-            if ((count != expected)); then
-                echo -e "  ${RED}Line ${linenum}: ${func} has ${count} args (expected ${expected})${RESET}"
-                ((errors++))
-            fi
-        done < <(grep -n "${func} " "${SCRIPT_UNDER_TEST}" | grep -v '^\s*#' | grep -v "${func}()" | grep -v "${func}() {" | grep -v "echo.*${func}")
-    done
-    if ((errors > 0)); then
-        echo -e "${RED}arg checks failed${RESET}"
-        exit 1
-    fi
-    echo -e "${GREEN}arg checks passed${RESET}"
-    echo ""
+  echo "Running arg checks..."
+  local errors=0
+  for func_sig in "cs_entry_append:7" "cs_entry_prepend:7"; do
+    local func="${func_sig%%:*}"
+    local expected="${func_sig##*:}"
+    while IFS=: read -r linenum content; do
+      local count
+      count=$(echo "${content}" | grep -o '"' | wc -l)
+      count=$((count / 2))
+      if ((count != expected)); then
+        echo -e "  ${RED}Line ${linenum}: ${func} has ${count} args (expected ${expected})${RESET}"
+        ((errors++))
+      fi
+    done < <(grep -n "${func} " "${SCRIPT_UNDER_TEST}" | grep -v '^\s*#' | grep -v "${func}()" | grep -v "${func}() {" | grep -v "echo.*${func}")
+  done
+  if ((errors > 0)); then
+    echo -e "${RED}arg checks failed${RESET}"
+    exit 1
+  fi
+  echo -e "${GREEN}arg checks passed${RESET}"
+  echo ""
 }
 
 # ── Source functions ──────────────────────────────
 load_functions() {
-    eval "$(sed -n '1,/^# ── Entrypoint/p' "${SCRIPT_UNDER_TEST}" | sed '$d')"
+  eval "$(sed -n '1,/^# ── Entrypoint/p' "${SCRIPT_UNDER_TEST}" | sed '$d')"
 }
 
 # ── Mock overrides ───────────────────────────────
 mock_cs_new_session() {
-    local old_new
-    old_new=$(cs_read_state new_pane)
-    if [[ -n "${old_new}" ]]; then
-        _tmux kill-pane -t "${old_new}" 2>/dev/null || true
-        rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane"
-    fi
-    local pane_id
-    pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
-    echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
-    echo "${pane_id}" > "${STATE_DIR}/new_pane"
-    cs_show_pane "${pane_id}"
+  local old_new
+  old_new=$(cs_read_state new_pane)
+  if [[ -n "${old_new}" ]]; then
+    _tmux kill-pane -t "${old_new}" 2>/dev/null || true
+    rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane"
+  fi
+  local pane_id
+  pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
+  echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
+  echo "${pane_id}" > "${STATE_DIR}/new_pane"
+  cs_show_pane "${pane_id}"
 }
 
 mock_cs_resume_session() {
-    local session_id="$1"
-    local pane_id
-    pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
-    echo "${session_id}" > "${STATE_DIR}/panes/${pane_id#%}"
-    cs_show_pane "${pane_id}"
+  local session_id="$1"
+  local pane_id
+  pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
+  echo "${session_id}" > "${STATE_DIR}/panes/${pane_id#%}"
+  cs_show_pane "${pane_id}"
 }
 
 mock_cs_show_welcome() {
-    local welcome_pane
-    welcome_pane=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
-    echo "${welcome_pane}" > "${STATE_DIR}/welcome_pane"
-    cs_show_pane "${welcome_pane}"
+  local welcome_pane
+  welcome_pane=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
+  echo "${welcome_pane}" > "${STATE_DIR}/welcome_pane"
+  cs_show_pane "${welcome_pane}"
 }
 
 install_mocks() {
-    eval 'cs_new_session() { mock_cs_new_session "$@"; }'
-    eval 'cs_resume_session() { mock_cs_resume_session "$@"; }'
-    eval 'cs_show_welcome() { mock_cs_show_welcome "$@"; }'
+  eval 'cs_new_session() { mock_cs_new_session "$@"; }'
+  eval 'cs_resume_session() { mock_cs_resume_session "$@"; }'
+  eval 'cs_show_welcome() { mock_cs_show_welcome "$@"; }'
 }
 
 # ── Test helpers ─────────────────────────────────
 pane_alive() {
-    cs_refresh_pane_cache
-    cs_pane_alive "$1"
+  cs_refresh_pane_cache
+  cs_pane_alive "$1"
 }
 
 cs_create_mock_session() {
-    local sid="$1" message="${2:-Test session}"
-    printf '{"type":"user","message":{"role":"user","content":"%s"},"sessionId":"%s"}\n' \
-        "${message}" "${sid}" > "${MOCK_PROJECT_DIR}/${sid}.jsonl"
+  local sid="$1" message="${2:-Test session}"
+  printf '{"type":"user","message":{"role":"user","content":"%s"},"sessionId":"%s"}\n' \
+    "${message}" "${sid}" > "${MOCK_PROJECT_DIR}/${sid}.jsonl"
 }
 
 find_entry_index() {
-    local target_id="$1"
-    for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
-        if [[ "${ENTRIES_ID[${i}]}" == "${target_id}" ]]; then
-            echo "${i}"
-            return
-        fi
-    done
-    echo "-1"
+  local target_id="$1"
+  for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
+    if [[ "${ENTRIES_ID[${i}]}" == "${target_id}" ]]; then
+      echo "${i}"
+      return
+    fi
+  done
+  echo "-1"
 }
 
 # ── State invariant checker ──────────────────────
 cs_assert_consistent() {
-    local label="$1"
-    local errors=0
+  local label="$1"
+  local errors=0
 
-    # 1. current_pane: empty or alive
-    local cp
-    cp=$(cs_read_state current_pane)
-    if [[ -n "${cp}" ]] && ! pane_alive "${cp}"; then
-        echo -e "    ${RED}FAIL${RESET} [${label}] current_pane '${cp}' is dead"
-        ((errors++))
+  # 1. current_pane: empty or alive
+  local cp
+  cp=$(cs_read_state current_pane)
+  if [[ -n "${cp}" ]] && ! pane_alive "${cp}"; then
+    echo -e "    ${RED}FAIL${RESET} [${label}] current_pane '${cp}' is dead"
+    ((errors++))
+  fi
+
+  # 2. new_pane: empty or alive
+  local np
+  np=$(cs_read_state new_pane)
+  if [[ -n "${np}" ]] && ! pane_alive "${np}"; then
+    echo -e "    ${RED}FAIL${RESET} [${label}] new_pane '${np}' is dead"
+    ((errors++))
+  fi
+
+  # 3. welcome_pane: empty or alive
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  if [[ -n "${wp}" ]] && ! pane_alive "${wp}"; then
+    echo -e "    ${RED}FAIL${RESET} [${label}] welcome_pane '${wp}' is dead"
+    ((errors++))
+  fi
+
+  # 4. Every panes/* references a live pane
+  for f in "${STATE_DIR}"/panes/*; do
+    [[ -f "${f}" ]] || continue
+    local pid="%$(basename "${f}")"
+    if ! pane_alive "${pid}"; then
+      echo -e "    ${RED}FAIL${RESET} [${label}] panes/$(basename "${f}") references dead pane '${pid}'"
+      ((errors++))
     fi
+  done
 
-    # 2. new_pane: empty or alive
-    local np
-    np=$(cs_read_state new_pane)
-    if [[ -n "${np}" ]] && ! pane_alive "${np}"; then
-        echo -e "    ${RED}FAIL${RESET} [${label}] new_pane '${np}' is dead"
+  # 5. picker_pane is set and alive
+  local pp
+  pp=$(cs_read_state picker_pane)
+  if [[ -z "${pp}" ]]; then
+    echo -e "    ${RED}FAIL${RESET} [${label}] picker_pane is empty"
+    ((errors++))
+  elif ! pane_alive "${pp}"; then
+    echo -e "    ${RED}FAIL${RESET} [${label}] picker_pane '${pp}' is dead"
+    ((errors++))
+  fi
+
+  # 6. Picker window pane count: 1 (picker only), 2 (picker + session),
+  #    or 3 (picker + session + terminal)
+  if [[ -n "${pp}" ]] && pane_alive "${pp}"; then
+    local picker_window
+    picker_window=$(_tmux display-message -t "${pp}" -p '#{window_id}' 2>/dev/null)
+    if [[ -n "${picker_window}" ]]; then
+      local pane_count expected_panes=1
+      pane_count=$(_tmux list-panes -t "${picker_window}" -F '#{pane_id}' 2>/dev/null | wc -l)
+      if [[ -n "${cp}" ]] && pane_alive "${cp}"; then
+        ((expected_panes++))
+        # Check for visible terminal in picker window
+        local _tp
+        _tp=$(cs_term_pane_for "${cp}")
+        if [[ -n "${_tp}" ]] && pane_alive "${_tp}"; then
+          local _tp_win
+          _tp_win=$(_tmux display-message -t "${_tp}" -p '#{window_id}' 2>/dev/null)
+          [[ "${_tp_win}" == "${picker_window}" ]] && ((expected_panes++))
+        fi
+      fi
+      if ((pane_count != expected_panes)); then
+        echo -e "    ${RED}FAIL${RESET} [${label}] picker window has ${pane_count} panes (expected ${expected_panes})"
         ((errors++))
+      fi
     fi
+  fi
 
-    # 3. welcome_pane: empty or alive
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    if [[ -n "${wp}" ]] && ! pane_alive "${wp}"; then
-        echo -e "    ${RED}FAIL${RESET} [${label}] welcome_pane '${wp}' is dead"
-        ((errors++))
-    fi
+  # 7. No untracked windows
+  if [[ -n "${pp}" ]] && pane_alive "${pp}"; then
+    local -A tracked_windows
+    local picker_window
+    picker_window=$(_tmux display-message -t "${pp}" -p '#{window_id}' 2>/dev/null)
+    tracked_windows["${picker_window}"]=1
 
-    # 4. Every panes/* references a live pane
     for f in "${STATE_DIR}"/panes/*; do
-        [[ -f "${f}" ]] || continue
-        local pid="%$(basename "${f}")"
-        if ! pane_alive "${pid}"; then
-            echo -e "    ${RED}FAIL${RESET} [${label}] panes/$(basename "${f}") references dead pane '${pid}'"
-            ((errors++))
-        fi
+      [[ -f "${f}" ]] || continue
+      local pid="%$(basename "${f}")"
+      local wid
+      wid=$(_tmux display-message -t "${pid}" -p '#{window_id}' 2>/dev/null) || continue
+      tracked_windows["${wid}"]=1
     done
 
-    # 5. picker_pane is set and alive
-    local pp
-    pp=$(cs_read_state picker_pane)
-    if [[ -z "${pp}" ]]; then
-        echo -e "    ${RED}FAIL${RESET} [${label}] picker_pane is empty"
-        ((errors++))
-    elif ! pane_alive "${pp}"; then
-        echo -e "    ${RED}FAIL${RESET} [${label}] picker_pane '${pp}' is dead"
-        ((errors++))
-    fi
-
-    # 6. Picker window pane count: 1 (picker only), 2 (picker + session),
-    #    or 3 (picker + session + terminal)
-    if [[ -n "${pp}" ]] && pane_alive "${pp}"; then
-        local picker_window
-        picker_window=$(_tmux display-message -t "${pp}" -p '#{window_id}' 2>/dev/null)
-        if [[ -n "${picker_window}" ]]; then
-            local pane_count expected_panes=1
-            pane_count=$(_tmux list-panes -t "${picker_window}" -F '#{pane_id}' 2>/dev/null | wc -l)
-            if [[ -n "${cp}" ]] && pane_alive "${cp}"; then
-                ((expected_panes++))
-                # Check for visible terminal in picker window
-                local _tp
-                _tp=$(cs_term_pane_for "${cp}")
-                if [[ -n "${_tp}" ]] && pane_alive "${_tp}"; then
-                    local _tp_win
-                    _tp_win=$(_tmux display-message -t "${_tp}" -p '#{window_id}' 2>/dev/null)
-                    [[ "${_tp_win}" == "${picker_window}" ]] && ((expected_panes++))
-                fi
-            fi
-            if ((pane_count != expected_panes)); then
-                echo -e "    ${RED}FAIL${RESET} [${label}] picker window has ${pane_count} panes (expected ${expected_panes})"
-                ((errors++))
-            fi
-        fi
-    fi
-
-    # 7. No untracked windows
-    if [[ -n "${pp}" ]] && pane_alive "${pp}"; then
-        local -A tracked_windows
-        local picker_window
-        picker_window=$(_tmux display-message -t "${pp}" -p '#{window_id}' 2>/dev/null)
-        tracked_windows["${picker_window}"]=1
-
-        for f in "${STATE_DIR}"/panes/*; do
-            [[ -f "${f}" ]] || continue
-            local pid="%$(basename "${f}")"
-            local wid
-            wid=$(_tmux display-message -t "${pid}" -p '#{window_id}' 2>/dev/null) || continue
-            tracked_windows["${wid}"]=1
-        done
-
-        # Track terminal pane windows
-        for f in "${STATE_DIR}"/term/*; do
-            [[ -f "${f}" ]] || continue
-            [[ "$(basename "${f}")" == *.* ]] && continue
-            local tpid
-            tpid=$(cat "${f}" 2>/dev/null || true)
-            if [[ -n "${tpid}" ]] && pane_alive "${tpid}"; then
-                local twid
-                twid=$(_tmux display-message -t "${tpid}" -p '#{window_id}' 2>/dev/null) || continue
-                tracked_windows["${twid}"]=1
-            fi
-        done
-
-        if [[ -n "${wp}" ]] && pane_alive "${wp}"; then
-            local wwid
-            wwid=$(_tmux display-message -t "${wp}" -p '#{window_id}' 2>/dev/null) || true
-            [[ -n "${wwid}" ]] && tracked_windows["${wwid}"]=1
-        fi
-
-        local all_windows
-        all_windows=$(_tmux list-windows -t "${TEST_SESSION}" -F '#{window_id}' 2>/dev/null)
-        while IFS= read -r wid; do
-            [[ -n "${wid}" ]] || continue
-            if [[ -z "${tracked_windows[${wid}]:-}" ]]; then
-                echo -e "    ${RED}FAIL${RESET} [${label}] untracked window '${wid}'"
-                ((errors++))
-            fi
-        done <<< "${all_windows}"
-    fi
-
-    # 8. Terminal state consistency
+    # Track terminal pane windows
     for f in "${STATE_DIR}"/term/*; do
-        [[ -f "${f}" ]] || continue
-        [[ "$(basename "${f}")" == *.* ]] && continue
-        local tpid
-        tpid=$(cat "${f}" 2>/dev/null || true)
-        if [[ -n "${tpid}" ]] && ! pane_alive "${tpid}"; then
-            echo -e "    ${RED}FAIL${RESET} [${label}] term/$(basename "${f}") references dead pane '${tpid}'"
-            ((errors++))
-        fi
-    done
-    for f in "${STATE_DIR}"/term/*.shown; do
-        [[ -f "${f}" ]] || continue
-        local base
-        base=$(basename "${f}" .shown)
-        if [[ ! -f "${STATE_DIR}/term/${base}" ]]; then
-            echo -e "    ${RED}FAIL${RESET} [${label}] term/${base}.shown exists but term/${base} does not"
-            ((errors++))
-        fi
+      [[ -f "${f}" ]] || continue
+      [[ "$(basename "${f}")" == *.* ]] && continue
+      local tpid
+      tpid=$(cat "${f}" 2>/dev/null || true)
+      if [[ -n "${tpid}" ]] && pane_alive "${tpid}"; then
+        local twid
+        twid=$(_tmux display-message -t "${tpid}" -p '#{window_id}' 2>/dev/null) || continue
+        tracked_windows["${twid}"]=1
+      fi
     done
 
-    return "${errors}"
+    if [[ -n "${wp}" ]] && pane_alive "${wp}"; then
+      local wwid
+      wwid=$(_tmux display-message -t "${wp}" -p '#{window_id}' 2>/dev/null) || true
+      [[ -n "${wwid}" ]] && tracked_windows["${wwid}"]=1
+    fi
+
+    local all_windows
+    all_windows=$(_tmux list-windows -t "${TEST_SESSION}" -F '#{window_id}' 2>/dev/null)
+    while IFS= read -r wid; do
+      [[ -n "${wid}" ]] || continue
+      if [[ -z "${tracked_windows[${wid}]:-}" ]]; then
+        echo -e "    ${RED}FAIL${RESET} [${label}] untracked window '${wid}'"
+        ((errors++))
+      fi
+    done <<< "${all_windows}"
+  fi
+
+  # 8. Terminal state consistency
+  for f in "${STATE_DIR}"/term/*; do
+    [[ -f "${f}" ]] || continue
+    [[ "$(basename "${f}")" == *.* ]] && continue
+    local tpid
+    tpid=$(cat "${f}" 2>/dev/null || true)
+    if [[ -n "${tpid}" ]] && ! pane_alive "${tpid}"; then
+      echo -e "    ${RED}FAIL${RESET} [${label}] term/$(basename "${f}") references dead pane '${tpid}'"
+      ((errors++))
+    fi
+  done
+  for f in "${STATE_DIR}"/term/*.shown; do
+    [[ -f "${f}" ]] || continue
+    local base
+    base=$(basename "${f}" .shown)
+    if [[ ! -f "${STATE_DIR}/term/${base}" ]]; then
+      echo -e "    ${RED}FAIL${RESET} [${label}] term/${base}.shown exists but term/${base} does not"
+      ((errors++))
+    fi
+  done
+
+  return "${errors}"
 }
 
 # ── Setup / teardown ─────────────────────────────
 cs_test_setup() {
-    TEST_TMP=$(mktemp -d)
-    TEST_SESSION="cs-test-$$"
-    TMUX_SERVER="cs-test-$$"
+  TEST_TMP=$(mktemp -d)
+  TEST_SESSION="cs-test-$$"
+  TMUX_SERVER="cs-test-$$"
 
-    mkdir -p "${TEST_TMP}/state/panes" "${TEST_TMP}/state/term"
-    mkdir -p "${TEST_TMP}/claude/projects"
-    mkdir -p "${TEST_TMP}/claude/sessions"
-    mkdir -p "${TEST_TMP}/config"
-    mkdir -p "${TEST_TMP}/data"
+  mkdir -p "${TEST_TMP}/state/panes" "${TEST_TMP}/state/term"
+  mkdir -p "${TEST_TMP}/claude/projects"
+  mkdir -p "${TEST_TMP}/claude/sessions"
+  mkdir -p "${TEST_TMP}/config"
+  mkdir -p "${TEST_TMP}/data"
 
-    CLAUDE_DIR="${TEST_TMP}/claude"
-    PROJECTS_DIR="${CLAUDE_DIR}/projects"
-    SESSIONS_DIR="${CLAUDE_DIR}/sessions"
-    CS_CONFIG_DIR="${TEST_TMP}/config"
-    CS_DATA_DIR="${TEST_TMP}/data"
-    CONFIG_FILE="${CS_CONFIG_DIR}/config"
-    NAMES_FILE="${CS_DATA_DIR}/names"
-    HIDDEN_FILE="${CS_DATA_DIR}/hidden"
-    PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
-    STATE_DIR="${TEST_TMP}/state"
+  CLAUDE_DIR="${TEST_TMP}/claude"
+  PROJECTS_DIR="${CLAUDE_DIR}/projects"
+  SESSIONS_DIR="${CLAUDE_DIR}/sessions"
+  CS_CONFIG_DIR="${TEST_TMP}/config"
+  CS_DATA_DIR="${TEST_TMP}/data"
+  CONFIG_FILE="${CS_CONFIG_DIR}/config"
+  NAMES_FILE="${CS_DATA_DIR}/names"
+  HIDDEN_FILE="${CS_DATA_DIR}/hidden"
+  PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
+  STATE_DIR="${TEST_TMP}/state"
 
-    : > "${CONFIG_FILE}"
-    : > "${HIDDEN_FILE}"
-    : > "${NAMES_FILE}"
-    : > "${PROJECT_NAMES_FILE}"
+  : > "${CONFIG_FILE}"
+  : > "${HIDDEN_FILE}"
+  : > "${NAMES_FILE}"
+  : > "${PROJECT_NAMES_FILE}"
 
-    MOCK_PWD="/tmp/cs-test-project-$$"
-    mkdir -p "${MOCK_PWD}"
-    MOCK_PROJECT_DIR="${PROJECTS_DIR}/$(echo "${MOCK_PWD}" | tr '/' '-')"
-    mkdir -p "${MOCK_PROJECT_DIR}"
+  MOCK_PWD="/tmp/cs-test-project-$$"
+  mkdir -p "${MOCK_PWD}"
+  MOCK_PROJECT_DIR="${PROJECTS_DIR}/$(echo "${MOCK_PWD}" | tr '/' '-')"
+  mkdir -p "${MOCK_PROJECT_DIR}"
 
-    # Create tmux session
-    _tmux new-session -d -s "${TEST_SESSION}" -x 120 -y 40 "sleep 99999"
-    sleep 0.05
-    PICKER_PANE=$(_tmux list-panes -t "${TEST_SESSION}" -F '#{pane_id}' | head -1)
-    echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
-    echo $$ > "${STATE_DIR}/picker_pid"
-    echo "${MOCK_PWD}" > "${STATE_DIR}/project_path"
+  # Create tmux session
+  _tmux new-session -d -s "${TEST_SESSION}" -x 120 -y 40 "sleep 99999"
+  sleep 0.05
+  PICKER_PANE=$(_tmux list-panes -t "${TEST_SESSION}" -F '#{pane_id}' | head -1)
+  echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
+  echo $$ > "${STATE_DIR}/picker_pid"
+  echo "${MOCK_PWD}" > "${STATE_DIR}/project_path"
 
-    # Override PWD for cs_get_project_dir
-    PWD="${MOCK_PWD}"
+  # Override PWD for cs_get_project_dir
+  PWD="${MOCK_PWD}"
 
-    # Reduce dormant-activate sleep for tests
-    CS_ACTIVATE_DELAY=0.05
+  # Reduce dormant-activate sleep for tests
+  CS_ACTIVATE_DELAY=0.05
 
-    # Initialize globals
-    SELECTED=0
-    SCROLL=0
-    DIRTY=0
-    LAST_FINGERPRINT=""
-    declare -gA BELL_SET
-    NOW=$(date +%s)
+  # Initialize globals
+  SELECTED=0
+  SCROLL=0
+  DIRTY=0
+  LAST_FINGERPRINT=""
+  declare -gA BELL_SET
+  NOW=$(date +%s)
 }
 
 cs_test_teardown() {
-    _tmux kill-session -t "${TEST_SESSION}" 2>/dev/null || true
-    rm -rf "${TEST_TMP}"
-    rm -rf "${MOCK_PWD}"
+  _tmux kill-session -t "${TEST_SESSION}" 2>/dev/null || true
+  rm -rf "${TEST_TMP}"
+  rm -rf "${MOCK_PWD}"
 }
 
 cs_test_reset() {
-    # Kill all panes except picker
-    local panes
-    panes=$(_tmux list-panes -s -t "${TEST_SESSION}" -F '#{pane_id}' 2>/dev/null)
-    while IFS= read -r p; do
-        [[ -n "${p}" ]] || continue
-        [[ "${p}" == "${PICKER_PANE}" ]] && continue
-        _tmux kill-pane -t "${p}" 2>/dev/null || true
-    done <<< "${panes}"
-    sleep 0.05
+  # Kill all panes except picker
+  local panes
+  panes=$(_tmux list-panes -s -t "${TEST_SESSION}" -F '#{pane_id}' 2>/dev/null)
+  while IFS= read -r p; do
+    [[ -n "${p}" ]] || continue
+    [[ "${p}" == "${PICKER_PANE}" ]] && continue
+    _tmux kill-pane -t "${p}" 2>/dev/null || true
+  done <<< "${panes}"
+  sleep 0.05
 
-    # Clear state
-    rm -f "${STATE_DIR}/current_pane" "${STATE_DIR}/new_pane" "${STATE_DIR}/welcome_pane"
-    rm -f "${STATE_DIR}/panes/"*
-    rm -f "${STATE_DIR}/term/"*
-    : > "${STATE_DIR}/bells"
-    rm -f "${STATE_DIR}/bells_active" "${STATE_DIR}/bells_active.tmp"
-    echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
-    echo $$ > "${STATE_DIR}/picker_pid"
+  # Clear state
+  rm -f "${STATE_DIR}/current_pane" "${STATE_DIR}/new_pane" "${STATE_DIR}/welcome_pane"
+  rm -f "${STATE_DIR}/panes/"*
+  rm -f "${STATE_DIR}/term/"*
+  : > "${STATE_DIR}/bells"
+  rm -f "${STATE_DIR}/bells_active" "${STATE_DIR}/bells_active.tmp"
+  echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
+  echo $$ > "${STATE_DIR}/picker_pid"
 
-    # Reset globals
-    ENTRIES_ID=()
-    ENTRIES_NAME=()
-    ENTRIES_MTIME=()
-    ENTRIES_STATUS=()
-    ENTRIES_PANE=()
-    SELECTED=0
-    SCROLL=0
-    declare -gA BELL_SET=()
+  # Reset globals
+  ENTRIES_ID=()
+  ENTRIES_NAME=()
+  ENTRIES_MTIME=()
+  ENTRIES_STATUS=()
+  ENTRIES_PANE=()
+  SELECTED=0
+  SCROLL=0
+  declare -gA BELL_SET=()
 
-    # Clear mock data
-    rm -rf "${MOCK_PROJECT_DIR}"
-    mkdir -p "${MOCK_PROJECT_DIR}"
-    rm -f "${SESSIONS_DIR}"/*.json
-    : > "${HIDDEN_FILE}"
-    : > "${NAMES_FILE}"
-    : > "${PROJECT_NAMES_FILE}"
-    PROJECT_NAMES=()
+  # Clear mock data
+  rm -rf "${MOCK_PROJECT_DIR}"
+  mkdir -p "${MOCK_PROJECT_DIR}"
+  rm -f "${SESSIONS_DIR}"/*.json
+  : > "${HIDDEN_FILE}"
+  : > "${NAMES_FILE}"
+  : > "${PROJECT_NAMES_FILE}"
+  PROJECT_NAMES=()
 
-    sleep 0.05
+  sleep 0.05
 }
 
 # ── Test runner ──────────────────────────────────
 run_test() {
-    local name="$1"
-    shift
-    cs_test_reset
-    echo -n "  ${name} ... "
-    local output
-    if output=$("$@" 2>&1); then
-        echo -e "${GREEN}PASS${RESET}"
-        ((PASS_COUNT++))
-    else
-        echo -e "${RED}FAIL${RESET}"
-        [[ -n "${output}" ]] && echo "${output}"
-        ((FAIL_COUNT++))
-    fi
+  local name="$1"
+  shift
+  cs_test_reset
+  echo -n "  ${name} ... "
+  local output
+  if output=$("$@" 2>&1); then
+    echo -e "${GREEN}PASS${RESET}"
+    ((PASS_COUNT++))
+  else
+    echo -e "${RED}FAIL${RESET}"
+    [[ -n "${output}" ]] && echo "${output}"
+    ((FAIL_COUNT++))
+  fi
 }
 
 # ── Test cases ───────────────────────────────────
 
 test_fresh_start_no_sessions() {
-    cs_scan_sessions
-    [[ ${#ENTRIES_ID[@]} -eq 0 ]] || { echo "    expected 0 entries, got ${#ENTRIES_ID[@]}"; return 1; }
-    cs_new_session
-    sleep 0.05
-    local np
-    np=$(cs_read_state new_pane)
-    [[ -n "${np}" ]] || { echo "    new_pane not set"; return 1; }
-    local cp
-    cp=$(cs_read_state current_pane)
-    [[ -n "${cp}" ]] || { echo "    current_pane not set"; return 1; }
-    cs_assert_consistent "fresh_no_sessions"
+  cs_scan_sessions
+  [[ ${#ENTRIES_ID[@]} -eq 0 ]] || { echo "    expected 0 entries, got ${#ENTRIES_ID[@]}"; return 1; }
+  cs_new_session
+  sleep 0.05
+  local np
+  np=$(cs_read_state new_pane)
+  [[ -n "${np}" ]] || { echo "    new_pane not set"; return 1; }
+  local cp
+  cp=$(cs_read_state current_pane)
+  [[ -n "${cp}" ]] || { echo "    current_pane not set"; return 1; }
+  cs_assert_consistent "fresh_no_sessions"
 }
 
 test_fresh_start_with_sessions() {
-    cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "first session"
-    cs_create_mock_session "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" "second session"
-    cs_scan_sessions
-    [[ ${#ENTRIES_ID[@]} -eq 2 ]] || { echo "    expected 2 entries, got ${#ENTRIES_ID[@]}"; return 1; }
-    cs_show_welcome
-    sleep 0.05
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" ]] || { echo "    welcome_pane not set"; return 1; }
-    cs_assert_consistent "fresh_with_sessions"
+  cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "first session"
+  cs_create_mock_session "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" "second session"
+  cs_scan_sessions
+  [[ ${#ENTRIES_ID[@]} -eq 2 ]] || { echo "    expected 2 entries, got ${#ENTRIES_ID[@]}"; return 1; }
+  cs_show_welcome
+  sleep 0.05
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" ]] || { echo "    welcome_pane not set"; return 1; }
+  cs_assert_consistent "fresh_with_sessions"
 }
 
 test_select_dormant() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "test dormant"
-    cs_scan_sessions
-    cs_show_welcome
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "test dormant"
+  cs_scan_sessions
+  cs_show_welcome
+  sleep 0.05
 
-    local idx
-    idx=$(find_entry_index "${sid}")
-    [[ "${idx}" != "-1" ]] || { echo "    session not found in entries"; return 1; }
-    SELECTED=${idx}
-    cs_activate_selected
-    sleep 0.05
+  local idx
+  idx=$(find_entry_index "${sid}")
+  [[ "${idx}" != "-1" ]] || { echo "    session not found in entries"; return 1; }
+  SELECTED=${idx}
+  cs_activate_selected
+  sleep 0.05
 
-    local cp
-    cp=$(cs_read_state current_pane)
-    [[ -n "${cp}" ]] || { echo "    current_pane not set after select"; return 1; }
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -z "${wp}" ]] || { echo "    welcome_pane not cleared"; return 1; }
-    cs_assert_consistent "select_dormant"
+  local cp
+  cp=$(cs_read_state current_pane)
+  [[ -n "${cp}" ]] || { echo "    current_pane not set after select"; return 1; }
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -z "${wp}" ]] || { echo "    welcome_pane not cleared"; return 1; }
+  cs_assert_consistent "select_dormant"
 }
 
 test_switch_sessions() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    cs_create_mock_session "${sid_a}" "session A"
-    cs_create_mock_session "${sid_b}" "session B"
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_a}" "session A"
+  cs_create_mock_session "${sid_b}" "session B"
 
-    # Resume A
-    cs_resume_session "${sid_a}"
-    sleep 0.05
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
+  # Resume A
+  cs_resume_session "${sid_a}"
+  sleep 0.05
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
 
-    # Resume B
-    cs_resume_session "${sid_b}"
-    sleep 0.05
-    local pane_b
-    pane_b=$(cs_read_state current_pane)
+  # Resume B
+  cs_resume_session "${sid_b}"
+  sleep 0.05
+  local pane_b
+  pane_b=$(cs_read_state current_pane)
 
-    # A should still be alive (parked)
-    pane_alive "${pane_a}" || { echo "    pane A died after switch"; return 1; }
-    # B should be current
-    [[ "${pane_b}" != "${pane_a}" ]] || { echo "    pane B same as pane A"; return 1; }
-    cs_assert_consistent "switch_sessions"
+  # A should still be alive (parked)
+  pane_alive "${pane_a}" || { echo "    pane A died after switch"; return 1; }
+  # B should be current
+  [[ "${pane_b}" != "${pane_a}" ]] || { echo "    pane B same as pane A"; return 1; }
+  cs_assert_consistent "switch_sessions"
 }
 
 test_close_active() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "to close"
-    cs_scan_sessions
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "to close"
+  cs_scan_sessions
 
-    local idx
-    idx=$(find_entry_index "${sid}")
-    SELECTED=${idx}
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local idx
+  idx=$(find_entry_index "${sid}")
+  SELECTED=${idx}
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    cs_rescan
-    idx=$(find_entry_index "${sid}")
-    SELECTED=${idx}
-    cs_close_selected
-    sleep 0.05
+  cs_rescan
+  idx=$(find_entry_index "${sid}")
+  SELECTED=${idx}
+  cs_close_selected
+  sleep 0.05
 
-    local cp
-    cp=$(cs_read_state current_pane)
-    # current_pane should be the welcome pane now (cs_after_remove shows welcome)
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" ]] || { echo "    welcome not shown after close"; return 1; }
-    cs_assert_consistent "close_active"
+  local cp
+  cp=$(cs_read_state current_pane)
+  # current_pane should be the welcome pane now (cs_after_remove shows welcome)
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" ]] || { echo "    welcome not shown after close"; return 1; }
+  cs_assert_consistent "close_active"
 }
 
 test_new_session() {
-    cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "existing"
-    cs_new_session
-    sleep 0.05
+  cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "existing"
+  cs_new_session
+  sleep 0.05
 
-    local np
-    np=$(cs_read_state new_pane)
-    [[ -n "${np}" ]] || { echo "    new_pane not set"; return 1; }
+  local np
+  np=$(cs_read_state new_pane)
+  [[ -n "${np}" ]] || { echo "    new_pane not set"; return 1; }
 
-    cs_scan_sessions
-    local idx
-    idx=$(find_entry_index "__new__")
-    [[ "${idx}" != "-1" ]] || { echo "    (new session) not in entries"; return 1; }
-    cs_assert_consistent "new_session"
+  cs_scan_sessions
+  local idx
+  idx=$(find_entry_index "__new__")
+  [[ "${idx}" != "-1" ]] || { echo "    (new session) not in entries"; return 1; }
+  cs_assert_consistent "new_session"
 }
 
 test_new_then_select_other() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "existing"
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "existing"
 
-    cs_new_session
-    sleep 0.05
-    local new_pane_id
-    new_pane_id=$(cs_read_state new_pane)
+  cs_new_session
+  sleep 0.05
+  local new_pane_id
+  new_pane_id=$(cs_read_state new_pane)
 
-    cs_scan_sessions
-    local idx
-    idx=$(find_entry_index "${sid}")
-    [[ "${idx}" != "-1" ]] || { echo "    existing session not found"; return 1; }
-    SELECTED=${idx}
-    cs_activate_selected
-    sleep 0.05
+  cs_scan_sessions
+  local idx
+  idx=$(find_entry_index "${sid}")
+  [[ "${idx}" != "-1" ]] || { echo "    existing session not found"; return 1; }
+  SELECTED=${idx}
+  cs_activate_selected
+  sleep 0.05
 
-    # New pane should be dead
-    if pane_alive "${new_pane_id}"; then
-        echo "    orphaned new pane still alive"
-        return 1
-    fi
-    # new_pane state should be cleared
-    local np
-    np=$(cs_read_state new_pane)
-    [[ -z "${np}" ]] || { echo "    new_pane not cleared"; return 1; }
-    cs_assert_consistent "new_then_select_other"
+  # New pane should be dead
+  if pane_alive "${new_pane_id}"; then
+    echo "    orphaned new pane still alive"
+    return 1
+  fi
+  # new_pane state should be cleared
+  local np
+  np=$(cs_read_state new_pane)
+  [[ -z "${np}" ]] || { echo "    new_pane not cleared"; return 1; }
+  cs_assert_consistent "new_then_select_other"
 }
 
 test_new_cancelled() {
-    cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "existing"
-    cs_new_session
-    sleep 0.05
-    local new_pane_id
-    new_pane_id=$(cs_read_state new_pane)
+  cs_create_mock_session "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" "existing"
+  cs_new_session
+  sleep 0.05
+  local new_pane_id
+  new_pane_id=$(cs_read_state new_pane)
 
-    # Simulate cancel — kill the pane externally
-    _tmux kill-pane -t "${new_pane_id}" 2>/dev/null || true
-    sleep 0.05
+  # Simulate cancel — kill the pane externally
+  _tmux kill-pane -t "${new_pane_id}" 2>/dev/null || true
+  sleep 0.05
 
-    cs_scan_sessions
+  cs_scan_sessions
 
-    local np
-    np=$(cs_read_state new_pane)
-    [[ -z "${np}" ]] || { echo "    new_pane not cleared after cancel"; return 1; }
-    cs_assert_consistent "new_cancelled"
+  local np
+  np=$(cs_read_state new_pane)
+  [[ -z "${np}" ]] || { echo "    new_pane not cleared after cancel"; return 1; }
+  cs_assert_consistent "new_cancelled"
 }
 
 test_bell_detection() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "bell test"
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "bell test"
 
-    # Resume and park it (create a second to make it background)
-    cs_resume_session "${sid}"
-    sleep 0.05
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
+  # Resume and park it (create a second to make it background)
+  cs_resume_session "${sid}"
+  sleep 0.05
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
 
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    cs_create_mock_session "${sid_b}" "foreground"
-    cs_resume_session "${sid_b}"
-    sleep 0.05
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_b}" "foreground"
+  cs_resume_session "${sid_b}"
+  sleep 0.05
 
-    # Write bell for pane A
-    echo "${pane_a}" > "${STATE_DIR}/bells"
-    cs_check_bells
+  # Write bell for pane A
+  echo "${pane_a}" > "${STATE_DIR}/bells"
+  cs_check_bells
 
-    [[ -n "${BELL_SET[${pane_a}]:-}" ]] || { echo "    BELL_SET not set for pane A"; return 1; }
+  [[ -n "${BELL_SET[${pane_a}]:-}" ]] || { echo "    BELL_SET not set for pane A"; return 1; }
 
-    # Show pane A — bell should clear
-    cs_show_pane "${pane_a}"
-    sleep 0.05
-    [[ -z "${BELL_SET[${pane_a}]:-}" ]] || { echo "    BELL_SET not cleared after showing"; return 1; }
-    cs_assert_consistent "bell_detection"
+  # Show pane A — bell should clear
+  cs_show_pane "${pane_a}"
+  sleep 0.05
+  [[ -z "${BELL_SET[${pane_a}]:-}" ]] || { echo "    BELL_SET not cleared after showing"; return 1; }
+  cs_assert_consistent "bell_detection"
 }
 
 test_remote_bell() {
-    local sid="cccccccc-cccc-cccc-cccc-cccccccccccc"
-    local remote_state="${STATE_DIR}/mock_remote"
-    local remote_project="${MOCK_PROJECT_DIR}_remote"
-    mkdir -p "${remote_state}/panes" "${remote_project}"
+  local sid="cccccccc-cccc-cccc-cccc-cccccccccccc"
+  local remote_state="${STATE_DIR}/mock_remote"
+  local remote_project="${MOCK_PROJECT_DIR}_remote"
+  mkdir -p "${remote_state}/panes" "${remote_project}"
 
-    # Create a session JSONL in the remote project dir
-    printf '{"type":"user","message":{"role":"user","content":"remote"},"sessionId":"%s"}\n' \
-        "${sid}" > "${remote_project}/${sid}.jsonl"
+  # Create a session JSONL in the remote project dir
+  printf '{"type":"user","message":{"role":"user","content":"remote"},"sessionId":"%s"}\n' \
+    "${sid}" > "${remote_project}/${sid}.jsonl"
 
-    # Mark it as managed (has a pane file)
-    echo "${sid}" > "${remote_state}/panes/99"
+  # Mark it as managed (has a pane file)
+  echo "${sid}" > "${remote_state}/panes/99"
 
-    # Write bells_active with the session UUID
-    echo "${sid}" > "${remote_state}/bells_active"
+  # Write bells_active with the session UUID
+  echo "${sid}" > "${remote_state}/bells_active"
 
-    # Scan remote sessions
-    cs_entry_clear
-    cs_scan_project_sessions "${remote_project}" "/tmp/fake" "remote" "${remote_state}"
+  # Scan remote sessions
+  cs_entry_clear
+  cs_scan_project_sessions "${remote_project}" "/tmp/fake" "remote" "${remote_state}"
 
-    # Find the entry and check its status
-    local found=0
-    for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
-        if [[ "${ENTRIES_ID[${i}]}" == "${sid}" ]]; then
-            [[ "${ENTRIES_STATUS[${i}]}" == "bell" ]] || { echo "    expected status 'bell', got '${ENTRIES_STATUS[${i}]}'"; return 1; }
-            found=1
-            break
-        fi
-    done
-    ((found)) || { echo "    remote session not found in entries"; return 1; }
+  # Find the entry and check its status
+  local found=0
+  for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
+    if [[ "${ENTRIES_ID[${i}]}" == "${sid}" ]]; then
+      [[ "${ENTRIES_STATUS[${i}]}" == "bell" ]] || { echo "    expected status 'bell', got '${ENTRIES_STATUS[${i}]}'"; return 1; }
+      found=1
+      break
+    fi
+  done
+  ((found)) || { echo "    remote session not found in entries"; return 1; }
 
-    # Clear bells_active — status should revert to managed
-    : > "${remote_state}/bells_active"
-    cs_entry_clear
-    cs_scan_project_sessions "${remote_project}" "/tmp/fake" "remote" "${remote_state}"
+  # Clear bells_active — status should revert to managed
+  : > "${remote_state}/bells_active"
+  cs_entry_clear
+  cs_scan_project_sessions "${remote_project}" "/tmp/fake" "remote" "${remote_state}"
 
-    for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
-        if [[ "${ENTRIES_ID[${i}]}" == "${sid}" ]]; then
-            [[ "${ENTRIES_STATUS[${i}]}" == "managed" ]] || { echo "    expected status 'managed' after clear, got '${ENTRIES_STATUS[${i}]}'"; return 1; }
-            break
-        fi
-    done
+  for ((i=0; i < ${#ENTRIES_ID[@]}; i++)); do
+    if [[ "${ENTRIES_ID[${i}]}" == "${sid}" ]]; then
+      [[ "${ENTRIES_STATUS[${i}]}" == "managed" ]] || { echo "    expected status 'managed' after clear, got '${ENTRIES_STATUS[${i}]}'"; return 1; }
+      break
+    fi
+  done
 
-    rm -rf "${remote_state}" "${remote_project}"
+  rm -rf "${remote_state}" "${remote_project}"
 }
 
 test_hide_session() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    cs_create_mock_session "${sid_a}" "to hide"
-    cs_create_mock_session "${sid_b}" "to keep"
-    cs_scan_sessions
-    [[ ${#ENTRIES_ID[@]} -eq 2 ]] || { echo "    expected 2 entries"; return 1; }
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_a}" "to hide"
+  cs_create_mock_session "${sid_b}" "to keep"
+  cs_scan_sessions
+  [[ ${#ENTRIES_ID[@]} -eq 2 ]] || { echo "    expected 2 entries"; return 1; }
 
-    # Hide session A (bypass confirm prompt)
-    echo "${sid_a}" >> "${HIDDEN_FILE}"
-    cs_scan_sessions
-    [[ ${#ENTRIES_ID[@]} -eq 1 ]] || { echo "    expected 1 entry after hide, got ${#ENTRIES_ID[@]}"; return 1; }
-    local idx
-    idx=$(find_entry_index "${sid_a}")
-    [[ "${idx}" == "-1" ]] || { echo "    hidden session still in list"; return 1; }
-    cs_assert_consistent "hide_session"
+  # Hide session A (bypass confirm prompt)
+  echo "${sid_a}" >> "${HIDDEN_FILE}"
+  cs_scan_sessions
+  [[ ${#ENTRIES_ID[@]} -eq 1 ]] || { echo "    expected 1 entry after hide, got ${#ENTRIES_ID[@]}"; return 1; }
+  local idx
+  idx=$(find_entry_index "${sid_a}")
+  [[ "${idx}" == "-1" ]] || { echo "    hidden session still in list"; return 1; }
+  cs_assert_consistent "hide_session"
 }
 
 test_hide_older() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    local sid_c="cccccccc-cccc-cccc-cccc-cccccccccccc"
-    cs_create_mock_session "${sid_a}" "old session"
-    cs_create_mock_session "${sid_b}" "middle session"
-    cs_create_mock_session "${sid_c}" "new session"
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  local sid_c="cccccccc-cccc-cccc-cccc-cccccccccccc"
+  cs_create_mock_session "${sid_a}" "old session"
+  cs_create_mock_session "${sid_b}" "middle session"
+  cs_create_mock_session "${sid_c}" "new session"
 
-    # Backdate A and B so they're older than C
-    touch -t 202601010000 "${MOCK_PROJECT_DIR}/${sid_a}.jsonl"
-    touch -t 202602010000 "${MOCK_PROJECT_DIR}/${sid_b}.jsonl"
-    # C keeps current time (newest)
+  # Backdate A and B so they're older than C
+  touch -t 202601010000 "${MOCK_PROJECT_DIR}/${sid_a}.jsonl"
+  touch -t 202602010000 "${MOCK_PROJECT_DIR}/${sid_b}.jsonl"
+  # C keeps current time (newest)
 
-    cs_scan_sessions
-    [[ ${#ENTRIES_ID[@]} -eq 3 ]] || { echo "    expected 3 entries, got ${#ENTRIES_ID[@]}"; return 1; }
+  cs_scan_sessions
+  [[ ${#ENTRIES_ID[@]} -eq 3 ]] || { echo "    expected 3 entries, got ${#ENTRIES_ID[@]}"; return 1; }
 
-    # Select B (middle) — hide B and everything older (A)
-    local idx
-    idx=$(find_entry_index "${sid_b}")
-    SELECTED=${idx}
-    cs_hide_older <<< "y"
+  # Select B (middle) — hide B and everything older (A)
+  local idx
+  idx=$(find_entry_index "${sid_b}")
+  SELECTED=${idx}
+  cs_hide_older <<< "y"
 
-    cs_scan_sessions
-    [[ ${#ENTRIES_ID[@]} -eq 1 ]] || { echo "    expected 1 entry after hide_older, got ${#ENTRIES_ID[@]}"; return 1; }
+  cs_scan_sessions
+  [[ ${#ENTRIES_ID[@]} -eq 1 ]] || { echo "    expected 1 entry after hide_older, got ${#ENTRIES_ID[@]}"; return 1; }
 
-    # C (newest) should survive
-    idx=$(find_entry_index "${sid_c}")
-    [[ "${idx}" != "-1" ]] || { echo "    new session should not be hidden"; return 1; }
+  # C (newest) should survive
+  idx=$(find_entry_index "${sid_c}")
+  [[ "${idx}" != "-1" ]] || { echo "    new session should not be hidden"; return 1; }
 
-    # A and B should be hidden
-    idx=$(find_entry_index "${sid_a}")
-    [[ "${idx}" == "-1" ]] || { echo "    old session should be hidden"; return 1; }
-    idx=$(find_entry_index "${sid_b}")
-    [[ "${idx}" == "-1" ]] || { echo "    middle session should be hidden"; return 1; }
+  # A and B should be hidden
+  idx=$(find_entry_index "${sid_a}")
+  [[ "${idx}" == "-1" ]] || { echo "    old session should be hidden"; return 1; }
+  idx=$(find_entry_index "${sid_b}")
+  [[ "${idx}" == "-1" ]] || { echo "    middle session should be hidden"; return 1; }
 
-    cs_assert_consistent "hide_older"
+  cs_assert_consistent "hide_older"
 }
 
 cs_create_mock_active_session() {
-    local sid="$1" pid="$2"
-    printf '{"pid":%s,"sessionId":"%s","cwd":"/tmp","startedAt":0,"kind":"interactive","entrypoint":"cli"}\n' \
-        "${pid}" "${sid}" > "${SESSIONS_DIR}/${pid}.json"
+  local sid="$1" pid="$2"
+  printf '{"pid":%s,"sessionId":"%s","cwd":"/tmp","startedAt":0,"kind":"interactive","entrypoint":"cli"}\n' \
+    "${pid}" "${sid}" > "${SESSIONS_DIR}/${pid}.json"
 }
 
 test_locked_session_blocked() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "locked session"
-    cs_create_mock_active_session "${sid}" "$$"
-    cs_scan_sessions
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "locked session"
+  cs_create_mock_active_session "${sid}" "$$"
+  cs_scan_sessions
 
-    local idx
-    idx=$(find_entry_index "${sid}")
-    [[ "${idx}" != "-1" ]] || { echo "    session not found"; return 1; }
-    [[ "${ENTRIES_STATUS[${idx}]}" == "active_elsewhere" ]] || { echo "    expected active_elsewhere, got ${ENTRIES_STATUS[${idx}]}"; return 1; }
-    SELECTED=${idx}
-    cs_activate_selected
+  local idx
+  idx=$(find_entry_index "${sid}")
+  [[ "${idx}" != "-1" ]] || { echo "    session not found"; return 1; }
+  [[ "${ENTRIES_STATUS[${idx}]}" == "active_elsewhere" ]] || { echo "    expected active_elsewhere, got ${ENTRIES_STATUS[${idx}]}"; return 1; }
+  SELECTED=${idx}
+  cs_activate_selected
 
-    local cp
-    cp=$(cs_read_state current_pane)
-    [[ -z "${cp}" ]] || { echo "    current_pane should be empty after locked select"; return 1; }
-    cs_assert_consistent "locked_blocked"
+  local cp
+  cp=$(cs_read_state current_pane)
+  [[ -z "${cp}" ]] || { echo "    current_pane should be empty after locked select"; return 1; }
+  cs_assert_consistent "locked_blocked"
 }
 
 test_show_pane_safety() {
-    local rc=0
-    cs_show_pane "%99999" || rc=$?
-    [[ ${rc} -eq 1 ]] || { echo "    expected return 1, got ${rc}"; return 1; }
+  local rc=0
+  cs_show_pane "%99999" || rc=$?
+  [[ ${rc} -eq 1 ]] || { echo "    expected return 1, got ${rc}"; return 1; }
 
-    local cp
-    cp=$(cs_read_state current_pane)
-    [[ -z "${cp}" ]] || { echo "    current_pane should be empty"; return 1; }
-    cs_assert_consistent "show_pane_safety"
+  local cp
+  cp=$(cs_read_state current_pane)
+  [[ -z "${cp}" ]] || { echo "    current_pane should be empty"; return 1; }
+  cs_assert_consistent "show_pane_safety"
 }
 
 test_double_n() {
-    cs_new_session
-    sleep 0.05
-    local pane_a
-    pane_a=$(cs_read_state new_pane)
+  cs_new_session
+  sleep 0.05
+  local pane_a
+  pane_a=$(cs_read_state new_pane)
 
-    cs_new_session
-    sleep 0.05
-    local pane_b
-    pane_b=$(cs_read_state new_pane)
+  cs_new_session
+  sleep 0.05
+  local pane_b
+  pane_b=$(cs_read_state new_pane)
 
-    # A should be dead
-    if pane_alive "${pane_a}"; then
-        echo "    pane A still alive after double-N"
-        return 1
-    fi
-    # B should be the new pane
-    [[ "${pane_b}" != "${pane_a}" ]] || { echo "    pane B same as pane A"; return 1; }
-    # Only one "new" entry in panes/
-    local new_count
-    new_count=$(grep -rl "^new$" "${STATE_DIR}/panes/" 2>/dev/null | wc -l)
-    [[ ${new_count} -eq 1 ]] || { echo "    expected 1 new entry, got ${new_count}"; return 1; }
-    cs_assert_consistent "double_n"
+  # A should be dead
+  if pane_alive "${pane_a}"; then
+    echo "    pane A still alive after double-N"
+    return 1
+  fi
+  # B should be the new pane
+  [[ "${pane_b}" != "${pane_a}" ]] || { echo "    pane B same as pane A"; return 1; }
+  # Only one "new" entry in panes/
+  local new_count
+  new_count=$(grep -rl "^new$" "${STATE_DIR}/panes/" 2>/dev/null | wc -l)
+  [[ ${new_count} -eq 1 ]] || { echo "    expected 1 new entry, got ${new_count}"; return 1; }
+  cs_assert_consistent "double_n"
 }
 
 test_selection_preserved() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    local sid_c="cccccccc-cccc-cccc-cccc-cccccccccccc"
-    cs_create_mock_session "${sid_a}" "session A"
-    cs_create_mock_session "${sid_b}" "session B"
-    cs_create_mock_session "${sid_c}" "session C"
-    cs_scan_sessions
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  local sid_c="cccccccc-cccc-cccc-cccc-cccccccccccc"
+  cs_create_mock_session "${sid_a}" "session A"
+  cs_create_mock_session "${sid_b}" "session B"
+  cs_create_mock_session "${sid_c}" "session C"
+  cs_scan_sessions
 
-    local idx
-    idx=$(find_entry_index "${sid_b}")
-    [[ "${idx}" != "-1" ]] || { echo "    session B not found"; return 1; }
-    SELECTED=${idx}
+  local idx
+  idx=$(find_entry_index "${sid_b}")
+  [[ "${idx}" != "-1" ]] || { echo "    session B not found"; return 1; }
+  SELECTED=${idx}
 
-    # Make A oldest so sort order changes
-    touch -d "2 hours ago" "${MOCK_PROJECT_DIR}/${sid_a}.jsonl"
-    cs_rescan
+  # Make A oldest so sort order changes
+  touch -d "2 hours ago" "${MOCK_PROJECT_DIR}/${sid_a}.jsonl"
+  cs_rescan
 
-    [[ "${ENTRIES_ID[${SELECTED}]}" == "${sid_b}" ]] || { echo "    selection not preserved: expected ${sid_b}, got ${ENTRIES_ID[${SELECTED}]}"; return 1; }
+  [[ "${ENTRIES_ID[${SELECTED}]}" == "${sid_b}" ]] || { echo "    selection not preserved: expected ${sid_b}, got ${ENTRIES_ID[${SELECTED}]}"; return 1; }
 }
 
 test_selection_fallback_to_pane() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    cs_create_mock_session "${sid_a}" "session A"
-    cs_create_mock_session "${sid_b}" "session B"
-    cs_scan_sessions
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_a}" "session A"
+  cs_create_mock_session "${sid_b}" "session B"
+  cs_scan_sessions
 
-    # Activate session B so it becomes current_pane
-    local idx
-    idx=$(find_entry_index "${sid_b}")
-    [[ "${idx}" != "-1" ]] || { echo "    session B not found"; return 1; }
-    SELECTED=${idx}
-    cs_activate_selected
-    sleep 0.05
+  # Activate session B so it becomes current_pane
+  local idx
+  idx=$(find_entry_index "${sid_b}")
+  [[ "${idx}" != "-1" ]] || { echo "    session B not found"; return 1; }
+  SELECTED=${idx}
+  cs_activate_selected
+  sleep 0.05
 
-    # Simulate SELECTED pointing at an ID that will disappear
-    SELECTED=0
-    ENTRIES_ID[0]="__gone__"
+  # Simulate SELECTED pointing at an ID that will disappear
+  SELECTED=0
+  ENTRIES_ID[0]="__gone__"
 
-    cs_rescan
+  cs_rescan
 
-    # SELECTED should fall back to session B (the current_pane)
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    [[ -n "${cur_pane}" ]] || { echo "    current_pane not set"; return 1; }
-    [[ "${ENTRIES_PANE[${SELECTED}]}" == "${cur_pane}" ]] || {
-        echo "    SELECTED not synced to current_pane: pane=${ENTRIES_PANE[${SELECTED}]}, expected=${cur_pane}"
-        return 1
-    }
-    [[ "${ENTRIES_ID[${SELECTED}]}" == "${sid_b}" ]] || {
-        echo "    SELECTED on wrong session: got ${ENTRIES_ID[${SELECTED}]}, expected ${sid_b}"
-        return 1
-    }
-    cs_assert_consistent "selection_fallback_to_pane"
+  # SELECTED should fall back to session B (the current_pane)
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  [[ -n "${cur_pane}" ]] || { echo "    current_pane not set"; return 1; }
+  [[ "${ENTRIES_PANE[${SELECTED}]}" == "${cur_pane}" ]] || {
+    echo "    SELECTED not synced to current_pane: pane=${ENTRIES_PANE[${SELECTED}]}, expected=${cur_pane}"
+    return 1
+  }
+  [[ "${ENTRIES_ID[${SELECTED}]}" == "${sid_b}" ]] || {
+    echo "    SELECTED on wrong session: got ${ENTRIES_ID[${SELECTED}]}, expected ${sid_b}"
+    return 1
+  }
+  cs_assert_consistent "selection_fallback_to_pane"
 }
 
 test_custom_names() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "some long boring message"
-    echo "${sid}=my custom name" > "${NAMES_FILE}"
-    cs_scan_sessions
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "some long boring message"
+  echo "${sid}=my custom name" > "${NAMES_FILE}"
+  cs_scan_sessions
 
-    local idx
-    idx=$(find_entry_index "${sid}")
-    [[ "${idx}" != "-1" ]] || { echo "    session not found"; return 1; }
-    [[ "${ENTRIES_NAME[${idx}]}" == "my custom name" ]] || { echo "    expected 'my custom name', got '${ENTRIES_NAME[${idx}]}'"; return 1; }
+  local idx
+  idx=$(find_entry_index "${sid}")
+  [[ "${idx}" != "-1" ]] || { echo "    session not found"; return 1; }
+  [[ "${ENTRIES_NAME[${idx}]}" == "my custom name" ]] || { echo "    expected 'my custom name', got '${ENTRIES_NAME[${idx}]}'"; return 1; }
 }
 
 test_clean_message() {
-    local result
+  local result
 
-    result=$(cs_clean_message "I want to write a wrapper for claude")
-    [[ "${result}" == "write a wrapper for claude" ]] || { echo "    filler 'I want to' not stripped: '${result}'"; return 1; }
+  result=$(cs_clean_message "I want to write a wrapper for claude")
+  [[ "${result}" == "write a wrapper for claude" ]] || { echo "    filler 'I want to' not stripped: '${result}'"; return 1; }
 
-    result=$(cs_clean_message "Please help me with this")
-    [[ "${result}" == "help me with this" ]] || { echo "    filler 'Please' not stripped: '${result}'"; return 1; }
+  result=$(cs_clean_message "Please help me with this")
+  [[ "${result}" == "help me with this" ]] || { echo "    filler 'Please' not stripped: '${result}'"; return 1; }
 
-    result=$(cs_clean_message "normal message without filler")
-    [[ "${result}" == "normal message without filler" ]] || { echo "    normal message changed: '${result}'"; return 1; }
+  result=$(cs_clean_message "normal message without filler")
+  [[ "${result}" == "normal message without filler" ]] || { echo "    normal message changed: '${result}'"; return 1; }
 
-    result=$(cs_clean_message $'first line\nsecond line')
-    [[ "${result}" == "first line" ]] || { echo "    multiline not stripped: '${result}'"; return 1; }
+  result=$(cs_clean_message $'first line\nsecond line')
+  [[ "${result}" == "first line" ]] || { echo "    multiline not stripped: '${result}'"; return 1; }
 }
 
 test_display_names_single_path() {
-    REMOTE_SERVERS=()
-    INACTIVE_PROJECTS=()
-    cs_compute_display_names
-    [[ "${DISPLAY_NAMES[${PWD}]}" == "${PWD##*/}" ]] || { echo "    expected '${PWD##*/}', got '${DISPLAY_NAMES[${PWD}]}'"; return 1; }
+  REMOTE_SERVERS=()
+  INACTIVE_PROJECTS=()
+  cs_compute_display_names
+  [[ "${DISPLAY_NAMES[${PWD}]}" == "${PWD##*/}" ]] || { echo "    expected '${PWD##*/}', got '${DISPLAY_NAMES[${PWD}]}'"; return 1; }
 }
 
 test_display_names_different_leaves() {
-    REMOTE_SERVERS=("srv|/home/user/project-a")
-    INACTIVE_PROJECTS=("san|/home/user/project-b")
-    cs_compute_display_names
-    [[ "${DISPLAY_NAMES[/home/user/project-a]}" == "project-a" ]] || { echo "    expected 'project-a', got '${DISPLAY_NAMES[/home/user/project-a]}'"; return 1; }
-    [[ "${DISPLAY_NAMES[/home/user/project-b]}" == "project-b" ]] || { echo "    expected 'project-b', got '${DISPLAY_NAMES[/home/user/project-b]}'"; return 1; }
+  REMOTE_SERVERS=("srv|/home/user/project-a")
+  INACTIVE_PROJECTS=("san|/home/user/project-b")
+  cs_compute_display_names
+  [[ "${DISPLAY_NAMES[/home/user/project-a]}" == "project-a" ]] || { echo "    expected 'project-a', got '${DISPLAY_NAMES[/home/user/project-a]}'"; return 1; }
+  [[ "${DISPLAY_NAMES[/home/user/project-b]}" == "project-b" ]] || { echo "    expected 'project-b', got '${DISPLAY_NAMES[/home/user/project-b]}'"; return 1; }
 }
 
 test_display_names_same_leaf_different_parent() {
-    REMOTE_SERVERS=("srv|/home/user/client-a/api")
-    INACTIVE_PROJECTS=("san|/home/user/client-b/api")
-    cs_compute_display_names
-    [[ "${DISPLAY_NAMES[/home/user/client-a/api]}" == "client-a/api" ]] || { echo "    expected 'client-a/api', got '${DISPLAY_NAMES[/home/user/client-a/api]}'"; return 1; }
-    [[ "${DISPLAY_NAMES[/home/user/client-b/api]}" == "client-b/api" ]] || { echo "    expected 'client-b/api', got '${DISPLAY_NAMES[/home/user/client-b/api]}'"; return 1; }
+  REMOTE_SERVERS=("srv|/home/user/client-a/api")
+  INACTIVE_PROJECTS=("san|/home/user/client-b/api")
+  cs_compute_display_names
+  [[ "${DISPLAY_NAMES[/home/user/client-a/api]}" == "client-a/api" ]] || { echo "    expected 'client-a/api', got '${DISPLAY_NAMES[/home/user/client-a/api]}'"; return 1; }
+  [[ "${DISPLAY_NAMES[/home/user/client-b/api]}" == "client-b/api" ]] || { echo "    expected 'client-b/api', got '${DISPLAY_NAMES[/home/user/client-b/api]}'"; return 1; }
 }
 
 test_display_names_deep_divergence() {
-    REMOTE_SERVERS=("srv|/home/user/aaaa/otherwise/same/but/very/long/path/my-project")
-    INACTIVE_PROJECTS=("san|/home/user/bbbb/otherwise/same/but/very/long/path/my-project")
-    cs_compute_display_names
-    [[ "${DISPLAY_NAMES[/home/user/aaaa/otherwise/same/but/very/long/path/my-project]}" == "aaaa/.../my-project" ]] || { echo "    expected 'aaaa/.../my-project', got '${DISPLAY_NAMES[/home/user/aaaa/otherwise/same/but/very/long/path/my-project]}'"; return 1; }
-    [[ "${DISPLAY_NAMES[/home/user/bbbb/otherwise/same/but/very/long/path/my-project]}" == "bbbb/.../my-project" ]] || { echo "    expected 'bbbb/.../my-project', got '${DISPLAY_NAMES[/home/user/bbbb/otherwise/same/but/very/long/path/my-project]}'"; return 1; }
+  REMOTE_SERVERS=("srv|/home/user/aaaa/otherwise/same/but/very/long/path/my-project")
+  INACTIVE_PROJECTS=("san|/home/user/bbbb/otherwise/same/but/very/long/path/my-project")
+  cs_compute_display_names
+  [[ "${DISPLAY_NAMES[/home/user/aaaa/otherwise/same/but/very/long/path/my-project]}" == "aaaa/.../my-project" ]] || { echo "    expected 'aaaa/.../my-project', got '${DISPLAY_NAMES[/home/user/aaaa/otherwise/same/but/very/long/path/my-project]}'"; return 1; }
+  [[ "${DISPLAY_NAMES[/home/user/bbbb/otherwise/same/but/very/long/path/my-project]}" == "bbbb/.../my-project" ]] || { echo "    expected 'bbbb/.../my-project', got '${DISPLAY_NAMES[/home/user/bbbb/otherwise/same/but/very/long/path/my-project]}'"; return 1; }
 }
 
 test_display_names_three_way_collision() {
-    REMOTE_SERVERS=("s1|/home/user/aaaa/foo/bar" "s2|/home/user/bbbb/foo/bar")
-    INACTIVE_PROJECTS=("san|/home/user/bbbb/baz/bar")
-    cs_compute_display_names
-    [[ "${DISPLAY_NAMES[/home/user/aaaa/foo/bar]}" == "aaaa/.../bar" ]] || { echo "    expected 'aaaa/.../bar', got '${DISPLAY_NAMES[/home/user/aaaa/foo/bar]}'"; return 1; }
-    [[ "${DISPLAY_NAMES[/home/user/bbbb/foo/bar]}" == "bbbb/foo/bar" ]] || { echo "    expected 'bbbb/foo/bar', got '${DISPLAY_NAMES[/home/user/bbbb/foo/bar]}'"; return 1; }
-    [[ "${DISPLAY_NAMES[/home/user/bbbb/baz/bar]}" == "bbbb/baz/bar" ]] || { echo "    expected 'bbbb/baz/bar', got '${DISPLAY_NAMES[/home/user/bbbb/baz/bar]}'"; return 1; }
+  REMOTE_SERVERS=("s1|/home/user/aaaa/foo/bar" "s2|/home/user/bbbb/foo/bar")
+  INACTIVE_PROJECTS=("san|/home/user/bbbb/baz/bar")
+  cs_compute_display_names
+  [[ "${DISPLAY_NAMES[/home/user/aaaa/foo/bar]}" == "aaaa/.../bar" ]] || { echo "    expected 'aaaa/.../bar', got '${DISPLAY_NAMES[/home/user/aaaa/foo/bar]}'"; return 1; }
+  [[ "${DISPLAY_NAMES[/home/user/bbbb/foo/bar]}" == "bbbb/foo/bar" ]] || { echo "    expected 'bbbb/foo/bar', got '${DISPLAY_NAMES[/home/user/bbbb/foo/bar]}'"; return 1; }
+  [[ "${DISPLAY_NAMES[/home/user/bbbb/baz/bar]}" == "bbbb/baz/bar" ]] || { echo "    expected 'bbbb/baz/bar', got '${DISPLAY_NAMES[/home/user/bbbb/baz/bar]}'"; return 1; }
 }
 
 test_display_names_compression() {
-    local result
-    result=$(cs_compress_suffix "my-project")
-    [[ "${result}" == "my-project" ]] || { echo "    1-component: expected 'my-project', got '${result}'"; return 1; }
-    result=$(cs_compress_suffix "client-a/api")
-    [[ "${result}" == "client-a/api" ]] || { echo "    2-component: expected 'client-a/api', got '${result}'"; return 1; }
-    result=$(cs_compress_suffix "aaaa/otherwise/same/my-project")
-    [[ "${result}" == "aaaa/.../my-project" ]] || { echo "    4-component: expected 'aaaa/.../my-project', got '${result}'"; return 1; }
+  local result
+  result=$(cs_compress_suffix "my-project")
+  [[ "${result}" == "my-project" ]] || { echo "    1-component: expected 'my-project', got '${result}'"; return 1; }
+  result=$(cs_compress_suffix "client-a/api")
+  [[ "${result}" == "client-a/api" ]] || { echo "    2-component: expected 'client-a/api', got '${result}'"; return 1; }
+  result=$(cs_compress_suffix "aaaa/otherwise/same/my-project")
+  [[ "${result}" == "aaaa/.../my-project" ]] || { echo "    4-component: expected 'aaaa/.../my-project', got '${result}'"; return 1; }
 }
 
 test_project_rename_override() {
-    REMOTE_SERVERS=("srv|/home/user/client-a/api")
-    INACTIVE_PROJECTS=()
-    cs_compute_display_names
-    # Without override, should use display name
-    local san
-    san=$(cs_sanitize_path "/home/user/client-a/api")
-    [[ "${PROJECT_NAMES[${san}]:-}" == "" ]] || { echo "    should have no override yet"; return 1; }
-    # Set override
-    PROJECT_NAMES["${san}"]="backend"
-    local leaf="${PROJECT_NAMES[${san}]:-${DISPLAY_NAMES[/home/user/client-a/api]:-api}}"
-    [[ "${leaf}" == "backend" ]] || { echo "    expected 'backend', got '${leaf}'"; return 1; }
+  REMOTE_SERVERS=("srv|/home/user/client-a/api")
+  INACTIVE_PROJECTS=()
+  cs_compute_display_names
+  # Without override, should use display name
+  local san
+  san=$(cs_sanitize_path "/home/user/client-a/api")
+  [[ "${PROJECT_NAMES[${san}]:-}" == "" ]] || { echo "    should have no override yet"; return 1; }
+  # Set override
+  PROJECT_NAMES["${san}"]="backend"
+  local leaf="${PROJECT_NAMES[${san}]:-${DISPLAY_NAMES[/home/user/client-a/api]:-api}}"
+  [[ "${leaf}" == "backend" ]] || { echo "    expected 'backend', got '${leaf}'"; return 1; }
 }
 
 test_project_rename_clear() {
-    local san
-    san=$(cs_sanitize_path "/home/user/my-project")
-    PROJECT_NAMES["${san}"]="custom"
-    [[ "${PROJECT_NAMES[${san}]}" == "custom" ]] || { echo "    set failed"; return 1; }
-    unset "PROJECT_NAMES[${san}]"
-    [[ "${PROJECT_NAMES[${san}]:-}" == "" ]] || { echo "    clear failed"; return 1; }
+  local san
+  san=$(cs_sanitize_path "/home/user/my-project")
+  PROJECT_NAMES["${san}"]="custom"
+  [[ "${PROJECT_NAMES[${san}]}" == "custom" ]] || { echo "    set failed"; return 1; }
+  unset "PROJECT_NAMES[${san}]"
+  [[ "${PROJECT_NAMES[${san}]:-}" == "" ]] || { echo "    clear failed"; return 1; }
 }
 
 test_project_rename_header_lookup() {
-    PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
-    PROJECT_NAMES["${PWD_SANITIZED}"]="my-custom-name"
-    local pname="${PROJECT_NAMES[${PWD_SANITIZED}]:-}"
-    [[ "${pname}" == "my-custom-name" ]] || { echo "    expected 'my-custom-name', got '${pname}'"; return 1; }
-    unset "PROJECT_NAMES[${PWD_SANITIZED}]"
+  PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
+  PROJECT_NAMES["${PWD_SANITIZED}"]="my-custom-name"
+  local pname="${PROJECT_NAMES[${PWD_SANITIZED}]:-}"
+  [[ "${pname}" == "my-custom-name" ]] || { echo "    expected 'my-custom-name', got '${pname}'"; return 1; }
+  unset "PROJECT_NAMES[${PWD_SANITIZED}]"
 }
 
 test_del_kv() {
-    local tmpfile="${TEST_TMP}/test_kv"
-    echo "key1=val1" > "${tmpfile}"
-    echo "key2=val2" >> "${tmpfile}"
-    echo "key3=val3" >> "${tmpfile}"
-    cs_del_kv "${tmpfile}" "key2"
-    grep -q "^key1=" "${tmpfile}" || { echo "    key1 missing"; return 1; }
-    grep -q "^key2=" "${tmpfile}" && { echo "    key2 not deleted"; return 1; }
-    grep -q "^key3=" "${tmpfile}" || { echo "    key3 missing"; return 1; }
+  local tmpfile="${TEST_TMP}/test_kv"
+  echo "key1=val1" > "${tmpfile}"
+  echo "key2=val2" >> "${tmpfile}"
+  echo "key3=val3" >> "${tmpfile}"
+  cs_del_kv "${tmpfile}" "key2"
+  grep -q "^key1=" "${tmpfile}" || { echo "    key1 missing"; return 1; }
+  grep -q "^key2=" "${tmpfile}" && { echo "    key2 not deleted"; return 1; }
+  grep -q "^key3=" "${tmpfile}" || { echo "    key3 missing"; return 1; }
 }
 
 test_active_elsewhere_detection() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "active elsewhere"
-    cs_create_mock_active_session "${sid}" "$$"
-    cs_scan_sessions
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "active elsewhere"
+  cs_create_mock_active_session "${sid}" "$$"
+  cs_scan_sessions
 
-    local idx
-    idx=$(find_entry_index "${sid}")
-    [[ "${idx}" != "-1" ]] || { echo "    session not found"; return 1; }
-    [[ "${ENTRIES_STATUS[${idx}]}" == "active_elsewhere" ]] || { echo "    expected active_elsewhere, got ${ENTRIES_STATUS[${idx}]}"; return 1; }
+  local idx
+  idx=$(find_entry_index "${sid}")
+  [[ "${idx}" != "-1" ]] || { echo "    session not found"; return 1; }
+  [[ "${ENTRIES_STATUS[${idx}]}" == "active_elsewhere" ]] || { echo "    expected active_elsewhere, got ${ENTRIES_STATUS[${idx}]}"; return 1; }
 }
 
 test_stale_recovery() {
-    # Write dead pane IDs to state
-    echo "%99999" > "${STATE_DIR}/current_pane"
-    echo "fake-session-id" > "${STATE_DIR}/panes/99999"
-    echo "%99998" > "${STATE_DIR}/new_pane"
-    echo "new" > "${STATE_DIR}/panes/99998"
+  # Write dead pane IDs to state
+  echo "%99999" > "${STATE_DIR}/current_pane"
+  echo "fake-session-id" > "${STATE_DIR}/panes/99999"
+  echo "%99998" > "${STATE_DIR}/new_pane"
+  echo "new" > "${STATE_DIR}/panes/99998"
 
-    # Run stale cleanup (same logic as picker_loop startup)
-    local cur
-    cur=$(cs_read_state current_pane)
-    if [[ -n "${cur}" ]] && ! pane_alive "${cur}"; then
-        echo "" > "${STATE_DIR}/current_pane"
-    fi
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    if [[ -n "${wp}" ]] && ! pane_alive "${wp}"; then
-        rm -f "${STATE_DIR}/welcome_pane"
-    fi
+  # Run stale cleanup (same logic as picker_loop startup)
+  local cur
+  cur=$(cs_read_state current_pane)
+  if [[ -n "${cur}" ]] && ! pane_alive "${cur}"; then
+    echo "" > "${STATE_DIR}/current_pane"
+  fi
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  if [[ -n "${wp}" ]] && ! pane_alive "${wp}"; then
+    rm -f "${STATE_DIR}/welcome_pane"
+  fi
 
-    cs_scan_sessions
+  cs_scan_sessions
 
-    # Dead refs should be gone
-    cur=$(cs_read_state current_pane)
-    [[ -z "${cur}" ]] || { echo "    stale current_pane not cleared"; return 1; }
-    local np
-    np=$(cs_read_state new_pane)
-    [[ -z "${np}" ]] || { echo "    stale new_pane not cleared"; return 1; }
-    [[ ! -f "${STATE_DIR}/panes/99999" ]] || { echo "    stale panes/99999 not removed"; return 1; }
-    [[ ! -f "${STATE_DIR}/panes/99998" ]] || { echo "    stale panes/99998 not removed"; return 1; }
-    cs_assert_consistent "stale_recovery"
+  # Dead refs should be gone
+  cur=$(cs_read_state current_pane)
+  [[ -z "${cur}" ]] || { echo "    stale current_pane not cleared"; return 1; }
+  local np
+  np=$(cs_read_state new_pane)
+  [[ -z "${np}" ]] || { echo "    stale new_pane not cleared"; return 1; }
+  [[ ! -f "${STATE_DIR}/panes/99999" ]] || { echo "    stale panes/99999 not removed"; return 1; }
+  [[ ! -f "${STATE_DIR}/panes/99998" ]] || { echo "    stale panes/99998 not removed"; return 1; }
+  cs_assert_consistent "stale_recovery"
 }
 
 test_project_path_persistence() {
-    # project_path should exist after cs_init_state
-    local pp
-    pp=$(cs_read_state project_path)
-    [[ -n "${pp}" ]] || { echo "    project_path not written"; return 1; }
-    [[ "${pp}" == "${PWD}" ]] || { echo "    project_path mismatch: '${pp}' != '${PWD}'"; return 1; }
+  # project_path should exist after cs_init_state
+  local pp
+  pp=$(cs_read_state project_path)
+  [[ -n "${pp}" ]] || { echo "    project_path not written"; return 1; }
+  [[ "${pp}" == "${PWD}" ]] || { echo "    project_path mismatch: '${pp}' != '${PWD}'"; return 1; }
 }
 
 test_discover_remote_servers() {
-    # Create a second tmux server
-    local remote_server="cs-fake-remote-$$"
-    local remote_sanitized="-fake-remote-$$"
-    local base="${XDG_RUNTIME_DIR:-/tmp}"
-    local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
-    local remote_state="${base}/claude-spaces/${remote_sanitized}"
-    mkdir -p "${remote_state}"
-    echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
-    mkdir -p "${base}/claude-spaces/.servers"
-    ln -snf "${remote_state}" "${base}/claude-spaces/.servers/${remote_server}"
-    mkdir -p "/tmp/fake-remote-project"
-    command tmux -L "${remote_server}" new-session -d -s test "sleep 99999"
-    sleep 0.05
+  # Create a second tmux server
+  local remote_server="cs-fake-remote-$$"
+  local remote_sanitized="-fake-remote-$$"
+  local base="${XDG_RUNTIME_DIR:-/tmp}"
+  local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
+  local remote_state="${base}/claude-spaces/${remote_sanitized}"
+  mkdir -p "${remote_state}"
+  echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
+  mkdir -p "${base}/claude-spaces/.servers"
+  ln -snf "${remote_state}" "${base}/claude-spaces/.servers/${remote_server}"
+  mkdir -p "/tmp/fake-remote-project"
+  command tmux -L "${remote_server}" new-session -d -s test "sleep 99999"
+  sleep 0.05
 
-    cs_discover_servers
+  cs_discover_servers
 
-    # Should find the remote server
-    local found=0
-    for entry in "${REMOTE_SERVERS[@]}"; do
-        if [[ "${entry}" == "${remote_server}|/tmp/fake-remote-project" ]]; then
-            found=1
-            break
-        fi
-    done
-    [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; rm -f "${base}/claude-spaces/.servers/${remote_server}"; return 1; }
+  # Should find the remote server
+  local found=0
+  for entry in "${REMOTE_SERVERS[@]}"; do
+    if [[ "${entry}" == "${remote_server}|/tmp/fake-remote-project" ]]; then
+      found=1
+      break
+    fi
+  done
+  [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; rm -f "${base}/claude-spaces/.servers/${remote_server}"; return 1; }
 
-    # Should NOT include our own server
-    for entry in "${REMOTE_SERVERS[@]}"; do
-        local srv="${entry%%|*}"
-        if [[ "${srv}" == "${TMUX_SERVER}" ]]; then
-            echo "    own server found in remote list"
-            command tmux -L "${remote_server}" kill-server 2>/dev/null
-            [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
-            rm -rf "${remote_state}" "/tmp/fake-remote-project"
-            rm -f "${base}/claude-spaces/.servers/${remote_server}"
-            return 1
-        fi
-    done
+  # Should NOT include our own server
+  for entry in "${REMOTE_SERVERS[@]}"; do
+    local srv="${entry%%|*}"
+    if [[ "${srv}" == "${TMUX_SERVER}" ]]; then
+      echo "    own server found in remote list"
+      command tmux -L "${remote_server}" kill-server 2>/dev/null
+      [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
+      rm -rf "${remote_state}" "/tmp/fake-remote-project"
+      rm -f "${base}/claude-spaces/.servers/${remote_server}"
+      return 1
+    fi
+  done
 
-    # Cleanup
-    command tmux -L "${remote_server}" kill-server 2>/dev/null
-    [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
-    rm -rf "${remote_state}" "/tmp/fake-remote-project"
-    rm -f "${base}/claude-spaces/.servers/${remote_server}"
+  # Cleanup
+  command tmux -L "${remote_server}" kill-server 2>/dev/null
+  [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
+  rm -rf "${remote_state}" "/tmp/fake-remote-project"
+  rm -f "${base}/claude-spaces/.servers/${remote_server}"
 }
 
 test_discover_inactive_projects() {
-    # Create a project dir with JSONL but no running server
-    local inactive_sanitized="-tmp-inactive-test-$$"
-    local inactive_dir="${PROJECTS_DIR}/${inactive_sanitized}"
-    mkdir -p "${inactive_dir}"
-    local base="${XDG_RUNTIME_DIR:-/tmp}"
-    local inactive_state="${base}/claude-spaces/${inactive_sanitized}"
-    mkdir -p "${inactive_state}"
-    echo "/tmp/inactive-test-$$" > "${inactive_state}/project_path"
-    mkdir -p "/tmp/inactive-test-$$"
-    printf '{"type":"user","message":{"role":"user","content":"test"},"sessionId":"aaaa","cwd":"/tmp/inactive-test-$$"}\n' \
-        > "${inactive_dir}/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+  # Create a project dir with JSONL but no running server
+  local inactive_sanitized="-tmp-inactive-test-$$"
+  local inactive_dir="${PROJECTS_DIR}/${inactive_sanitized}"
+  mkdir -p "${inactive_dir}"
+  local base="${XDG_RUNTIME_DIR:-/tmp}"
+  local inactive_state="${base}/claude-spaces/${inactive_sanitized}"
+  mkdir -p "${inactive_state}"
+  echo "/tmp/inactive-test-$$" > "${inactive_state}/project_path"
+  mkdir -p "/tmp/inactive-test-$$"
+  printf '{"type":"user","message":{"role":"user","content":"test"},"sessionId":"aaaa","cwd":"/tmp/inactive-test-$$"}\n' \
+    > "${inactive_dir}/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
 
-    cs_discover_servers
-    cs_discover_inactive
+  cs_discover_servers
+  cs_discover_inactive
 
-    local found=0
-    for entry in "${INACTIVE_PROJECTS[@]}"; do
-        if [[ "${entry}" == "${inactive_sanitized}|/tmp/inactive-test-$$" ]]; then
-            found=1
-            break
-        fi
-    done
-    [[ ${found} -eq 1 ]] || { echo "    inactive project not discovered"; rm -rf "${inactive_dir}" "${inactive_state}" "/tmp/inactive-test-$$"; return 1; }
+  local found=0
+  for entry in "${INACTIVE_PROJECTS[@]}"; do
+    if [[ "${entry}" == "${inactive_sanitized}|/tmp/inactive-test-$$" ]]; then
+      found=1
+      break
+    fi
+  done
+  [[ ${found} -eq 1 ]] || { echo "    inactive project not discovered"; rm -rf "${inactive_dir}" "${inactive_state}" "/tmp/inactive-test-$$"; return 1; }
 
-    # Cleanup
-    rm -rf "${inactive_dir}" "${inactive_state}" "/tmp/inactive-test-$$"
+  # Cleanup
+  rm -rf "${inactive_dir}" "${inactive_state}" "/tmp/inactive-test-$$"
 }
 
 test_header_skip_navigation() {
-    # Build entries with a header in the middle
-    ENTRIES_ID=("s1" "__hdr_remote__" "s2")
-    ENTRIES_NAME=("session1" "other projects" "session2")
-    ENTRIES_MTIME=("0" "0" "0")
-    ENTRIES_STATUS=("dormant" "" "dormant")
-    ENTRIES_PANE=("" "" "")
-    ENTRIES_TYPE=("local" "header" "remote")
-    ENTRIES_PATH=("" "" "/tmp")
+  # Build entries with a header in the middle
+  ENTRIES_ID=("s1" "__hdr_remote__" "s2")
+  ENTRIES_NAME=("session1" "other projects" "session2")
+  ENTRIES_MTIME=("0" "0" "0")
+  ENTRIES_STATUS=("dormant" "" "dormant")
+  ENTRIES_PANE=("" "" "")
+  ENTRIES_TYPE=("local" "header" "remote")
+  ENTRIES_PATH=("" "" "/tmp")
 
-    SELECTED=0
-    cs_move_down
-    [[ ${SELECTED} -eq 2 ]] || { echo "    move_down didn't skip header: SELECTED=${SELECTED}"; return 1; }
+  SELECTED=0
+  cs_move_down
+  [[ ${SELECTED} -eq 2 ]] || { echo "    move_down didn't skip header: SELECTED=${SELECTED}"; return 1; }
 
-    cs_move_up
-    [[ ${SELECTED} -eq 0 ]] || { echo "    move_up didn't skip header: SELECTED=${SELECTED}"; return 1; }
+  cs_move_up
+  [[ ${SELECTED} -eq 0 ]] || { echo "    move_up didn't skip header: SELECTED=${SELECTED}"; return 1; }
 }
 
 test_local_only_navigation() {
-    # Mixed entries: two locals, then spacer+header+remote
-    ENTRIES_ID=("s1" "s2" "__spacer_remote__" "__hdr_remote__" "__proj_-tmp-foo__")
-    ENTRIES_NAME=("session1" "session2" "" "other projects" "foo")
-    ENTRIES_MTIME=("0" "0" "0" "0" "0")
-    ENTRIES_STATUS=("dormant" "dormant" "" "" "")
-    ENTRIES_PANE=("" "" "" "" "")
-    ENTRIES_TYPE=("local" "local" "spacer" "header" "project")
-    ENTRIES_PATH=("" "" "" "" "/tmp/foo")
+  # Mixed entries: two locals, then spacer+header+remote
+  ENTRIES_ID=("s1" "s2" "__spacer_remote__" "__hdr_remote__" "__proj_-tmp-foo__")
+  ENTRIES_NAME=("session1" "session2" "" "other projects" "foo")
+  ENTRIES_MTIME=("0" "0" "0" "0" "0")
+  ENTRIES_STATUS=("dormant" "dormant" "" "" "")
+  ENTRIES_PANE=("" "" "" "" "")
+  ENTRIES_TYPE=("local" "local" "spacer" "header" "project")
+  ENTRIES_PATH=("" "" "" "" "/tmp/foo")
 
-    # move_down local_only from first local → second local
-    SELECTED=0
-    cs_move_down 1
-    [[ ${SELECTED} -eq 1 ]] || { echo "    down from 0: expected 1, got ${SELECTED}"; return 1; }
+  # move_down local_only from first local → second local
+  SELECTED=0
+  cs_move_down 1
+  [[ ${SELECTED} -eq 1 ]] || { echo "    down from 0: expected 1, got ${SELECTED}"; return 1; }
 
-    # move_down local_only from last local → wraps to first local
-    cs_move_down 1
-    [[ ${SELECTED} -eq 0 ]] || { echo "    down from 1: expected 0 (wrap), got ${SELECTED}"; return 1; }
+  # move_down local_only from last local → wraps to first local
+  cs_move_down 1
+  [[ ${SELECTED} -eq 0 ]] || { echo "    down from 1: expected 0 (wrap), got ${SELECTED}"; return 1; }
 
-    # move_up local_only from first local → wraps to last local
-    cs_move_up 1
-    [[ ${SELECTED} -eq 1 ]] || { echo "    up from 0: expected 1 (wrap), got ${SELECTED}"; return 1; }
+  # move_up local_only from first local → wraps to last local
+  cs_move_up 1
+  [[ ${SELECTED} -eq 1 ]] || { echo "    up from 0: expected 1 (wrap), got ${SELECTED}"; return 1; }
 
-    # move_up local_only from last local → first local
-    cs_move_up 1
-    [[ ${SELECTED} -eq 0 ]] || { echo "    up from 1: expected 0, got ${SELECTED}"; return 1; }
+  # move_up local_only from last local → first local
+  cs_move_up 1
+  [[ ${SELECTED} -eq 0 ]] || { echo "    up from 1: expected 0, got ${SELECTED}"; return 1; }
 
-    # Verify non-local_only still reaches remote
-    SELECTED=1
-    cs_move_down
-    [[ ${SELECTED} -eq 4 ]] || { echo "    bare down from 1: expected 4, got ${SELECTED}"; return 1; }
+  # Verify non-local_only still reaches remote
+  SELECTED=1
+  cs_move_down
+  [[ ${SELECTED} -eq 4 ]] || { echo "    bare down from 1: expected 4, got ${SELECTED}"; return 1; }
 }
 
 test_activate_remote() {
-    # Mock _tmux detach-client to not actually detach
-    local orig_tmux
-    orig_tmux=$(declare -f _tmux)
-    _tmux() {
-        if [[ "$1" == "detach-client" ]]; then
-            MOCK_DETACHED=1
-            return 0
-        fi
-        if [[ -n "${TMUX_SERVER}" ]]; then
-            command tmux -L "${TMUX_SERVER}" "$@"
-        else
-            command tmux "$@"
-        fi
-    }
-    MOCK_DETACHED=0
+  # Mock _tmux detach-client to not actually detach
+  local orig_tmux
+  orig_tmux=$(declare -f _tmux)
+  _tmux() {
+    if [[ "$1" == "detach-client" ]]; then
+      MOCK_DETACHED=1
+      return 0
+    fi
+    if [[ -n "${TMUX_SERVER}" ]]; then
+      command tmux -L "${TMUX_SERVER}" "$@"
+    else
+      command tmux "$@"
+    fi
+  }
+  MOCK_DETACHED=0
 
-    ENTRIES_ID=("__proj_-tmp-foo__")
-    ENTRIES_NAME=("foo")
-    ENTRIES_MTIME=("0")
-    ENTRIES_STATUS=("")
-    ENTRIES_PANE=("")
-    ENTRIES_TYPE=("project")
-    ENTRIES_PATH=("/tmp/foo")
-    SELECTED=0
+  ENTRIES_ID=("__proj_-tmp-foo__")
+  ENTRIES_NAME=("foo")
+  ENTRIES_MTIME=("0")
+  ENTRIES_STATUS=("")
+  ENTRIES_PANE=("")
+  ENTRIES_TYPE=("project")
+  ENTRIES_PATH=("/tmp/foo")
+  SELECTED=0
 
-    cs_activate_selected
+  cs_activate_selected
 
-    [[ ${MOCK_DETACHED} -eq 1 ]] || { echo "    detach not called"; eval "${orig_tmux}"; return 1; }
+  [[ ${MOCK_DETACHED} -eq 1 ]] || { echo "    detach not called"; eval "${orig_tmux}"; return 1; }
 
-    local st
-    st=$(cs_read_state switch_target)
-    [[ "${st}" == "/tmp/foo" ]] || { echo "    switch_target wrong: '${st}'"; eval "${orig_tmux}"; return 1; }
+  local st
+  st=$(cs_read_state switch_target)
+  [[ "${st}" == "/tmp/foo" ]] || { echo "    switch_target wrong: '${st}'"; eval "${orig_tmux}"; return 1; }
 
-    # Restore original _tmux
-    eval "${orig_tmux}"
-    rm -f "${STATE_DIR}/switch_target"
+  # Restore original _tmux
+  eval "${orig_tmux}"
+  rm -f "${STATE_DIR}/switch_target"
 }
 
 test_guard_local_only_actions() {
-    # Set up a remote entry as selected
-    ENTRIES_ID=("__proj_-tmp-foo__")
-    ENTRIES_NAME=("foo")
-    ENTRIES_MTIME=("0")
-    ENTRIES_STATUS=("")
-    ENTRIES_PANE=("")
-    ENTRIES_TYPE=("project")
-    ENTRIES_PATH=("/tmp/foo")
-    SELECTED=0
+  # Set up a remote entry as selected
+  ENTRIES_ID=("__proj_-tmp-foo__")
+  ENTRIES_NAME=("foo")
+  ENTRIES_MTIME=("0")
+  ENTRIES_STATUS=("")
+  ENTRIES_PANE=("")
+  ENTRIES_TYPE=("project")
+  ENTRIES_PATH=("/tmp/foo")
+  SELECTED=0
 
-    # These should all be no-ops (return immediately)
-    cs_close_selected
-    cs_confirm_hide < /dev/null
-    cs_rename_selected < /dev/null
+  # These should all be no-ops (return immediately)
+  cs_close_selected
+  cs_confirm_hide < /dev/null
+  cs_rename_selected < /dev/null
 
-    # If we got here without errors, the guards worked
-    cs_assert_consistent "guard_local_only"
+  # If we got here without errors, the guards worked
+  cs_assert_consistent "guard_local_only"
 }
 
 # ── Terminal pane tests ──────────────────────────
 
 test_term_create_and_kill() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    [[ -n "${pane_a}" ]] || { echo "    no current_pane"; return 1; }
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  [[ -n "${pane_a}" ]] || { echo "    no current_pane"; return 1; }
 
-    cs_term_create "${pane_a}"
-    sleep 0.05
+  cs_term_create "${pane_a}"
+  sleep 0.05
 
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
-    [[ -n "${term_pane}" ]] || { echo "    no term pane"; return 1; }
-    pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
-    [[ -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    no term state file"; return 1; }
-    [[ -f "${STATE_DIR}/term/${pane_a#%}.shown" ]] || { echo "    no .shown file"; return 1; }
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  [[ -n "${term_pane}" ]] || { echo "    no term pane"; return 1; }
+  pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
+  [[ -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    no term state file"; return 1; }
+  [[ -f "${STATE_DIR}/term/${pane_a#%}.shown" ]] || { echo "    no .shown file"; return 1; }
 
-    cs_term_kill "${pane_a}"
-    sleep 0.05
+  cs_term_kill "${pane_a}"
+  sleep 0.05
 
-    cs_refresh_pane_cache
-    pane_alive "${term_pane}" && { echo "    term still alive after kill"; return 1; }
-    [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+  cs_refresh_pane_cache
+  pane_alive "${term_pane}" && { echo "    term still alive after kill"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
 
-    cs_assert_consistent "term_create_kill"
+  cs_assert_consistent "term_create_kill"
 }
 
 test_term_toggle_on_off() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
 
-    cs_term_toggle
-    sleep 0.05
-    cs_term_is_shown "${pane_a}" || { echo "    not shown after toggle on"; return 1; }
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
-    pane_alive "${term_pane}" || { echo "    term dead after toggle on"; return 1; }
-    cs_assert_consistent "term_toggle_on" || return 1
+  cs_term_toggle
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after toggle on"; return 1; }
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  pane_alive "${term_pane}" || { echo "    term dead after toggle on"; return 1; }
+  cs_assert_consistent "term_toggle_on" || return 1
 
-    cs_term_toggle
-    sleep 0.05
-    cs_term_is_shown "${pane_a}" && { echo "    still shown after toggle off"; return 1; }
-    cs_refresh_pane_cache
-    pane_alive "${term_pane}" || { echo "    term dead after toggle off"; return 1; }
+  cs_term_toggle
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after toggle off"; return 1; }
+  cs_refresh_pane_cache
+  pane_alive "${term_pane}" || { echo "    term dead after toggle off"; return 1; }
 
-    cs_assert_consistent "term_toggle_off"
+  cs_assert_consistent "term_toggle_off"
 }
 
 test_term_swap_with_terminal() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    cs_create_mock_session "${sid_a}" "session A"
-    cs_create_mock_session "${sid_b}" "session B"
-    cs_scan_sessions
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_a}" "session A"
+  cs_create_mock_session "${sid_b}" "session B"
+  cs_scan_sessions
 
-    # Resume A and give it a terminal
-    cs_resume_session "${sid_a}"
-    sleep 0.05
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_a
-    term_a=$(cs_term_pane_for "${pane_a}")
+  # Resume A and give it a terminal
+  cs_resume_session "${sid_a}"
+  sleep 0.05
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_a
+  term_a=$(cs_term_pane_for "${pane_a}")
 
-    # Switch to B (dormant)
-    cs_scan_sessions
-    local idx_b
-    idx_b=$(find_entry_index "${sid_b}")
-    SELECTED=${idx_b}
-    cs_activate_selected
-    sleep 0.15
+  # Switch to B (dormant)
+  cs_scan_sessions
+  local idx_b
+  idx_b=$(find_entry_index "${sid_b}")
+  SELECTED=${idx_b}
+  cs_activate_selected
+  sleep 0.15
 
-    local pane_b
-    pane_b=$(cs_read_state current_pane)
-    [[ "${pane_b}" != "${pane_a}" ]] || { echo "    didn't switch to B"; return 1; }
+  local pane_b
+  pane_b=$(cs_read_state current_pane)
+  [[ "${pane_b}" != "${pane_a}" ]] || { echo "    didn't switch to B"; return 1; }
 
-    # B should not have a terminal
-    cs_term_is_shown "${pane_b}" && { echo "    B has terminal but shouldn't"; return 1; }
-    # A's terminal should still be alive (parked)
-    cs_refresh_pane_cache
-    pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
-    cs_assert_consistent "term_swap_no_term" || return 1
+  # B should not have a terminal
+  cs_term_is_shown "${pane_b}" && { echo "    B has terminal but shouldn't"; return 1; }
+  # A's terminal should still be alive (parked)
+  cs_refresh_pane_cache
+  pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
+  cs_assert_consistent "term_swap_no_term" || return 1
 
-    # Switch back to A — terminal should reappear
-    cs_scan_sessions
-    local idx_a
-    idx_a=$(find_entry_index "${sid_a}")
-    SELECTED=${idx_a}
-    cs_activate_selected
-    sleep 0.05
+  # Switch back to A — terminal should reappear
+  cs_scan_sessions
+  local idx_a
+  idx_a=$(find_entry_index "${sid_a}")
+  SELECTED=${idx_a}
+  cs_activate_selected
+  sleep 0.05
 
-    local cur
-    cur=$(cs_read_state current_pane)
-    [[ "${cur}" == "${pane_a}" ]] || { echo "    didn't switch back to A"; return 1; }
-    cs_term_is_shown "${pane_a}" || { echo "    A's terminal not shown after swap back"; return 1; }
+  local cur
+  cur=$(cs_read_state current_pane)
+  [[ "${cur}" == "${pane_a}" ]] || { echo "    didn't switch back to A"; return 1; }
+  cs_term_is_shown "${pane_a}" || { echo "    A's terminal not shown after swap back"; return 1; }
 
-    cs_assert_consistent "term_swap_back"
+  cs_assert_consistent "term_swap_back"
 }
 
 test_term_swap_both_have_terminal() {
-    local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-    cs_create_mock_session "${sid_a}" "session A"
-    cs_create_mock_session "${sid_b}" "session B"
-    cs_scan_sessions
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_a}" "session A"
+  cs_create_mock_session "${sid_b}" "session B"
+  cs_scan_sessions
 
-    # Resume A with terminal
-    cs_resume_session "${sid_a}"
-    sleep 0.05
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_a
-    term_a=$(cs_term_pane_for "${pane_a}")
+  # Resume A with terminal
+  cs_resume_session "${sid_a}"
+  sleep 0.05
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_a
+  term_a=$(cs_term_pane_for "${pane_a}")
 
-    # Switch to B (dormant) and give it a terminal
-    cs_scan_sessions
-    local idx_b
-    idx_b=$(find_entry_index "${sid_b}")
-    SELECTED=${idx_b}
-    cs_activate_selected
-    sleep 0.15
-    local pane_b
-    pane_b=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_b
-    term_b=$(cs_term_pane_for "${pane_b}")
-    cs_assert_consistent "term_both_B_active" || return 1
+  # Switch to B (dormant) and give it a terminal
+  cs_scan_sessions
+  local idx_b
+  idx_b=$(find_entry_index "${sid_b}")
+  SELECTED=${idx_b}
+  cs_activate_selected
+  sleep 0.15
+  local pane_b
+  pane_b=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_b
+  term_b=$(cs_term_pane_for "${pane_b}")
+  cs_assert_consistent "term_both_B_active" || return 1
 
-    # Switch back to A
-    cs_scan_sessions
-    local idx_a
-    idx_a=$(find_entry_index "${sid_a}")
-    SELECTED=${idx_a}
-    cs_activate_selected
-    sleep 0.05
+  # Switch back to A
+  cs_scan_sessions
+  local idx_a
+  idx_a=$(find_entry_index "${sid_a}")
+  SELECTED=${idx_a}
+  cs_activate_selected
+  sleep 0.05
 
-    cs_refresh_pane_cache
-    pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
-    pane_alive "${term_b}" || { echo "    B's terminal died"; return 1; }
-    cs_term_is_shown "${pane_a}" || { echo "    A's terminal not shown"; return 1; }
+  cs_refresh_pane_cache
+  pane_alive "${term_a}" || { echo "    A's terminal died"; return 1; }
+  pane_alive "${term_b}" || { echo "    B's terminal died"; return 1; }
+  cs_term_is_shown "${pane_a}" || { echo "    A's terminal not shown"; return 1; }
 
-    cs_assert_consistent "term_both_swap"
+  cs_assert_consistent "term_both_swap"
 }
 
 test_term_auto_create_on_focus() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_is_shown "${pane_a}" && { echo "    has terminal before focus"; return 1; }
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_is_shown "${pane_a}" && { echo "    has terminal before focus"; return 1; }
 
-    cs_term_smart
-    sleep 0.05
+  cs_term_smart
+  sleep 0.05
 
-    cs_term_is_shown "${pane_a}" || { echo "    not shown after focus"; return 1; }
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
-    pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after focus"; return 1; }
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
 
-    cs_assert_consistent "term_auto_focus"
+  cs_assert_consistent "term_auto_focus"
 }
 
 test_term_toggle_no_session() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_show_welcome
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_show_welcome
+  sleep 0.05
 
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" ]] || { echo "    no welcome pane"; return 1; }
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" ]] || { echo "    no welcome pane"; return 1; }
 
-    cs_term_toggle
-    sleep 0.05
+  cs_term_toggle
+  sleep 0.05
 
-    local count
-    count=$(find "${STATE_DIR}/term" -maxdepth 1 -not -name term -type f 2>/dev/null | wc -l)
-    ((count == 0)) || { echo "    term state created: ${count} files"; return 1; }
+  local count
+  count=$(find "${STATE_DIR}/term" -maxdepth 1 -not -name term -type f 2>/dev/null | wc -l)
+  ((count == 0)) || { echo "    term state created: ${count} files"; return 1; }
 
-    cs_assert_consistent "term_toggle_welcome"
+  cs_assert_consistent "term_toggle_welcome"
 }
 
 test_term_close_session_with_terminal() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
 
-    cs_close_pane "${pane_a}"
-    cs_after_remove "${pane_a}"
-    sleep 0.05
+  cs_close_pane "${pane_a}"
+  cs_after_remove "${pane_a}"
+  sleep 0.05
 
-    cs_refresh_pane_cache
-    pane_alive "${pane_a}" && { echo "    session still alive"; return 1; }
-    pane_alive "${term_pane}" && { echo "    terminal still alive"; return 1; }
-    [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+  cs_refresh_pane_cache
+  pane_alive "${pane_a}" && { echo "    session still alive"; return 1; }
+  pane_alive "${term_pane}" && { echo "    terminal still alive"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
 
-    cs_assert_consistent "term_close"
+  cs_assert_consistent "term_close"
 }
 
 test_term_dies_externally() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
 
-    _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
-    sleep 0.05
+  _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
+  sleep 0.05
 
-    # Simulate the health check
-    cs_refresh_pane_cache
-    if cs_term_is_shown "${pane_a}"; then
-        local tp
-        tp=$(cs_term_pane_for "${pane_a}")
-        if [[ -n "${tp}" ]] && ! cs_pane_alive "${tp}"; then
-            rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height}
-        fi
+  # Simulate the health check
+  cs_refresh_pane_cache
+  if cs_term_is_shown "${pane_a}"; then
+    local tp
+    tp=$(cs_term_pane_for "${pane_a}")
+    if [[ -n "${tp}" ]] && ! cs_pane_alive "${tp}"; then
+      rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height}
     fi
+  fi
 
-    [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
 
-    cs_assert_consistent "term_dies"
+  cs_assert_consistent "term_dies"
 }
 
 test_term_height_persists() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
 
-    _tmux resize-pane -t "${term_pane}" -y 10 2>/dev/null || true
-    sleep 0.05
-    local orig_h
-    orig_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+  _tmux resize-pane -t "${term_pane}" -y 10 2>/dev/null || true
+  sleep 0.05
+  local orig_h
+  orig_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
 
-    # Toggle off (saves height as percentage)
-    cs_term_toggle
-    sleep 0.05
+  # Toggle off (saves height as percentage)
+  cs_term_toggle
+  sleep 0.05
 
-    local saved_pct
-    saved_pct=$(cat "${STATE_DIR}/term/${pane_a#%}.height" 2>/dev/null || true)
-    [[ -n "${saved_pct}" ]] || { echo "    height not saved"; return 1; }
+  local saved_pct
+  saved_pct=$(cat "${STATE_DIR}/term/${pane_a#%}.height" 2>/dev/null || true)
+  [[ -n "${saved_pct}" ]] || { echo "    height not saved"; return 1; }
 
-    # Toggle back on
-    cs_term_toggle
-    sleep 0.05
+  # Toggle back on
+  cs_term_toggle
+  sleep 0.05
 
-    # Restored height should be close to the original
-    local new_h
-    new_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    local diff=$(( new_h - orig_h ))
-    (( diff < 0 )) && diff=$(( -diff ))
-    (( diff <= 2 )) || { echo "    height not restored: orig=${orig_h} got=${new_h}"; return 1; }
+  # Restored height should be close to the original
+  local new_h
+  new_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+  local diff=$(( new_h - orig_h ))
+  (( diff < 0 )) && diff=$(( -diff ))
+  (( diff <= 2 )) || { echo "    height not restored: orig=${orig_h} got=${new_h}"; return 1; }
 
-    cs_assert_consistent "term_height"
+  cs_assert_consistent "term_height"
 }
 
 test_term_across_reload() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
 
-    cs_term_is_shown "${pane_a}" || { echo "    not shown before reload"; return 1; }
+  cs_term_is_shown "${pane_a}" || { echo "    not shown before reload"; return 1; }
 
-    # Simulate reload: stale cleanup
-    cs_refresh_pane_cache
-    for f in "${STATE_DIR}"/term/*; do
-        [[ -f "${f}" ]] || continue
-        local bn
-        bn=$(basename "${f}")
-        [[ "${bn}" == *.* ]] && continue
-        local tpid
-        tpid=$(cat "${f}" 2>/dev/null || true)
-        if [[ -n "${tpid}" ]] && ! cs_pane_alive "${tpid}"; then
-            rm -f "${f}" "${f}.shown" "${f}.height"
-        fi
-    done
+  # Simulate reload: stale cleanup
+  cs_refresh_pane_cache
+  for f in "${STATE_DIR}"/term/*; do
+    [[ -f "${f}" ]] || continue
+    local bn
+    bn=$(basename "${f}")
+    [[ "${bn}" == *.* ]] && continue
+    local tpid
+    tpid=$(cat "${f}" 2>/dev/null || true)
+    if [[ -n "${tpid}" ]] && ! cs_pane_alive "${tpid}"; then
+      rm -f "${f}" "${f}.shown" "${f}.height"
+    fi
+  done
 
-    pane_alive "${term_pane}" || { echo "    term died after reload"; return 1; }
-    cs_term_is_shown "${pane_a}" || { echo "    not shown after reload"; return 1; }
+  pane_alive "${term_pane}" || { echo "    term died after reload"; return 1; }
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after reload"; return 1; }
 
-    cs_assert_consistent "term_reload"
+  cs_assert_consistent "term_reload"
 }
 
 test_term_winch_repin() {
-    local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    cs_create_mock_session "${sid}" "session A"
-    cs_scan_sessions
-    cs_resume_session "${sid}"
-    sleep 0.05
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
 
-    local pane_a
-    pane_a=$(cs_read_state current_pane)
-    cs_term_toggle
-    sleep 0.05
-    local term_pane
-    term_pane=$(cs_term_pane_for "${pane_a}")
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
 
-    # Record initial percentage
-    local init_th init_sh init_pct
-    init_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
-    init_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
-    init_pct=$(( init_th * 100 / (init_th + init_sh) ))
+  # Record initial percentage
+  local init_th init_sh init_pct
+  init_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+  init_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+  init_pct=$(( init_th * 100 / (init_th + init_sh) ))
 
-    # Shrink window
-    _tmux resize-window -y 20 2>/dev/null || true
-    sleep 0.05
+  # Shrink window
+  _tmux resize-window -y 20 2>/dev/null || true
+  sleep 0.05
 
-    # Call WINCH handler
-    cs_handle_winch
-    sleep 0.05
+  # Call WINCH handler
+  cs_handle_winch
+  sleep 0.05
 
-    # Check terminal is still approximately the right percentage
-    local new_th new_sh new_pct
-    new_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
-    new_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
-    new_pct=$(( new_th * 100 / (new_th + new_sh) ))
+  # Check terminal is still approximately the right percentage
+  local new_th new_sh new_pct
+  new_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+  new_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+  new_pct=$(( new_th * 100 / (new_th + new_sh) ))
 
-    local diff=$(( new_pct - init_pct ))
-    (( diff < 0 )) && diff=$(( -diff ))
-    (( diff <= 3 )) || { echo "    pct drifted: init=${init_pct}% now=${new_pct}% (diff=${diff})"; return 1; }
+  local diff=$(( new_pct - init_pct ))
+  (( diff < 0 )) && diff=$(( -diff ))
+  (( diff <= 3 )) || { echo "    pct drifted: init=${init_pct}% now=${new_pct}% (diff=${diff})"; return 1; }
 
-    # Grow back
-    _tmux resize-window -y 40 2>/dev/null || true
-    sleep 0.05
-    cs_handle_winch
-    sleep 0.05
+  # Grow back
+  _tmux resize-window -y 40 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
 
-    local fin_th fin_sh fin_pct
-    fin_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
-    fin_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
-    fin_pct=$(( fin_th * 100 / (fin_th + fin_sh) ))
+  local fin_th fin_sh fin_pct
+  fin_th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+  fin_sh=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+  fin_pct=$(( fin_th * 100 / (fin_th + fin_sh) ))
 
-    diff=$(( fin_pct - init_pct ))
-    (( diff < 0 )) && diff=$(( -diff ))
-    (( diff <= 3 )) || { echo "    pct drifted after grow: init=${init_pct}% now=${fin_pct}% (diff=${diff})"; return 1; }
+  diff=$(( fin_pct - init_pct ))
+  (( diff < 0 )) && diff=$(( -diff ))
+  (( diff <= 3 )) || { echo "    pct drifted after grow: init=${init_pct}% now=${fin_pct}% (diff=${diff})"; return 1; }
 
-    cs_assert_consistent "term_winch"
+  cs_assert_consistent "term_winch"
 }
 
 # ── Main ─────────────────────────────────────────
 main() {
-    echo "claude-spaces integration tests"
-    echo "══════════════════════════════════"
-    echo ""
+  echo "claude-spaces integration tests"
+  echo "══════════════════════════════════"
+  echo ""
 
-    phase_shellcheck
-    phase_arg_checks
+  phase_shellcheck
+  phase_arg_checks
 
-    echo "Loading functions..."
-    CS_TESTING=1
-    load_functions
-    install_mocks
-    echo "Setting up test environment..."
-    cs_test_setup
-    trap cs_test_teardown EXIT
-    echo ""
-    echo "Running tests:"
+  echo "Loading functions..."
+  CS_TESTING=1
+  load_functions
+  install_mocks
+  echo "Setting up test environment..."
+  cs_test_setup
+  trap cs_test_teardown EXIT
+  echo ""
+  echo "Running tests:"
 
-    run_test "fresh start, no sessions"     test_fresh_start_no_sessions
-    run_test "fresh start, with sessions"   test_fresh_start_with_sessions
-    run_test "select dormant session"       test_select_dormant
-    run_test "switch between sessions"      test_switch_sessions
-    run_test "close active session"         test_close_active
-    run_test "new session (N)"              test_new_session
-    run_test "new then select other"        test_new_then_select_other
-    run_test "new session cancelled"        test_new_cancelled
-    run_test "bell detection"               test_bell_detection
-    run_test "remote bell"                  test_remote_bell
-    run_test "hide session"                 test_hide_session
-    run_test "hide this & older"            test_hide_older
-    run_test "stale state recovery"         test_stale_recovery
-    run_test "locked session blocked"       test_locked_session_blocked
-    run_test "show pane safety"             test_show_pane_safety
-    run_test "double-N"                     test_double_n
-    run_test "selection preserved"          test_selection_preserved
-    run_test "selection fallback to pane"  test_selection_fallback_to_pane
-    run_test "custom session names"         test_custom_names
-    run_test "clean message"                test_clean_message
-    run_test "display names: single"        test_display_names_single_path
-    run_test "display names: diff leaves"   test_display_names_different_leaves
-    run_test "display names: same leaf"     test_display_names_same_leaf_different_parent
-    run_test "display names: deep div"      test_display_names_deep_divergence
-    run_test "display names: three-way"     test_display_names_three_way_collision
-    run_test "display names: compression"   test_display_names_compression
-    run_test "project rename: override"     test_project_rename_override
-    run_test "project rename: clear"        test_project_rename_clear
-    run_test "project rename: header"       test_project_rename_header_lookup
-    run_test "del_kv"                       test_del_kv
-    run_test "active-elsewhere detection"   test_active_elsewhere_detection
-    run_test "project path persistence"    test_project_path_persistence
-    run_test "discover remote servers"     test_discover_remote_servers
-    run_test "discover inactive projects"  test_discover_inactive_projects
-    run_test "header skip navigation"      test_header_skip_navigation
-    run_test "local-only navigation"       test_local_only_navigation
-    run_test "activate remote"             test_activate_remote
-    run_test "guard local-only actions"    test_guard_local_only_actions
+  run_test "fresh start, no sessions"     test_fresh_start_no_sessions
+  run_test "fresh start, with sessions"   test_fresh_start_with_sessions
+  run_test "select dormant session"       test_select_dormant
+  run_test "switch between sessions"      test_switch_sessions
+  run_test "close active session"         test_close_active
+  run_test "new session (N)"              test_new_session
+  run_test "new then select other"        test_new_then_select_other
+  run_test "new session cancelled"        test_new_cancelled
+  run_test "bell detection"               test_bell_detection
+  run_test "remote bell"                  test_remote_bell
+  run_test "hide session"                 test_hide_session
+  run_test "hide this & older"            test_hide_older
+  run_test "stale state recovery"         test_stale_recovery
+  run_test "locked session blocked"       test_locked_session_blocked
+  run_test "show pane safety"             test_show_pane_safety
+  run_test "double-N"                     test_double_n
+  run_test "selection preserved"          test_selection_preserved
+  run_test "selection fallback to pane"  test_selection_fallback_to_pane
+  run_test "custom session names"         test_custom_names
+  run_test "clean message"                test_clean_message
+  run_test "display names: single"        test_display_names_single_path
+  run_test "display names: diff leaves"   test_display_names_different_leaves
+  run_test "display names: same leaf"     test_display_names_same_leaf_different_parent
+  run_test "display names: deep div"      test_display_names_deep_divergence
+  run_test "display names: three-way"     test_display_names_three_way_collision
+  run_test "display names: compression"   test_display_names_compression
+  run_test "project rename: override"     test_project_rename_override
+  run_test "project rename: clear"        test_project_rename_clear
+  run_test "project rename: header"       test_project_rename_header_lookup
+  run_test "del_kv"                       test_del_kv
+  run_test "active-elsewhere detection"   test_active_elsewhere_detection
+  run_test "project path persistence"    test_project_path_persistence
+  run_test "discover remote servers"     test_discover_remote_servers
+  run_test "discover inactive projects"  test_discover_inactive_projects
+  run_test "header skip navigation"      test_header_skip_navigation
+  run_test "local-only navigation"       test_local_only_navigation
+  run_test "activate remote"             test_activate_remote
+  run_test "guard local-only actions"    test_guard_local_only_actions
 
-    # Terminal pane tests
-    run_test "term create and kill"        test_term_create_and_kill
-    run_test "term toggle on/off"          test_term_toggle_on_off
-    run_test "term swap with terminal"     test_term_swap_with_terminal
-    run_test "term swap both terminals"    test_term_swap_both_have_terminal
-    run_test "term auto-create on focus"   test_term_auto_create_on_focus
-    run_test "term toggle no session"      test_term_toggle_no_session
-    run_test "term close with terminal"    test_term_close_session_with_terminal
-    run_test "term dies externally"        test_term_dies_externally
-    run_test "term height persists"        test_term_height_persists
-    run_test "term across reload"          test_term_across_reload
-    run_test "term WINCH re-pin"           test_term_winch_repin
+  # Terminal pane tests
+  run_test "term create and kill"        test_term_create_and_kill
+  run_test "term toggle on/off"          test_term_toggle_on_off
+  run_test "term swap with terminal"     test_term_swap_with_terminal
+  run_test "term swap both terminals"    test_term_swap_both_have_terminal
+  run_test "term auto-create on focus"   test_term_auto_create_on_focus
+  run_test "term toggle no session"      test_term_toggle_no_session
+  run_test "term close with terminal"    test_term_close_session_with_terminal
+  run_test "term dies externally"        test_term_dies_externally
+  run_test "term height persists"        test_term_height_persists
+  run_test "term across reload"          test_term_across_reload
+  run_test "term WINCH re-pin"           test_term_winch_repin
 
-    echo ""
-    echo "══════════════════════════════════"
-    echo -e "${PASS_COUNT} ${GREEN}passed${RESET}, ${FAIL_COUNT} ${RED}failed${RESET}"
-    ((FAIL_COUNT == 0))
+  echo ""
+  echo "══════════════════════════════════"
+  echo -e "${PASS_COUNT} ${GREEN}passed${RESET}, ${FAIL_COUNT} ${RED}failed${RESET}"
+  ((FAIL_COUNT == 0))
 }
 
 main "$@"

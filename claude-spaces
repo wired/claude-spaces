@@ -84,65 +84,65 @@ UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 
 # ── tmux wrapper ─────────────────────────────────
 _tmux() {
-    if [[ -n "${TMUX_SERVER}" ]]; then
-        command tmux -L "${TMUX_SERVER}" "$@"
-    else
-        command tmux "$@"
-    fi
+  if [[ -n "${TMUX_SERVER}" ]]; then
+    command tmux -L "${TMUX_SERVER}" "$@"
+  else
+    command tmux "$@"
+  fi
 }
 
 cs_exec_tmux() {
-    if [[ -n "${TMUX_SERVER}" ]]; then
-        exec tmux -L "${TMUX_SERVER}" "$@"
-    else
-        exec tmux "$@"
-    fi
+  if [[ -n "${TMUX_SERVER}" ]]; then
+    exec tmux -L "${TMUX_SERVER}" "$@"
+  else
+    exec tmux "$@"
+  fi
 }
 
 # ── Config ────────────────────────────────────────
 cs_load_config() {
-    mkdir -p "${CS_CONFIG_DIR}" "${CS_DATA_DIR}"
-    if [[ ! -f "${CONFIG_FILE}" ]]; then
-        cs_create_default_config
-    fi
-    while IFS='=' read -r key value; do
-        [[ -z "${key}" || "${key}" =~ ^[[:space:]]*# ]] && continue
-        key="${key// /}"
-        value="${value// /}"
-        # shellcheck disable=SC2034
-        case "${key}" in
-            picker_width) PICKER_WIDTH="${value}" ;;
-            recent_threshold) RECENT_THRESHOLD="${value}" ;;
-            group_by) GROUP_BY="${value}" ;;
-            picker_side) PICKER_SIDE="${value}" ;;
+  mkdir -p "${CS_CONFIG_DIR}" "${CS_DATA_DIR}"
+  if [[ ! -f "${CONFIG_FILE}" ]]; then
+    cs_create_default_config
+  fi
+  while IFS='=' read -r key value; do
+    [[ -z "${key}" || "${key}" =~ ^[[:space:]]*# ]] && continue
+    key="${key// /}"
+    value="${value// /}"
+    # shellcheck disable=SC2034
+    case "${key}" in
+      picker_width) PICKER_WIDTH="${value}" ;;
+      recent_threshold) RECENT_THRESHOLD="${value}" ;;
+      group_by) GROUP_BY="${value}" ;;
+      picker_side) PICKER_SIDE="${value}" ;;
 
-            window_name_len) WINDOW_NAME_LEN="${value}" ;;
-            tmux_conf) TMUX_CONF="${value}" ;;
-            terminal_height) TERMINAL_HEIGHT="${value}" ;;
-            show_index) SHOW_INDEX="${value}" ;;
-            prefix) CS_PREFIX="${value}" ;;
-            color_header_bg) CS_CLR_HEADER_BG="${value}" ;;
-            color_active) CS_CLR_ACTIVE="${value}" ;;
-            color_bell) CS_CLR_BELL="${value}" ;;
-            color_running) CS_CLR_RUNNING="${value}" ;;
-            color_dormant) CS_CLR_DORMANT="${value}" ;;
-            color_locked) CS_CLR_LOCKED="${value}" ;;
-            color_selection) CS_CLR_SELECTION="${value}" ;;
-            color_chrome) CS_CLR_CHROME="${value}" ;;
-            color_section) CS_CLR_SECTION="${value}" ;;
-            color_prompt_warn) CS_CLR_PROMPT_WARN="${value}" ;;
-            color_prompt_danger) CS_CLR_PROMPT_DANGER="${value}" ;;
-            color_bell_menu) CS_CLR_BELL_MENU="${value}" ;;
-            color_search_active) CS_CLR_SEARCH_ACTIVE="${value}" ;;
-            color_search_bar) CS_CLR_SEARCH_BAR="${value}" ;;
-            color_bold) CS_CLR_BOLD="${value}" ;;
-            bind_*) BIND_OVERRIDES["${key}"]="${value}" ;;
-        esac
-    done < "${CONFIG_FILE}"
+      window_name_len) WINDOW_NAME_LEN="${value}" ;;
+      tmux_conf) TMUX_CONF="${value}" ;;
+      terminal_height) TERMINAL_HEIGHT="${value}" ;;
+      show_index) SHOW_INDEX="${value}" ;;
+      prefix) CS_PREFIX="${value}" ;;
+      color_header_bg) CS_CLR_HEADER_BG="${value}" ;;
+      color_active) CS_CLR_ACTIVE="${value}" ;;
+      color_bell) CS_CLR_BELL="${value}" ;;
+      color_running) CS_CLR_RUNNING="${value}" ;;
+      color_dormant) CS_CLR_DORMANT="${value}" ;;
+      color_locked) CS_CLR_LOCKED="${value}" ;;
+      color_selection) CS_CLR_SELECTION="${value}" ;;
+      color_chrome) CS_CLR_CHROME="${value}" ;;
+      color_section) CS_CLR_SECTION="${value}" ;;
+      color_prompt_warn) CS_CLR_PROMPT_WARN="${value}" ;;
+      color_prompt_danger) CS_CLR_PROMPT_DANGER="${value}" ;;
+      color_bell_menu) CS_CLR_BELL_MENU="${value}" ;;
+      color_search_active) CS_CLR_SEARCH_ACTIVE="${value}" ;;
+      color_search_bar) CS_CLR_SEARCH_BAR="${value}" ;;
+      color_bold) CS_CLR_BOLD="${value}" ;;
+      bind_*) BIND_OVERRIDES["${key}"]="${value}" ;;
+    esac
+  done < "${CONFIG_FILE}"
 }
 
 cs_create_default_config() {
-    cat > "${CONFIG_FILE}" << 'EOF'
+  cat > "${CONFIG_FILE}" << 'EOF'
 # claude-spaces configuration
 # Uncomment and modify values to override defaults.
 
@@ -217,46 +217,46 @@ EOF
 
 # ── Help Text ─────────────────────────────────────
 cs_help_text() {
-    echo "  Picker keys:"
-    echo "    j/k, Up/Down   Navigate sessions"
-    echo "    1-9, 0         Jump to Nth session + focus"
-    echo "    Enter          Load + focus session"
-    echo "    Space          Load session (stay in picker)"
-    echo "    H/L            Load + focus session"
-    echo "    a/i            Focus Claude pane"
-    echo "    h/l            Move between panes"
-    echo "    /              Search sessions"
-    echo "    :              Command menu"
-    echo "    Q              Detach    R  Reload picker"
-    echo "  Prefix keys (from any pane):"
-    echo "    hjkl, Arrows   Pane movement"
-    echo "    J/K, S-Arrows  Next/prev session + focus"
-    echo "    Space          Picker/Claude toggle"
-    echo "    Enter/i        Focus Claude pane"
-    echo "    \`              Terminal (smart toggle)"
-    echo "    t              Toggle terminal on/off"
-    echo "    a              Literal grave (\`)"
-    echo "    c  New   x  Close   r  Rename"
-    echo "    H  Hide  s  Shutdown"
-    echo "    R  Reload picker"
-    echo "    z              Zoom pane"
-    echo "    :              Command menu"
-    echo "    [/]            Copy/paste   d  Detach"
-    echo ""
-    echo "  Bell detection (highlights finished sessions):"
-    echo "    Add to hooks in ~/.claude/settings.json:"
-    echo '    "Stop": [{"hooks": [{"type": "command", "command": "printf '"'"'\\a'"'"' > /dev/tty"}]}]'
-    echo ""
-    echo "  Full README: https://github.com/wired/claude-spaces"
+  echo "  Picker keys:"
+  echo "    j/k, Up/Down   Navigate sessions"
+  echo "    1-9, 0         Jump to Nth session + focus"
+  echo "    Enter          Load + focus session"
+  echo "    Space          Load session (stay in picker)"
+  echo "    H/L            Load + focus session"
+  echo "    a/i            Focus Claude pane"
+  echo "    h/l            Move between panes"
+  echo "    /              Search sessions"
+  echo "    :              Command menu"
+  echo "    Q              Detach    R  Reload picker"
+  echo "  Prefix keys (from any pane):"
+  echo "    hjkl, Arrows   Pane movement"
+  echo "    J/K, S-Arrows  Next/prev session + focus"
+  echo "    Space          Picker/Claude toggle"
+  echo "    Enter/i        Focus Claude pane"
+  echo "    \`              Terminal (smart toggle)"
+  echo "    t              Toggle terminal on/off"
+  echo "    a              Literal grave (\`)"
+  echo "    c  New   x  Close   r  Rename"
+  echo "    H  Hide  s  Shutdown"
+  echo "    R  Reload picker"
+  echo "    z              Zoom pane"
+  echo "    :              Command menu"
+  echo "    [/]            Copy/paste   d  Detach"
+  echo ""
+  echo "  Bell detection (highlights finished sessions):"
+  echo "    Add to hooks in ~/.claude/settings.json:"
+  echo '    "Stop": [{"hooks": [{"type": "command", "command": "printf '"'"'\\a'"'"' > /dev/tty"}]}]'
+  echo ""
+  echo "  Full README: https://github.com/wired/claude-spaces"
 }
 
 # ── Preflight ─────────────────────────────────────
 cs_preflight() {
-    local ok=1
-    command -v tmux &>/dev/null || { echo "ERROR: tmux not found. Please install using your package manager."; ok=0; }
-    command -v jq &>/dev/null || { echo "ERROR: jq not found. Please install using your package manager."; ok=0; }
-    command -v claude &>/dev/null || { echo "ERROR: claude not found. Install from https://docs.anthropic.com/en/docs/claude-code"; ok=0; }
-    ((ok)) || exit 1
+  local ok=1
+  command -v tmux &>/dev/null || { echo "ERROR: tmux not found. Please install using your package manager."; ok=0; }
+  command -v jq &>/dev/null || { echo "ERROR: jq not found. Please install using your package manager."; ok=0; }
+  command -v claude &>/dev/null || { echo "ERROR: claude not found. Install from https://docs.anthropic.com/en/docs/claude-code"; ok=0; }
+  ((ok)) || exit 1
 }
 
 # ── Portability ───────────────────────────────────
@@ -268,28 +268,28 @@ fi
 
 # ── State ─────────────────────────────────────────
 cs_sanitize_path() {
-    local p="${1//\//-}"
-    echo "${p//_/-}"
+  local p="${1//\//-}"
+  echo "${p//_/-}"
 }
 PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
 
 cs_init_state() {
-    PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
-    local sanitized="${PWD_SANITIZED}"
-    local base="${XDG_RUNTIME_DIR:-/tmp}"
-    STATE_DIR="${base}/claude-spaces/${sanitized}"
-    # If picker pane from previous run is dead, wipe stale state
-    cs_refresh_pane_cache
-    local old_picker
-    old_picker=$(cs_read_state picker_pane)
-    if [[ -n "${old_picker}" ]] && ! cs_pane_alive "${old_picker}"; then
-        rm -rf "${STATE_DIR}"
-    fi
-    mkdir -p "${STATE_DIR}/panes" "${STATE_DIR}/term"
-    echo "${PWD}" > "${STATE_DIR}/project_path"
-    # Server → state dir mapping for cross-server discovery
-    mkdir -p "${base}/claude-spaces/.servers"
-    ln -snf "${STATE_DIR}" "${base}/claude-spaces/.servers/${TMUX_SERVER}"
+  PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
+  local sanitized="${PWD_SANITIZED}"
+  local base="${XDG_RUNTIME_DIR:-/tmp}"
+  STATE_DIR="${base}/claude-spaces/${sanitized}"
+  # If picker pane from previous run is dead, wipe stale state
+  cs_refresh_pane_cache
+  local old_picker
+  old_picker=$(cs_read_state picker_pane)
+  if [[ -n "${old_picker}" ]] && ! cs_pane_alive "${old_picker}"; then
+    rm -rf "${STATE_DIR}"
+  fi
+  mkdir -p "${STATE_DIR}/panes" "${STATE_DIR}/term"
+  echo "${PWD}" > "${STATE_DIR}/project_path"
+  # Server → state dir mapping for cross-server discovery
+  mkdir -p "${base}/claude-spaces/.servers"
+  ln -snf "${STATE_DIR}" "${base}/claude-spaces/.servers/${TMUX_SERVER}"
 }
 
 cs_read_state() { cat "${STATE_DIR}/$1" 2>/dev/null || true; }
@@ -305,44 +305,44 @@ _cs_find_session_pid() {
 }
 
 cs_rename_pane_window() {
-    local pane="$1" name="$2"
-    if ((${#name} > WINDOW_NAME_LEN)); then
-        name="${name:0:${WINDOW_NAME_LEN}}"
-    fi
-    _tmux rename-window -t "${pane}" "${name}" 2>/dev/null || true
-    _tmux set-option -t "${pane}" -w automatic-rename off 2>/dev/null || true
+  local pane="$1" name="$2"
+  if ((${#name} > WINDOW_NAME_LEN)); then
+    name="${name:0:${WINDOW_NAME_LEN}}"
+  fi
+  _tmux rename-window -t "${pane}" "${name}" 2>/dev/null || true
+  _tmux set-option -t "${pane}" -w automatic-rename off 2>/dev/null || true
 }
 
 LIVE_PANES=""
 cs_refresh_pane_cache() {
-    LIVE_PANES=$(_tmux list-panes -a -F '#{pane_id}' 2>/dev/null || true)
+  LIVE_PANES=$(_tmux list-panes -a -F '#{pane_id}' 2>/dev/null || true)
 }
 cs_pane_alive() {
-    [[ $'\n'"${LIVE_PANES}"$'\n' == *$'\n'"$1"$'\n'* ]]
+  [[ $'\n'"${LIVE_PANES}"$'\n' == *$'\n'"$1"$'\n'* ]]
 }
 
 # ── Entry Helpers ─────────────────────────────────
 cs_entry_append() {
-    if [[ -n "${CS_TESTING:-}" ]] && (($# != 7)); then
-        echo "FATAL: cs_entry_append called with $# args, expected 7" >&2; exit 1
-    fi
-    ENTRIES_ID+=("$1"); ENTRIES_NAME+=("$2"); ENTRIES_MTIME+=("$3")
-    ENTRIES_STATUS+=("$4"); ENTRIES_PANE+=("$5"); ENTRIES_TYPE+=("$6"); ENTRIES_PATH+=("$7")
+  if [[ -n "${CS_TESTING:-}" ]] && (($# != 7)); then
+    echo "FATAL: cs_entry_append called with $# args, expected 7" >&2; exit 1
+  fi
+  ENTRIES_ID+=("$1"); ENTRIES_NAME+=("$2"); ENTRIES_MTIME+=("$3")
+  ENTRIES_STATUS+=("$4"); ENTRIES_PANE+=("$5"); ENTRIES_TYPE+=("$6"); ENTRIES_PATH+=("$7")
 }
 
 cs_entry_prepend() {
-    if [[ -n "${CS_TESTING:-}" ]] && (($# != 7)); then
-        echo "FATAL: cs_entry_prepend called with $# args, expected 7" >&2; exit 1
-    fi
-    ENTRIES_ID=("$1" "${ENTRIES_ID[@]}"); ENTRIES_NAME=("$2" "${ENTRIES_NAME[@]}")
-    ENTRIES_MTIME=("$3" "${ENTRIES_MTIME[@]}"); ENTRIES_STATUS=("$4" "${ENTRIES_STATUS[@]}")
-    ENTRIES_PANE=("$5" "${ENTRIES_PANE[@]}"); ENTRIES_TYPE=("$6" "${ENTRIES_TYPE[@]}")
-    ENTRIES_PATH=("$7" "${ENTRIES_PATH[@]}")
+  if [[ -n "${CS_TESTING:-}" ]] && (($# != 7)); then
+    echo "FATAL: cs_entry_prepend called with $# args, expected 7" >&2; exit 1
+  fi
+  ENTRIES_ID=("$1" "${ENTRIES_ID[@]}"); ENTRIES_NAME=("$2" "${ENTRIES_NAME[@]}")
+  ENTRIES_MTIME=("$3" "${ENTRIES_MTIME[@]}"); ENTRIES_STATUS=("$4" "${ENTRIES_STATUS[@]}")
+  ENTRIES_PANE=("$5" "${ENTRIES_PANE[@]}"); ENTRIES_TYPE=("$6" "${ENTRIES_TYPE[@]}")
+  ENTRIES_PATH=("$7" "${ENTRIES_PATH[@]}")
 }
 
 cs_entry_clear() {
-    ENTRIES_ID=(); ENTRIES_NAME=(); ENTRIES_MTIME=(); ENTRIES_STATUS=()
-    ENTRIES_PANE=(); ENTRIES_TYPE=(); ENTRIES_PATH=()
+  ENTRIES_ID=(); ENTRIES_NAME=(); ENTRIES_MTIME=(); ENTRIES_STATUS=()
+  ENTRIES_PANE=(); ENTRIES_TYPE=(); ENTRIES_PATH=()
 }
 
 declare -gA HIDDEN_SET
@@ -350,465 +350,465 @@ declare -gA CUSTOM_NAMES
 declare -gA PROJECT_NAMES
 
 cs_load_shared_maps() {
-    HIDDEN_SET=()
-    if [[ -f "${HIDDEN_FILE}" ]]; then
-        while IFS= read -r hid; do
-            [[ -n "${hid}" ]] && HIDDEN_SET["${hid}"]=1
-        done < "${HIDDEN_FILE}"
-    fi
-    CUSTOM_NAMES=()
-    if [[ -f "${NAMES_FILE}" ]]; then
-        while IFS='=' read -r nkey nval; do
-            [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
-            CUSTOM_NAMES["${nkey}"]="${nval}"
-        done < "${NAMES_FILE}"
-    fi
-    PROJECT_NAMES=()
-    if [[ -f "${PROJECT_NAMES_FILE}" ]]; then
-        while IFS='=' read -r nkey nval; do
-            [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
-            PROJECT_NAMES["${nkey}"]="${nval}"
-        done < "${PROJECT_NAMES_FILE}"
-    fi
+  HIDDEN_SET=()
+  if [[ -f "${HIDDEN_FILE}" ]]; then
+    while IFS= read -r hid; do
+      [[ -n "${hid}" ]] && HIDDEN_SET["${hid}"]=1
+    done < "${HIDDEN_FILE}"
+  fi
+  CUSTOM_NAMES=()
+  if [[ -f "${NAMES_FILE}" ]]; then
+    while IFS='=' read -r nkey nval; do
+      [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
+      CUSTOM_NAMES["${nkey}"]="${nval}"
+    done < "${NAMES_FILE}"
+  fi
+  PROJECT_NAMES=()
+  if [[ -f "${PROJECT_NAMES_FILE}" ]]; then
+    while IFS='=' read -r nkey nval; do
+      [[ -z "${nkey}" || "${nkey}" =~ ^[[:space:]]*# ]] && continue
+      PROJECT_NAMES["${nkey}"]="${nval}"
+    done < "${PROJECT_NAMES_FILE}"
+  fi
 }
 
 # ── Display Name Disambiguation ──────────────────
 declare -gA DISPLAY_NAMES
 
 cs_compress_suffix() {
-    local suffix="$1"
-    local stripped="${suffix//[!\/]/}"
-    local slashes=${#stripped}
-    if ((slashes <= 1)); then
-        echo "${suffix}"
-    else
-        echo "${suffix%%/*}/.../${suffix##*/}"
-    fi
+  local suffix="$1"
+  local stripped="${suffix//[!\/]/}"
+  local slashes=${#stripped}
+  if ((slashes <= 1)); then
+    echo "${suffix}"
+  else
+    echo "${suffix%%/*}/.../${suffix##*/}"
+  fi
 }
 
 cs_resolve_collision_group() {
-    local -n _grp=$1
-    local n=${#_grp[@]}
-    local -a comp_strs=()
-    local gi
+  local -n _grp=$1
+  local n=${#_grp[@]}
+  local -a comp_strs=()
+  local gi
+  for ((gi=0; gi<n; gi++)); do
+    local -a _parts
+    IFS='/' read -ra _parts <<< "${_grp[gi]}"
+    local -a _filtered=()
+    local _c
+    for _c in "${_parts[@]}"; do
+      [[ -n "${_c}" ]] && _filtered+=("${_c}")
+    done
+    local IFS=$'\n'
+    comp_strs+=("${_filtered[*]}")
+  done
+  local depth=1
+  while true; do
+    local -A suffix_map
+    suffix_map=()
+    local -a suffixes=()
     for ((gi=0; gi<n; gi++)); do
-        local -a _parts
-        IFS='/' read -ra _parts <<< "${_grp[gi]}"
-        local -a _filtered=()
-        local _c
-        for _c in "${_parts[@]}"; do
-            [[ -n "${_c}" ]] && _filtered+=("${_c}")
-        done
-        local IFS=$'\n'
-        comp_strs+=("${_filtered[*]}")
+      local -a comps
+      mapfile -t comps <<< "${comp_strs[gi]}"
+      local nc=${#comps[@]}
+      local suffix=""
+      local di start=$((nc - depth))
+      ((start < 0)) && start=0
+      for ((di=start; di<nc; di++)); do
+        [[ -n "${suffix}" ]] && suffix+="/"
+        suffix+="${comps[di]}"
+      done
+      suffixes+=("${suffix}")
+      suffix_map["${suffix}"]=$(( ${suffix_map["${suffix}"]:-0} + 1 ))
     done
-    local depth=1
-    while true; do
-        local -A suffix_map
-        suffix_map=()
-        local -a suffixes=()
-        for ((gi=0; gi<n; gi++)); do
-            local -a comps
-            mapfile -t comps <<< "${comp_strs[gi]}"
-            local nc=${#comps[@]}
-            local suffix=""
-            local di start=$((nc - depth))
-            ((start < 0)) && start=0
-            for ((di=start; di<nc; di++)); do
-                [[ -n "${suffix}" ]] && suffix+="/"
-                suffix+="${comps[di]}"
-            done
-            suffixes+=("${suffix}")
-            suffix_map["${suffix}"]=$(( ${suffix_map["${suffix}"]:-0} + 1 ))
-        done
-        local all_unique=1
-        for ((gi=0; gi<n; gi++)); do
-            ((suffix_map["${suffixes[gi]}"] > 1)) && { all_unique=0; break; }
-        done
-        if ((all_unique)); then
-            # Compress, then check for display collisions
-            local -a compressed=()
-            local -A comp_count
-            comp_count=()
-            for ((gi=0; gi<n; gi++)); do
-                local _cs
-                _cs=$(cs_compress_suffix "${suffixes[gi]}")
-                compressed+=("${_cs}")
-                comp_count["${_cs}"]=$(( ${comp_count["${_cs}"]:-0} + 1 ))
-            done
-            for ((gi=0; gi<n; gi++)); do
-                if ((comp_count["${compressed[gi]}"] > 1)); then
-                    DISPLAY_NAMES["${_grp[gi]}"]="${suffixes[gi]}"
-                else
-                    DISPLAY_NAMES["${_grp[gi]}"]="${compressed[gi]}"
-                fi
-            done
-            return
-        fi
-        ((depth++))
-        if ((depth > 50)); then
-            for ((gi=0; gi<n; gi++)); do
-                DISPLAY_NAMES["${_grp[gi]}"]="${_grp[gi]}"
-            done
-            return
-        fi
+    local all_unique=1
+    for ((gi=0; gi<n; gi++)); do
+      ((suffix_map["${suffixes[gi]}"] > 1)) && { all_unique=0; break; }
     done
+    if ((all_unique)); then
+      # Compress, then check for display collisions
+      local -a compressed=()
+      local -A comp_count
+      comp_count=()
+      for ((gi=0; gi<n; gi++)); do
+        local _cs
+        _cs=$(cs_compress_suffix "${suffixes[gi]}")
+        compressed+=("${_cs}")
+        comp_count["${_cs}"]=$(( ${comp_count["${_cs}"]:-0} + 1 ))
+      done
+      for ((gi=0; gi<n; gi++)); do
+        if ((comp_count["${compressed[gi]}"] > 1)); then
+          DISPLAY_NAMES["${_grp[gi]}"]="${suffixes[gi]}"
+        else
+          DISPLAY_NAMES["${_grp[gi]}"]="${compressed[gi]}"
+        fi
+      done
+      return
+    fi
+    ((depth++))
+    if ((depth > 50)); then
+      for ((gi=0; gi<n; gi++)); do
+        DISPLAY_NAMES["${_grp[gi]}"]="${_grp[gi]}"
+      done
+      return
+    fi
+  done
 }
 
 cs_compute_display_names() {
-    DISPLAY_NAMES=()
-    local -a all_paths=()
-    local -A seen
-    local _p
-    for _p in "${PWD}" \
-              "${REMOTE_SERVERS[@]/#*|/}" \
-              "${INACTIVE_PROJECTS[@]/#*|/}"; do
-        [[ -z "${_p}" || -v "seen[${_p}]" ]] && continue
-        seen["${_p}"]=1
-        all_paths+=("${_p}")
-    done
-    local -A leaf_count
-    for _p in "${all_paths[@]}"; do
-        local _leaf="${_p##*/}"
-        leaf_count["${_leaf}"]=$(( ${leaf_count["${_leaf}"]:-0} + 1 ))
-    done
-    local -A leaf_done
-    for _p in "${all_paths[@]}"; do
-        local _leaf="${_p##*/}"
-        if ((leaf_count["${_leaf}"] == 1)); then
-            DISPLAY_NAMES["${_p}"]="${_leaf}"
-        elif [[ ! -v "leaf_done[${_leaf}]" ]]; then
-            leaf_done["${_leaf}"]=1
-            local -a group=()
-            local _q
-            for _q in "${all_paths[@]}"; do
-                [[ "${_q##*/}" == "${_leaf}" ]] && group+=("${_q}")
-            done
-            cs_resolve_collision_group group
-        fi
-    done
+  DISPLAY_NAMES=()
+  local -a all_paths=()
+  local -A seen
+  local _p
+  for _p in "${PWD}" \
+        "${REMOTE_SERVERS[@]/#*|/}" \
+        "${INACTIVE_PROJECTS[@]/#*|/}"; do
+    [[ -z "${_p}" || -v "seen[${_p}]" ]] && continue
+    seen["${_p}"]=1
+    all_paths+=("${_p}")
+  done
+  local -A leaf_count
+  for _p in "${all_paths[@]}"; do
+    local _leaf="${_p##*/}"
+    leaf_count["${_leaf}"]=$(( ${leaf_count["${_leaf}"]:-0} + 1 ))
+  done
+  local -A leaf_done
+  for _p in "${all_paths[@]}"; do
+    local _leaf="${_p##*/}"
+    if ((leaf_count["${_leaf}"] == 1)); then
+      DISPLAY_NAMES["${_p}"]="${_leaf}"
+    elif [[ ! -v "leaf_done[${_leaf}]" ]]; then
+      leaf_done["${_leaf}"]=1
+      local -a group=()
+      local _q
+      for _q in "${all_paths[@]}"; do
+        [[ "${_q##*/}" == "${_leaf}" ]] && group+=("${_q}")
+      done
+      cs_resolve_collision_group group
+    fi
+  done
 }
 
 cs_cache_clear() {
-    CACHED_ENTRIES_ID=(); CACHED_ENTRIES_NAME=(); CACHED_ENTRIES_MTIME=()
-    CACHED_ENTRIES_STATUS=(); CACHED_ENTRIES_PANE=(); CACHED_ENTRIES_TYPE=()
-    CACHED_ENTRIES_PATH=()
+  CACHED_ENTRIES_ID=(); CACHED_ENTRIES_NAME=(); CACHED_ENTRIES_MTIME=()
+  CACHED_ENTRIES_STATUS=(); CACHED_ENTRIES_PANE=(); CACHED_ENTRIES_TYPE=()
+  CACHED_ENTRIES_PATH=()
 }
 
 cs_cache_save_from() {
-    local start="$1"
-    CACHED_ENTRIES_ID=("${ENTRIES_ID[@]:${start}}")
-    CACHED_ENTRIES_NAME=("${ENTRIES_NAME[@]:${start}}")
-    CACHED_ENTRIES_MTIME=("${ENTRIES_MTIME[@]:${start}}")
-    CACHED_ENTRIES_STATUS=("${ENTRIES_STATUS[@]:${start}}")
-    CACHED_ENTRIES_PANE=("${ENTRIES_PANE[@]:${start}}")
-    CACHED_ENTRIES_TYPE=("${ENTRIES_TYPE[@]:${start}}")
-    CACHED_ENTRIES_PATH=("${ENTRIES_PATH[@]:${start}}")
+  local start="$1"
+  CACHED_ENTRIES_ID=("${ENTRIES_ID[@]:${start}}")
+  CACHED_ENTRIES_NAME=("${ENTRIES_NAME[@]:${start}}")
+  CACHED_ENTRIES_MTIME=("${ENTRIES_MTIME[@]:${start}}")
+  CACHED_ENTRIES_STATUS=("${ENTRIES_STATUS[@]:${start}}")
+  CACHED_ENTRIES_PANE=("${ENTRIES_PANE[@]:${start}}")
+  CACHED_ENTRIES_TYPE=("${ENTRIES_TYPE[@]:${start}}")
+  CACHED_ENTRIES_PATH=("${ENTRIES_PATH[@]:${start}}")
 }
 
 cs_cache_restore() {
-    ENTRIES_ID+=("${CACHED_ENTRIES_ID[@]}")
-    ENTRIES_NAME+=("${CACHED_ENTRIES_NAME[@]}")
-    ENTRIES_MTIME+=("${CACHED_ENTRIES_MTIME[@]}")
-    ENTRIES_STATUS+=("${CACHED_ENTRIES_STATUS[@]}")
-    ENTRIES_PANE+=("${CACHED_ENTRIES_PANE[@]}")
-    ENTRIES_TYPE+=("${CACHED_ENTRIES_TYPE[@]}")
-    ENTRIES_PATH+=("${CACHED_ENTRIES_PATH[@]}")
+  ENTRIES_ID+=("${CACHED_ENTRIES_ID[@]}")
+  ENTRIES_NAME+=("${CACHED_ENTRIES_NAME[@]}")
+  ENTRIES_MTIME+=("${CACHED_ENTRIES_MTIME[@]}")
+  ENTRIES_STATUS+=("${CACHED_ENTRIES_STATUS[@]}")
+  ENTRIES_PANE+=("${CACHED_ENTRIES_PANE[@]}")
+  ENTRIES_TYPE+=("${CACHED_ENTRIES_TYPE[@]}")
+  ENTRIES_PATH+=("${CACHED_ENTRIES_PATH[@]}")
 }
 
 # ── Session Discovery ─────────────────────────────
 cs_get_project_dir() {
-    local sanitized
-    sanitized=$(cs_sanitize_path "${PWD}")
-    echo "${PROJECTS_DIR}/${sanitized}"
+  local sanitized
+  sanitized=$(cs_sanitize_path "${PWD}")
+  echo "${PROJECTS_DIR}/${sanitized}"
 }
 
 cs_clean_message() {
-    local msg="$1"
-    # First line only
-    msg="${msg%%$'\n'*}"
-    # Strip leading filler
-    msg=$(echo "${msg}" | sed -E 's/^(I want to |Can you |Please |Hey |Hi |Could you |I need to |Help me |I would like to )//i')
-    echo "${msg}"
+  local msg="$1"
+  # First line only
+  msg="${msg%%$'\n'*}"
+  # Strip leading filler
+  msg=$(echo "${msg}" | sed -E 's/^(I want to |Can you |Please |Hey |Hi |Could you |I need to |Help me |I would like to )//i')
+  echo "${msg}"
 }
 
 cs_resolve_name() {
-    local sid="$1" jsonl="$2"
-    if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
-        echo "${CUSTOM_NAMES[${sid}]}"
-        return
-    fi
-    local name
-    name=$(head -20 "${jsonl}" | jq -r '
-        select(.type == "user" and (.message.content | type) == "string" and (((.message.content | startswith("<local-command-")) or (.message.content | startswith("<command-"))) | not))
-        | .message.content
-        | split("\n")[0]
-    ' 2>/dev/null | head -1)
-    if [[ -n "${name}" ]]; then
-        name=$(cs_clean_message "${name}")
-    fi
-    if [[ -z "${name}" || ${#name} -lt 3 ]]; then
-        name="${sid:0:8}"
-    else
-        cs_set_kv "${NAMES_FILE}" "${sid}" "${name}"
-        CUSTOM_NAMES["${sid}"]="${name}"
-    fi
-    echo "${name}"
+  local sid="$1" jsonl="$2"
+  if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
+    echo "${CUSTOM_NAMES[${sid}]}"
+    return
+  fi
+  local name
+  name=$(head -20 "${jsonl}" | jq -r '
+    select(.type == "user" and (.message.content | type) == "string" and (((.message.content | startswith("<local-command-")) or (.message.content | startswith("<command-"))) | not))
+    | .message.content
+    | split("\n")[0]
+  ' 2>/dev/null | head -1)
+  if [[ -n "${name}" ]]; then
+    name=$(cs_clean_message "${name}")
+  fi
+  if [[ -z "${name}" || ${#name} -lt 3 ]]; then
+    name="${sid:0:8}"
+  else
+    cs_set_kv "${NAMES_FILE}" "${sid}" "${name}"
+    CUSTOM_NAMES["${sid}"]="${name}"
+  fi
+  echo "${name}"
 }
 
 cs_check_new_pane() {
-    local new_p
-    new_p=$(cs_read_state new_pane)
-    if [[ -n "${new_p}" ]]; then
-        if ! cs_pane_alive "${new_p}"; then
-            rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}"
-            local cp
-            cp=$(cs_read_state current_pane)
-            if [[ "${cp}" == "${new_p}" ]]; then
-                echo "" > "${STATE_DIR}/current_pane"
-            fi
-        else
-            cs_entry_prepend "__new__" "(new session)" "$(date +%s)" "managed" "${new_p}" "local" ""
-        fi
+  local new_p
+  new_p=$(cs_read_state new_pane)
+  if [[ -n "${new_p}" ]]; then
+    if ! cs_pane_alive "${new_p}"; then
+      rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}"
+      local cp
+      cp=$(cs_read_state current_pane)
+      if [[ "${cp}" == "${new_p}" ]]; then
+        echo "" > "${STATE_DIR}/current_pane"
+      fi
+    else
+      cs_entry_prepend "__new__" "(new session)" "$(date +%s)" "managed" "${new_p}" "local" ""
     fi
+  fi
 }
 
 cs_scan_sessions() {
-    cs_refresh_pane_cache
-    local project_dir
-    project_dir=$(cs_get_project_dir)
+  cs_refresh_pane_cache
+  local project_dir
+  project_dir=$(cs_get_project_dir)
 
-    cs_entry_clear
-    cs_load_shared_maps
+  cs_entry_clear
+  cs_load_shared_maps
 
-    if [[ ! -d "${project_dir}" ]]; then
-        cs_check_new_pane
-        return 0
-    fi
-
-    # Build active-elsewhere set: sessionId -> pid
-    declare -A active_pids
-    if [[ -d "${SESSIONS_DIR}" ]]; then
-        for f in "${SESSIONS_DIR}"/*.json; do
-            [[ -f "${f}" ]] || continue
-            local content pid sid
-            content=$(< "${f}") || continue
-            [[ "${content}" =~ \"pid\":[[:space:]]*([0-9]+) ]] || continue
-            pid="${BASH_REMATCH[1]}"
-            [[ "${content}" =~ \"sessionId\":[[:space:]]*\"([^\"]+)\" ]] || continue
-            sid="${BASH_REMATCH[1]}"
-            kill -0 "${pid}" 2>/dev/null && active_pids["${sid}"]="${pid}"
-        done
-    fi
-
-    # Resolve "new" panes to real session IDs
-    for f in "${STATE_DIR}"/panes/*; do
-        [[ -f "${f}" ]] || continue
-        local content
-        content=$(cat "${f}" 2>/dev/null)
-        if [[ "${content}" == "new" ]]; then
-            local pn
-            pn="%${f##*/}"
-            cs_pane_alive "${pn}" || continue
-            local pp
-            pp=$(_tmux display-message -t "${pn}" -p '#{pane_pid}' 2>/dev/null) || continue
-            pp=$(_cs_find_session_pid "${pp}") || continue
-            if [[ -f "${SESSIONS_DIR}/${pp}.json" ]]; then
-                local rsid
-                rsid=$(jq -r '.sessionId' "${SESSIONS_DIR}/${pp}.json" 2>/dev/null)
-                local pdir
-                pdir=$(cs_get_project_dir)
-                if [[ -n "${rsid}" && -f "${pdir}/${rsid}.jsonl" ]]; then
-                    echo "${rsid}" > "${f}"
-                    rm -f "${STATE_DIR}/new_pane"
-                fi
-            fi
-        fi
-    done
-
-    # Build managed pane set: sessionId -> pane_id
-    declare -A managed_panes
-    for f in "${STATE_DIR}"/panes/*; do
-        [[ -f "${f}" ]] || continue
-        local pane_num pane_id sid
-        pane_num="${f##*/}"
-        pane_id="%${pane_num}"
-        sid=$(cat "${f}" 2>/dev/null) || continue
-        if cs_pane_alive "${pane_id}"; then
-            managed_panes["${sid}"]="${pane_id}"
-        else
-            rm -f "${f}"
-        fi
-    done
-
-    # Scan JSONL files
-    declare -A mtimes
-    while read -r mt fn; do
-        mtimes["${fn}"]="${mt}"
-    done < <(_cs_stat "${project_dir}"/*.jsonl 2>/dev/null)
-    for f in "${project_dir}"/*.jsonl; do
-        [[ -f "${f}" ]] || continue
-        local sid="${f##*/}"
-        sid="${sid%.jsonl}"
-        [[ "${sid}" =~ ${UUID_RE} ]] || continue
-        [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
-
-        local mtime="${mtimes[${f}]}"
-
-        local name
-        name=$(cs_resolve_name "${sid}" "${f}")
-        [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
-
-        # Status
-        local status="dormant"
-        local pane=""
-        if [[ -v "managed_panes[${sid}]" ]]; then
-            status="managed"
-            pane="${managed_panes[${sid}]}"
-        elif [[ -v "active_pids[${sid}]" ]]; then
-            status="active_elsewhere"
-        fi
-
-        cs_entry_append "${sid}" "${name}" "${mtime}" "${status}" "${pane}" "local" ""
-    done
-
-    cs_sort_entries
-
+  if [[ ! -d "${project_dir}" ]]; then
     cs_check_new_pane
+    return 0
+  fi
+
+  # Build active-elsewhere set: sessionId -> pid
+  declare -A active_pids
+  if [[ -d "${SESSIONS_DIR}" ]]; then
+    for f in "${SESSIONS_DIR}"/*.json; do
+      [[ -f "${f}" ]] || continue
+      local content pid sid
+      content=$(< "${f}") || continue
+      [[ "${content}" =~ \"pid\":[[:space:]]*([0-9]+) ]] || continue
+      pid="${BASH_REMATCH[1]}"
+      [[ "${content}" =~ \"sessionId\":[[:space:]]*\"([^\"]+)\" ]] || continue
+      sid="${BASH_REMATCH[1]}"
+      kill -0 "${pid}" 2>/dev/null && active_pids["${sid}"]="${pid}"
+    done
+  fi
+
+  # Resolve "new" panes to real session IDs
+  for f in "${STATE_DIR}"/panes/*; do
+    [[ -f "${f}" ]] || continue
+    local content
+    content=$(cat "${f}" 2>/dev/null)
+    if [[ "${content}" == "new" ]]; then
+      local pn
+      pn="%${f##*/}"
+      cs_pane_alive "${pn}" || continue
+      local pp
+      pp=$(_tmux display-message -t "${pn}" -p '#{pane_pid}' 2>/dev/null) || continue
+      pp=$(_cs_find_session_pid "${pp}") || continue
+      if [[ -f "${SESSIONS_DIR}/${pp}.json" ]]; then
+        local rsid
+        rsid=$(jq -r '.sessionId' "${SESSIONS_DIR}/${pp}.json" 2>/dev/null)
+        local pdir
+        pdir=$(cs_get_project_dir)
+        if [[ -n "${rsid}" && -f "${pdir}/${rsid}.jsonl" ]]; then
+          echo "${rsid}" > "${f}"
+          rm -f "${STATE_DIR}/new_pane"
+        fi
+      fi
+    fi
+  done
+
+  # Build managed pane set: sessionId -> pane_id
+  declare -A managed_panes
+  for f in "${STATE_DIR}"/panes/*; do
+    [[ -f "${f}" ]] || continue
+    local pane_num pane_id sid
+    pane_num="${f##*/}"
+    pane_id="%${pane_num}"
+    sid=$(cat "${f}" 2>/dev/null) || continue
+    if cs_pane_alive "${pane_id}"; then
+      managed_panes["${sid}"]="${pane_id}"
+    else
+      rm -f "${f}"
+    fi
+  done
+
+  # Scan JSONL files
+  declare -A mtimes
+  while read -r mt fn; do
+    mtimes["${fn}"]="${mt}"
+  done < <(_cs_stat "${project_dir}"/*.jsonl 2>/dev/null)
+  for f in "${project_dir}"/*.jsonl; do
+    [[ -f "${f}" ]] || continue
+    local sid="${f##*/}"
+    sid="${sid%.jsonl}"
+    [[ "${sid}" =~ ${UUID_RE} ]] || continue
+    [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
+
+    local mtime="${mtimes[${f}]}"
+
+    local name
+    name=$(cs_resolve_name "${sid}" "${f}")
+    [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
+
+    # Status
+    local status="dormant"
+    local pane=""
+    if [[ -v "managed_panes[${sid}]" ]]; then
+      status="managed"
+      pane="${managed_panes[${sid}]}"
+    elif [[ -v "active_pids[${sid}]" ]]; then
+      status="active_elsewhere"
+    fi
+
+    cs_entry_append "${sid}" "${name}" "${mtime}" "${status}" "${pane}" "local" ""
+  done
+
+  cs_sort_entries
+
+  cs_check_new_pane
 }
 
 cs_sort_entries() {
-    local n=${#ENTRIES_ID[@]}
-    ((n <= 1)) && return 0
+  local n=${#ENTRIES_ID[@]}
+  ((n <= 1)) && return 0
 
-    local now
-    now=$(date +%s)
-    local cutoff=$((now - RECENT_THRESHOLD * 60))
-    RECENT_CUTOFF=${cutoff}
+  local now
+  now=$(date +%s)
+  local cutoff=$((now - RECENT_THRESHOLD * 60))
+  RECENT_CUTOFF=${cutoff}
 
-    # Partition: recent by name, older by mtime desc; hidden always older
-    local recent_indices=() older_indices=()
-    for ((i = 0; i < n; i++)); do
-        if [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
-            older_indices+=("${i}")
-        elif ((ENTRIES_MTIME[i] >= cutoff)); then
-            recent_indices+=("${i}")
-        else
-            older_indices+=("${i}")
-        fi
-    done
-
-    # Sort recent by name (case-insensitive), index first to handle spaces
-    local sorted_recent=""
-    if ((${#recent_indices[@]} > 0)); then
-        sorted_recent=$(
-            for i in "${recent_indices[@]}"; do
-                echo "${i} ${ENTRIES_NAME[${i}],,}"
-            done | sort -t' ' -k2
-        )
+  # Partition: recent by name, older by mtime desc; hidden always older
+  local recent_indices=() older_indices=()
+  for ((i = 0; i < n; i++)); do
+    if [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
+      older_indices+=("${i}")
+    elif ((ENTRIES_MTIME[i] >= cutoff)); then
+      recent_indices+=("${i}")
+    else
+      older_indices+=("${i}")
     fi
+  done
 
-    # Sort older by mtime descending
-    local sorted_older=""
-    if ((${#older_indices[@]} > 0)); then
-        sorted_older=$(
-            for i in "${older_indices[@]}"; do
-                echo "${ENTRIES_MTIME[${i}]} ${i}"
-            done | sort -rnk1
-        )
-    fi
+  # Sort recent by name (case-insensitive), index first to handle spaces
+  local sorted_recent=""
+  if ((${#recent_indices[@]} > 0)); then
+    sorted_recent=$(
+      for i in "${recent_indices[@]}"; do
+        echo "${i} ${ENTRIES_NAME[${i}],,}"
+      done | sort -t' ' -k2
+    )
+  fi
 
-    local new_id=() new_name=() new_mtime=() new_status=() new_pane=() new_type=() new_path=()
-    local idx
-    if [[ -n "${sorted_recent}" ]]; then
-        while read -r idx _; do
-            new_id+=("${ENTRIES_ID[${idx}]}")
-            new_name+=("${ENTRIES_NAME[${idx}]}")
-            new_mtime+=("${ENTRIES_MTIME[${idx}]}")
-            new_status+=("${ENTRIES_STATUS[${idx}]}")
-            new_pane+=("${ENTRIES_PANE[${idx}]}")
-            new_type+=("${ENTRIES_TYPE[${idx}]}")
-            new_path+=("${ENTRIES_PATH[${idx}]}")
-        done <<< "${sorted_recent}"
-    fi
-    if [[ -n "${sorted_older}" ]]; then
-        while read -r _ idx; do
-            new_id+=("${ENTRIES_ID[${idx}]}")
-            new_name+=("${ENTRIES_NAME[${idx}]}")
-            new_mtime+=("${ENTRIES_MTIME[${idx}]}")
-            new_status+=("${ENTRIES_STATUS[${idx}]}")
-            new_pane+=("${ENTRIES_PANE[${idx}]}")
-            new_type+=("${ENTRIES_TYPE[${idx}]}")
-            new_path+=("${ENTRIES_PATH[${idx}]}")
-        done <<< "${sorted_older}"
-    fi
+  # Sort older by mtime descending
+  local sorted_older=""
+  if ((${#older_indices[@]} > 0)); then
+    sorted_older=$(
+      for i in "${older_indices[@]}"; do
+        echo "${ENTRIES_MTIME[${i}]} ${i}"
+      done | sort -rnk1
+    )
+  fi
 
-    ENTRIES_ID=("${new_id[@]}")
-    ENTRIES_NAME=("${new_name[@]}")
-    ENTRIES_MTIME=("${new_mtime[@]}")
-    ENTRIES_STATUS=("${new_status[@]}")
-    ENTRIES_PANE=("${new_pane[@]}")
-    ENTRIES_TYPE=("${new_type[@]}")
-    ENTRIES_PATH=("${new_path[@]}")
+  local new_id=() new_name=() new_mtime=() new_status=() new_pane=() new_type=() new_path=()
+  local idx
+  if [[ -n "${sorted_recent}" ]]; then
+    while read -r idx _; do
+      new_id+=("${ENTRIES_ID[${idx}]}")
+      new_name+=("${ENTRIES_NAME[${idx}]}")
+      new_mtime+=("${ENTRIES_MTIME[${idx}]}")
+      new_status+=("${ENTRIES_STATUS[${idx}]}")
+      new_pane+=("${ENTRIES_PANE[${idx}]}")
+      new_type+=("${ENTRIES_TYPE[${idx}]}")
+      new_path+=("${ENTRIES_PATH[${idx}]}")
+    done <<< "${sorted_recent}"
+  fi
+  if [[ -n "${sorted_older}" ]]; then
+    while read -r _ idx; do
+      new_id+=("${ENTRIES_ID[${idx}]}")
+      new_name+=("${ENTRIES_NAME[${idx}]}")
+      new_mtime+=("${ENTRIES_MTIME[${idx}]}")
+      new_status+=("${ENTRIES_STATUS[${idx}]}")
+      new_pane+=("${ENTRIES_PANE[${idx}]}")
+      new_type+=("${ENTRIES_TYPE[${idx}]}")
+      new_path+=("${ENTRIES_PATH[${idx}]}")
+    done <<< "${sorted_older}"
+  fi
+
+  ENTRIES_ID=("${new_id[@]}")
+  ENTRIES_NAME=("${new_name[@]}")
+  ENTRIES_MTIME=("${new_mtime[@]}")
+  ENTRIES_STATUS=("${new_status[@]}")
+  ENTRIES_PANE=("${new_pane[@]}")
+  ENTRIES_TYPE=("${new_type[@]}")
+  ENTRIES_PATH=("${new_path[@]}")
 }
 
 cs_rescan() {
-    local selected_id=""
-    if ((${#ENTRIES_ID[@]} > 0 && SELECTED < ${#ENTRIES_ID[@]})); then
-        selected_id="${ENTRIES_ID[${SELECTED}]}"
+  local selected_id=""
+  if ((${#ENTRIES_ID[@]} > 0 && SELECTED < ${#ENTRIES_ID[@]})); then
+    selected_id="${ENTRIES_ID[${SELECTED}]}"
+  fi
+  cs_build_all_entries
+  cs_search_save_full
+  # Restore selection: by ID, then by pane, then clamp
+  local _sel_found=0
+  if [[ -n "${selected_id}" ]]; then
+    local idx
+    idx=$(cs_find_entry_index "${selected_id}")
+    if [[ "${idx}" != "-1" ]]; then
+      SELECTED=${idx}
+      _sel_found=1
     fi
-    cs_build_all_entries
-    cs_search_save_full
-    # Restore selection: by ID, then by pane, then clamp
-    local _sel_found=0
-    if [[ -n "${selected_id}" ]]; then
-        local idx
-        idx=$(cs_find_entry_index "${selected_id}")
-        if [[ "${idx}" != "-1" ]]; then
-            SELECTED=${idx}
-            _sel_found=1
-        fi
+  fi
+  if ((!_sel_found)); then
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    if [[ -n "${cur_pane}" ]]; then
+      local pidx
+      pidx=$(cs_find_entry_by_pane "${cur_pane}")
+      if [[ "${pidx}" != "-1" ]]; then
+        SELECTED=${pidx}
+      fi
     fi
-    if ((!_sel_found)); then
-        local cur_pane
-        cur_pane=$(cs_read_state current_pane)
-        if [[ -n "${cur_pane}" ]]; then
-            local pidx
-            pidx=$(cs_find_entry_by_pane "${cur_pane}")
-            if [[ "${pidx}" != "-1" ]]; then
-                SELECTED=${pidx}
-            fi
-        fi
-        local n=${#ENTRIES_ID[@]}
-        if ((SELECTED >= n && n > 0)); then
-            SELECTED=$((n - 1))
-        fi
+    local n=${#ENTRIES_ID[@]}
+    if ((SELECTED >= n && n > 0)); then
+      SELECTED=$((n - 1))
     fi
-    if ((SEARCH_ACTIVE)); then
-        cs_search_apply_filter
-    fi
+  fi
+  if ((SEARCH_ACTIVE)); then
+    cs_search_apply_filter
+  fi
 }
 
 cs_find_entry_index() {
-    local target_id="$1"
-    for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
-        if [[ "${ENTRIES_ID[${fi}]}" == "${target_id}" ]]; then
-            echo "${fi}"
-            return
-        fi
-    done
-    echo "-1"
+  local target_id="$1"
+  for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
+    if [[ "${ENTRIES_ID[${fi}]}" == "${target_id}" ]]; then
+      echo "${fi}"
+      return
+    fi
+  done
+  echo "-1"
 }
 
 cs_find_entry_by_pane() {
-    local target_pane="$1"
-    for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
-        if [[ "${ENTRIES_PANE[${fi}]}" == "${target_pane}" ]]; then
-            echo "${fi}"
-            return
-        fi
-    done
-    echo "-1"
+  local target_pane="$1"
+  for ((fi=0; fi < ${#ENTRIES_PANE[@]}; fi++)); do
+    if [[ "${ENTRIES_PANE[${fi}]}" == "${target_pane}" ]]; then
+      echo "${fi}"
+      return
+    fi
+  done
+  echo "-1"
 }
 
 # ── Cross-server Discovery ────────────────────────
@@ -826,40 +826,40 @@ MENU_KEYS=()
 MENU_LABELS=()
 
 cs_menu_init() {
-    local hide_label="View hidden"
-    ((SHOW_HIDDEN)) && hide_label="Hide hidden"
-    if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-        MENU_KEYS=(r p x h o "" c v d s)
-        MENU_LABELS=(
-            "Rename"
-            "Rename project"
-            "Close"
-            "Hide"
-            "Hide this & older"
-            ""
-            "New session"
-            "${hide_label}"
-            "Detach"
-            "Shutdown"
-        )
-    else
-        MENU_KEYS=(p "" c v d s)
-        MENU_LABELS=(
-            "Rename project"
-            ""
-            "New session"
-            "${hide_label}"
-            "Detach"
-            "Shutdown"
-        )
-    fi
+  local hide_label="View hidden"
+  ((SHOW_HIDDEN)) && hide_label="Hide hidden"
+  if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
+    MENU_KEYS=(r p x h o "" c v d s)
+    MENU_LABELS=(
+      "Rename"
+      "Rename project"
+      "Close"
+      "Hide"
+      "Hide this & older"
+      ""
+      "New session"
+      "${hide_label}"
+      "Detach"
+      "Shutdown"
+    )
+  else
+    MENU_KEYS=(p "" c v d s)
+    MENU_LABELS=(
+      "Rename project"
+      ""
+      "New session"
+      "${hide_label}"
+      "Detach"
+      "Shutdown"
+    )
+  fi
 }
 
 cs_menu_enter() {
-    MENU_ACTIVE=1
-    MENU_TARGET_ID="${ENTRIES_ID[${SELECTED}]}"
-    cs_menu_init
-    DIRTY=1
+  MENU_ACTIVE=1
+  MENU_TARGET_ID="${ENTRIES_ID[${SELECTED}]}"
+  cs_menu_init
+  DIRTY=1
 }
 
 # ── Search / Filter ──────────────────────────────
@@ -870,117 +870,25 @@ FULL_ENTRIES_ID=(); FULL_ENTRIES_NAME=(); FULL_ENTRIES_MTIME=()
 FULL_ENTRIES_STATUS=(); FULL_ENTRIES_PANE=(); FULL_ENTRIES_TYPE=(); FULL_ENTRIES_PATH=()
 
 cs_search_save_full() {
-    FULL_ENTRIES_ID=("${ENTRIES_ID[@]}")
-    FULL_ENTRIES_NAME=("${ENTRIES_NAME[@]}")
-    FULL_ENTRIES_MTIME=("${ENTRIES_MTIME[@]}")
-    FULL_ENTRIES_STATUS=("${ENTRIES_STATUS[@]}")
-    FULL_ENTRIES_PANE=("${ENTRIES_PANE[@]}")
-    FULL_ENTRIES_TYPE=("${ENTRIES_TYPE[@]}")
-    FULL_ENTRIES_PATH=("${ENTRIES_PATH[@]}")
+  FULL_ENTRIES_ID=("${ENTRIES_ID[@]}")
+  FULL_ENTRIES_NAME=("${ENTRIES_NAME[@]}")
+  FULL_ENTRIES_MTIME=("${ENTRIES_MTIME[@]}")
+  FULL_ENTRIES_STATUS=("${ENTRIES_STATUS[@]}")
+  FULL_ENTRIES_PANE=("${ENTRIES_PANE[@]}")
+  FULL_ENTRIES_TYPE=("${ENTRIES_TYPE[@]}")
+  FULL_ENTRIES_PATH=("${ENTRIES_PATH[@]}")
 }
 
 cs_search_apply_filter() {
-    # Capture selected ID for preservation (only when in results, not search field)
-    local selected_id=""
-    if ((!SEARCH_FIELD_FOCUSED)) && ((${#ENTRIES_ID[@]} > 0)) && ((SELECTED < ${#ENTRIES_ID[@]})); then
-        selected_id="${ENTRIES_ID[${SELECTED}]}"
-    fi
+  # Capture selected ID for preservation (only when in results, not search field)
+  local selected_id=""
+  if ((!SEARCH_FIELD_FOCUSED)) && ((${#ENTRIES_ID[@]} > 0)) && ((SELECTED < ${#ENTRIES_ID[@]})); then
+    selected_id="${ENTRIES_ID[${SELECTED}]}"
+  fi
 
-    cs_entry_clear
+  cs_entry_clear
 
-    if [[ -z "${SEARCH_TERM}" ]]; then
-        ENTRIES_ID=("${FULL_ENTRIES_ID[@]}")
-        ENTRIES_NAME=("${FULL_ENTRIES_NAME[@]}")
-        ENTRIES_MTIME=("${FULL_ENTRIES_MTIME[@]}")
-        ENTRIES_STATUS=("${FULL_ENTRIES_STATUS[@]}")
-        ENTRIES_PANE=("${FULL_ENTRIES_PANE[@]}")
-        ENTRIES_TYPE=("${FULL_ENTRIES_TYPE[@]}")
-        ENTRIES_PATH=("${FULL_ENTRIES_PATH[@]}")
-    else
-        local term="${SEARCH_TERM,,}"
-        local n=${#FULL_ENTRIES_ID[@]}
-
-        # Pass 1: mark matching entries
-        local -a match=()
-        local i
-        for ((i = 0; i < n; i++)); do
-            local type="${FULL_ENTRIES_TYPE[${i}]}"
-            if [[ "${type}" == "header" || "${type}" == "spacer" ]]; then
-                match+=(0)
-            else
-                local name="${FULL_ENTRIES_NAME[${i}],,}"
-                if [[ "${name}" == *"${term}"* ]]; then
-                    match+=(1)
-                else
-                    match+=(0)
-                fi
-            fi
-        done
-
-        # Pass 2: copy matches, include spacer/header only if section has matches
-        for ((i = 0; i < n; i++)); do
-            local type="${FULL_ENTRIES_TYPE[${i}]}"
-            if [[ "${type}" == "spacer" || "${type}" == "header" ]]; then
-                # Look ahead: any match before next spacer or end?
-                local has_child=0 j
-                for ((j = i + 1; j < n; j++)); do
-                    [[ "${FULL_ENTRIES_TYPE[${j}]}" == "spacer" ]] && break
-                    ((match[j])) && { has_child=1; break; }
-                done
-                if ((has_child)); then
-                    cs_entry_append "${FULL_ENTRIES_ID[${i}]}" "${FULL_ENTRIES_NAME[${i}]}" "${FULL_ENTRIES_MTIME[${i}]}" "${FULL_ENTRIES_STATUS[${i}]}" "${FULL_ENTRIES_PANE[${i}]}" "${FULL_ENTRIES_TYPE[${i}]}" "${FULL_ENTRIES_PATH[${i}]}"
-                fi
-            elif ((match[i])); then
-                cs_entry_append "${FULL_ENTRIES_ID[${i}]}" "${FULL_ENTRIES_NAME[${i}]}" "${FULL_ENTRIES_MTIME[${i}]}" "${FULL_ENTRIES_STATUS[${i}]}" "${FULL_ENTRIES_PANE[${i}]}" "${FULL_ENTRIES_TYPE[${i}]}" "${FULL_ENTRIES_PATH[${i}]}"
-            fi
-        done
-    fi
-
-    # Restore selection
-    local new_n=${#ENTRIES_ID[@]}
-    if [[ -n "${selected_id}" ]]; then
-        local idx
-        idx=$(cs_find_entry_index "${selected_id}")
-        if [[ "${idx}" != "-1" ]]; then
-            SELECTED=${idx}
-            SCROLL=0
-            return
-        fi
-    fi
-    # Fallback: clamp and skip to nearest selectable
-    if ((new_n == 0)); then
-        SELECTED=0
-    elif ((SELECTED >= new_n)); then
-        SELECTED=$((new_n - 1))
-    fi
-    # Skip past headers/spacers
-    local start=${SELECTED}
-    while ((new_n > 0)) && [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]]; do
-        SELECTED=$(( (SELECTED + 1) % new_n ))
-        ((SELECTED == start)) && break
-    done
-    SCROLL=0
-}
-
-cs_search_enter() {
-    SEARCH_ACTIVE=1
-    SEARCH_TERM=""
-    SEARCH_FIELD_FOCUSED=1
-    DIRTY=1
-}
-
-cs_search_exit() {
-    # Capture selected ID before restoring full entries
-    local selected_id=""
-    if ((!SEARCH_FIELD_FOCUSED)) && ((${#ENTRIES_ID[@]} > 0)) && ((SELECTED < ${#ENTRIES_ID[@]})); then
-        selected_id="${ENTRIES_ID[${SELECTED}]}"
-    fi
-
-    SEARCH_ACTIVE=0
-    SEARCH_TERM=""
-    SEARCH_FIELD_FOCUSED=0
-
-    # Restore full entries
+  if [[ -z "${SEARCH_TERM}" ]]; then
     ENTRIES_ID=("${FULL_ENTRIES_ID[@]}")
     ENTRIES_NAME=("${FULL_ENTRIES_NAME[@]}")
     ENTRIES_MTIME=("${FULL_ENTRIES_MTIME[@]}")
@@ -988,2030 +896,2122 @@ cs_search_exit() {
     ENTRIES_PANE=("${FULL_ENTRIES_PANE[@]}")
     ENTRIES_TYPE=("${FULL_ENTRIES_TYPE[@]}")
     ENTRIES_PATH=("${FULL_ENTRIES_PATH[@]}")
+  else
+    local term="${SEARCH_TERM,,}"
+    local n=${#FULL_ENTRIES_ID[@]}
 
-    # Remap SELECTED in the full list
-    if [[ -n "${selected_id}" ]]; then
-        local idx
-        idx=$(cs_find_entry_index "${selected_id}")
-        if [[ "${idx}" != "-1" ]]; then
-            SELECTED=${idx}
-            DIRTY=1
-            return
+    # Pass 1: mark matching entries
+    local -a match=()
+    local i
+    for ((i = 0; i < n; i++)); do
+      local type="${FULL_ENTRIES_TYPE[${i}]}"
+      if [[ "${type}" == "header" || "${type}" == "spacer" ]]; then
+        match+=(0)
+      else
+        local name="${FULL_ENTRIES_NAME[${i}],,}"
+        if [[ "${name}" == *"${term}"* ]]; then
+          match+=(1)
+        else
+          match+=(0)
         fi
-    fi
-    # Fallback: clamp and skip
-    local n=${#ENTRIES_ID[@]}
-    if ((n == 0)); then
-        SELECTED=0
-    elif ((SELECTED >= n)); then
-        SELECTED=$((n - 1))
-    fi
-    local start=${SELECTED}
-    while ((n > 0)) && [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]]; do
-        SELECTED=$(( (SELECTED + 1) % n ))
-        ((SELECTED == start)) && break
+      fi
     done
-    DIRTY=1
+
+    # Pass 2: copy matches, include spacer/header only if section has matches
+    for ((i = 0; i < n; i++)); do
+      local type="${FULL_ENTRIES_TYPE[${i}]}"
+      if [[ "${type}" == "spacer" || "${type}" == "header" ]]; then
+        # Look ahead: any match before next spacer or end?
+        local has_child=0 j
+        for ((j = i + 1; j < n; j++)); do
+          [[ "${FULL_ENTRIES_TYPE[${j}]}" == "spacer" ]] && break
+          ((match[j])) && { has_child=1; break; }
+        done
+        if ((has_child)); then
+          cs_entry_append "${FULL_ENTRIES_ID[${i}]}" "${FULL_ENTRIES_NAME[${i}]}" "${FULL_ENTRIES_MTIME[${i}]}" "${FULL_ENTRIES_STATUS[${i}]}" "${FULL_ENTRIES_PANE[${i}]}" "${FULL_ENTRIES_TYPE[${i}]}" "${FULL_ENTRIES_PATH[${i}]}"
+        fi
+      elif ((match[i])); then
+        cs_entry_append "${FULL_ENTRIES_ID[${i}]}" "${FULL_ENTRIES_NAME[${i}]}" "${FULL_ENTRIES_MTIME[${i}]}" "${FULL_ENTRIES_STATUS[${i}]}" "${FULL_ENTRIES_PANE[${i}]}" "${FULL_ENTRIES_TYPE[${i}]}" "${FULL_ENTRIES_PATH[${i}]}"
+      fi
+    done
+  fi
+
+  # Restore selection
+  local new_n=${#ENTRIES_ID[@]}
+  if [[ -n "${selected_id}" ]]; then
+    local idx
+    idx=$(cs_find_entry_index "${selected_id}")
+    if [[ "${idx}" != "-1" ]]; then
+      SELECTED=${idx}
+      SCROLL=0
+      return
+    fi
+  fi
+  # Fallback: clamp and skip to nearest selectable
+  if ((new_n == 0)); then
+    SELECTED=0
+  elif ((SELECTED >= new_n)); then
+    SELECTED=$((new_n - 1))
+  fi
+  # Skip past headers/spacers
+  local start=${SELECTED}
+  while ((new_n > 0)) && [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]]; do
+    SELECTED=$(( (SELECTED + 1) % new_n ))
+    ((SELECTED == start)) && break
+  done
+  SCROLL=0
+}
+
+cs_search_enter() {
+  SEARCH_ACTIVE=1
+  SEARCH_TERM=""
+  SEARCH_FIELD_FOCUSED=1
+  DIRTY=1
+}
+
+cs_search_exit() {
+  # Capture selected ID before restoring full entries
+  local selected_id=""
+  if ((!SEARCH_FIELD_FOCUSED)) && ((${#ENTRIES_ID[@]} > 0)) && ((SELECTED < ${#ENTRIES_ID[@]})); then
+    selected_id="${ENTRIES_ID[${SELECTED}]}"
+  fi
+
+  SEARCH_ACTIVE=0
+  SEARCH_TERM=""
+  SEARCH_FIELD_FOCUSED=0
+
+  # Restore full entries
+  ENTRIES_ID=("${FULL_ENTRIES_ID[@]}")
+  ENTRIES_NAME=("${FULL_ENTRIES_NAME[@]}")
+  ENTRIES_MTIME=("${FULL_ENTRIES_MTIME[@]}")
+  ENTRIES_STATUS=("${FULL_ENTRIES_STATUS[@]}")
+  ENTRIES_PANE=("${FULL_ENTRIES_PANE[@]}")
+  ENTRIES_TYPE=("${FULL_ENTRIES_TYPE[@]}")
+  ENTRIES_PATH=("${FULL_ENTRIES_PATH[@]}")
+
+  # Remap SELECTED in the full list
+  if [[ -n "${selected_id}" ]]; then
+    local idx
+    idx=$(cs_find_entry_index "${selected_id}")
+    if [[ "${idx}" != "-1" ]]; then
+      SELECTED=${idx}
+      DIRTY=1
+      return
+    fi
+  fi
+  # Fallback: clamp and skip
+  local n=${#ENTRIES_ID[@]}
+  if ((n == 0)); then
+    SELECTED=0
+  elif ((SELECTED >= n)); then
+    SELECTED=$((n - 1))
+  fi
+  local start=${SELECTED}
+  while ((n > 0)) && [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]]; do
+    SELECTED=$(( (SELECTED + 1) % n ))
+    ((SELECTED == start)) && break
+  done
+  DIRTY=1
 }
 
 cs_search_handle_key() {
-    local key="$1"
-    case "${key}" in
-        $'\e')
-            local seq=""
-            read -rsn2 -t 0.1 seq || true
-            case "${seq}" in
-                '[A') cs_search_move_up; DIRTY=1 ;;
-                '[B') cs_search_move_down; DIRTY=1 ;;
-                '') cs_search_exit; DIRTY=1 ;;
-            esac
-            ;;
-        '')  # Enter
-            local n=${#ENTRIES_ID[@]}
-            # Count selectable entries
-            local selectable=0 first_sel=-1 i
-            for ((i = 0; i < n; i++)); do
-                if [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]]; then
-                    ((selectable++))
-                    ((first_sel == -1)) && first_sel=${i}
-                fi
-            done
-            if ((selectable == 1)); then
-                SEARCH_FIELD_FOCUSED=0
-                SELECTED=${first_sel}
-                cs_search_exit
-                cs_activate_selected
-                cs_focus_session
-                DIRTY=1
-            elif ((selectable > 1)); then
-                SEARCH_FIELD_FOCUSED=0
-                SELECTED=0
-                # Skip to first selectable
-                while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED < n - 1)); do
-                    ((SELECTED++))
-                done
-                DIRTY=1
-            fi
-            ;;
-        $'\177'|$'\b')  # Backspace
-            if ((${#SEARCH_TERM} > 0)); then
-                SEARCH_TERM="${SEARCH_TERM%?}"
-                cs_search_apply_filter
-            fi
-            DIRTY=1
-            ;;
-        *)
-            # Only append printable characters
-            if [[ "${key}" == [[:print:]] ]]; then
-                SEARCH_TERM+="${key}"
-                cs_search_apply_filter
-                DIRTY=1
-            fi
-            ;;
-    esac
+  local key="$1"
+  case "${key}" in
+    $'\e')
+      local seq=""
+      read -rsn2 -t 0.1 seq || true
+      case "${seq}" in
+        '[A') cs_search_move_up; DIRTY=1 ;;
+        '[B') cs_search_move_down; DIRTY=1 ;;
+        '') cs_search_exit; DIRTY=1 ;;
+      esac
+      ;;
+    '')  # Enter
+      local n=${#ENTRIES_ID[@]}
+      # Count selectable entries
+      local selectable=0 first_sel=-1 i
+      for ((i = 0; i < n; i++)); do
+        if [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]]; then
+          ((selectable++))
+          ((first_sel == -1)) && first_sel=${i}
+        fi
+      done
+      if ((selectable == 1)); then
+        SEARCH_FIELD_FOCUSED=0
+        SELECTED=${first_sel}
+        cs_search_exit
+        cs_activate_selected
+        cs_focus_session
+        DIRTY=1
+      elif ((selectable > 1)); then
+        SEARCH_FIELD_FOCUSED=0
+        SELECTED=0
+        # Skip to first selectable
+        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED < n - 1)); do
+          ((SELECTED++))
+        done
+        DIRTY=1
+      fi
+      ;;
+    $'\177'|$'\b')  # Backspace
+      if ((${#SEARCH_TERM} > 0)); then
+        SEARCH_TERM="${SEARCH_TERM%?}"
+        cs_search_apply_filter
+      fi
+      DIRTY=1
+      ;;
+    *)
+      # Only append printable characters
+      if [[ "${key}" == [[:print:]] ]]; then
+        SEARCH_TERM+="${key}"
+        cs_search_apply_filter
+        DIRTY=1
+      fi
+      ;;
+  esac
 }
 
 cs_search_move_down() {
-    local n=${#ENTRIES_ID[@]}
-    # Count selectable entries
-    local selectable=0 i
-    for ((i = 0; i < n; i++)); do
-        [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]] && ((selectable++))
-    done
-    ((selectable == 0)) && { SEARCH_FIELD_FOCUSED=1; return; }
+  local n=${#ENTRIES_ID[@]}
+  # Count selectable entries
+  local selectable=0 i
+  for ((i = 0; i < n; i++)); do
+    [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]] && ((selectable++))
+  done
+  ((selectable == 0)) && { SEARCH_FIELD_FOCUSED=1; return; }
 
-    if ((SEARCH_FIELD_FOCUSED)); then
-        SEARCH_FIELD_FOCUSED=0
-        SELECTED=0
-        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED < n - 1)); do
-            ((SELECTED++))
-        done
-    else
-        local old=${SELECTED}
-        cs_move_down
-        if ((SELECTED <= old)); then
-            SEARCH_FIELD_FOCUSED=1
-        fi
+  if ((SEARCH_FIELD_FOCUSED)); then
+    SEARCH_FIELD_FOCUSED=0
+    SELECTED=0
+    while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED < n - 1)); do
+      ((SELECTED++))
+    done
+  else
+    local old=${SELECTED}
+    cs_move_down
+    if ((SELECTED <= old)); then
+      SEARCH_FIELD_FOCUSED=1
     fi
+  fi
 }
 
 cs_search_move_up() {
-    local n=${#ENTRIES_ID[@]}
-    # Count selectable entries
-    local selectable=0 i
-    for ((i = 0; i < n; i++)); do
-        [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]] && ((selectable++))
-    done
-    ((selectable == 0)) && { SEARCH_FIELD_FOCUSED=1; return; }
+  local n=${#ENTRIES_ID[@]}
+  # Count selectable entries
+  local selectable=0 i
+  for ((i = 0; i < n; i++)); do
+    [[ "${ENTRIES_TYPE[${i}]}" != "header" && "${ENTRIES_TYPE[${i}]}" != "spacer" ]] && ((selectable++))
+  done
+  ((selectable == 0)) && { SEARCH_FIELD_FOCUSED=1; return; }
 
-    if ((SEARCH_FIELD_FOCUSED)); then
-        SEARCH_FIELD_FOCUSED=0
-        SELECTED=$((n - 1))
-        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED > 0)); do
-            ((SELECTED--))
-        done
-    else
-        local old=${SELECTED}
-        cs_move_up
-        if ((SELECTED >= old)); then
-            SEARCH_FIELD_FOCUSED=1
-        fi
+  if ((SEARCH_FIELD_FOCUSED)); then
+    SEARCH_FIELD_FOCUSED=0
+    SELECTED=$((n - 1))
+    while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED > 0)); do
+      ((SELECTED--))
+    done
+  else
+    local old=${SELECTED}
+    cs_move_up
+    if ((SELECTED >= old)); then
+      SEARCH_FIELD_FOCUSED=1
     fi
+  fi
 }
 
 cs_remote_scan_needed() {
-    local now
-    now=$(date +%s)
-    ((now - LAST_REMOTE_SCAN >= 5))
+  local now
+  now=$(date +%s)
+  ((now - LAST_REMOTE_SCAN >= 5))
 }
 
 cs_discover_servers() {
-    REMOTE_SERVERS=()
-    local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
-    [[ -d "${socket_dir}" ]] || return 0
-    local my_server="${TMUX_SERVER}"
-    for sock in "${socket_dir}"/cs-*; do
-        [[ -S "${sock}" ]] || continue
-        local name
-        name=$(basename "${sock}")
-        [[ "${name}" == "${my_server}" ]] && continue
-        [[ "${name}" == cs-test-* ]] && continue
-        local base="${XDG_RUNTIME_DIR:-/tmp}"
-        local remote_state="${base}/claude-spaces/.servers/${name}"
-        local remote_path=""
-        if [[ -f "${remote_state}/project_path" ]]; then
-            remote_path=$(cat "${remote_state}/project_path")
-        fi
-        [[ -n "${remote_path}" && -d "${remote_path}" ]] || continue
-        command tmux -L "${name}" has-session 2>/dev/null || continue
-        REMOTE_SERVERS+=("${name}|${remote_path}")
-    done
+  REMOTE_SERVERS=()
+  local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
+  [[ -d "${socket_dir}" ]] || return 0
+  local my_server="${TMUX_SERVER}"
+  for sock in "${socket_dir}"/cs-*; do
+    [[ -S "${sock}" ]] || continue
+    local name
+    name=$(basename "${sock}")
+    [[ "${name}" == "${my_server}" ]] && continue
+    [[ "${name}" == cs-test-* ]] && continue
+    local base="${XDG_RUNTIME_DIR:-/tmp}"
+    local remote_state="${base}/claude-spaces/.servers/${name}"
+    local remote_path=""
+    if [[ -f "${remote_state}/project_path" ]]; then
+      remote_path=$(cat "${remote_state}/project_path")
+    fi
+    [[ -n "${remote_path}" && -d "${remote_path}" ]] || continue
+    command tmux -L "${name}" has-session 2>/dev/null || continue
+    REMOTE_SERVERS+=("${name}|${remote_path}")
+  done
 }
 
 cs_discover_inactive() {
-    INACTIVE_PROJECTS=()
-    local base="${XDG_RUNTIME_DIR:-/tmp}"
-    # Build set of active sanitized paths (current + remote servers)
-    local -A active_set
-    active_set["$(cs_sanitize_path "${PWD}")"]=1
-    for entry in "${REMOTE_SERVERS[@]}"; do
-        active_set["$(cs_sanitize_path "${entry#*|}")"]=1
+  INACTIVE_PROJECTS=()
+  local base="${XDG_RUNTIME_DIR:-/tmp}"
+  # Build set of active sanitized paths (current + remote servers)
+  local -A active_set
+  active_set["$(cs_sanitize_path "${PWD}")"]=1
+  for entry in "${REMOTE_SERVERS[@]}"; do
+    active_set["$(cs_sanitize_path "${entry#*|}")"]=1
+  done
+  for dir in "${PROJECTS_DIR}"/*/; do
+    [[ -d "${dir}" ]] || continue
+    # Check for JSONL files
+    local has_jsonl=0
+    for f in "${dir}"*.jsonl; do
+      [[ -f "${f}" ]] && has_jsonl=1 && break
     done
-    for dir in "${PROJECTS_DIR}"/*/; do
-        [[ -d "${dir}" ]] || continue
-        # Check for JSONL files
-        local has_jsonl=0
-        for f in "${dir}"*.jsonl; do
-            [[ -f "${f}" ]] && has_jsonl=1 && break
-        done
-        ((has_jsonl)) || continue
-        local sanitized
-        sanitized=$(basename "${dir}")
-        [[ -v "active_set[${sanitized}]" ]] && continue
-        # Resolve path
-        local path=""
-        local state_dir="${base}/claude-spaces/${sanitized}"
-        if [[ -f "${state_dir}/project_path" ]]; then
-            path=$(cat "${state_dir}/project_path")
-        else
-            local jsonl_files=("${dir}"*.jsonl)
-            if [[ -f "${jsonl_files[0]}" ]]; then
-                path=$(head -20 "${jsonl_files[0]}" | jq -r 'select(.cwd) | .cwd' 2>/dev/null | head -1)
-            fi
-        fi
-        [[ -n "${path}" && -d "${path}" ]] || continue
-        INACTIVE_PROJECTS+=("${sanitized}|${path}")
-    done
+    ((has_jsonl)) || continue
+    local sanitized
+    sanitized=$(basename "${dir}")
+    [[ -v "active_set[${sanitized}]" ]] && continue
+    # Resolve path
+    local path=""
+    local state_dir="${base}/claude-spaces/${sanitized}"
+    if [[ -f "${state_dir}/project_path" ]]; then
+      path=$(cat "${state_dir}/project_path")
+    else
+      local jsonl_files=("${dir}"*.jsonl)
+      if [[ -f "${jsonl_files[0]}" ]]; then
+        path=$(head -20 "${jsonl_files[0]}" | jq -r 'select(.cwd) | .cwd' 2>/dev/null | head -1)
+      fi
+    fi
+    [[ -n "${path}" && -d "${path}" ]] || continue
+    INACTIVE_PROJECTS+=("${sanitized}|${path}")
+  done
 }
 
 cs_scan_project_sessions() {
-    local project_dir="$1" project_path="$2" entry_type="$3" remote_state_dir="${4:-}"
-    # Build remote managed set from pane files
-    local -A remote_managed
-    if [[ -n "${remote_state_dir}" && -d "${remote_state_dir}/panes" ]]; then
-        for pf in "${remote_state_dir}/panes/"*; do
-            [[ -f "${pf}" ]] || continue
-            local psid
-            psid=$(cat "${pf}" 2>/dev/null)
-            [[ -n "${psid}" && "${psid}" != "new" ]] && remote_managed["${psid}"]=1
-        done
-    fi
-    # Build remote bell set from bells_active file
-    local -A remote_bells
-    if [[ -n "${remote_state_dir}" && -s "${remote_state_dir}/bells_active" ]]; then
-        local _bsid
-        while IFS= read -r _bsid; do
-            [[ -n "${_bsid}" ]] && remote_bells["${_bsid}"]=1
-        done < "${remote_state_dir}/bells_active"
-    fi
-    # Collect into local arrays, then sort by mtime
-    local -a r_ids=() r_names=() r_mtimes=() r_statuses=()
-    declare -A r_mtimes_map
-    while read -r mt fn; do
-        r_mtimes_map["${fn}"]="${mt}"
-    done < <(_cs_stat "${project_dir}"/*.jsonl 2>/dev/null)
-    for f in "${project_dir}"/*.jsonl; do
-        [[ -f "${f}" ]] || continue
-        local sid="${f##*/}"
-        sid="${sid%.jsonl}"
-        [[ "${sid}" =~ ${UUID_RE} ]] || continue
-        [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
-        local mtime="${r_mtimes_map[${f}]}"
-        local name
-        name=$(cs_resolve_name "${sid}" "${f}")
-        [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
-        local rstatus="dormant"
-        [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
-        [[ -v "remote_bells[${sid}]" ]] && rstatus="bell"
-        r_ids+=("${sid}")
-        r_names+=("${name}")
-        r_mtimes+=("${mtime}")
-        r_statuses+=("${rstatus}")
+  local project_dir="$1" project_path="$2" entry_type="$3" remote_state_dir="${4:-}"
+  # Build remote managed set from pane files
+  local -A remote_managed
+  if [[ -n "${remote_state_dir}" && -d "${remote_state_dir}/panes" ]]; then
+    for pf in "${remote_state_dir}/panes/"*; do
+      [[ -f "${pf}" ]] || continue
+      local psid
+      psid=$(cat "${pf}" 2>/dev/null)
+      [[ -n "${psid}" && "${psid}" != "new" ]] && remote_managed["${psid}"]=1
     done
-    # Sort by mtime descending and append to global ENTRIES
-    local rn=${#r_ids[@]}
-    if ((rn > 0)); then
-        local indices
-        indices=$(
-            for ((ri=0; ri < rn; ri++)); do
-                echo "${r_mtimes[${ri}]} ${ri}"
-            done | sort -rnk1
-        )
-        while read -r _ idx; do
-            cs_entry_append "${r_ids[${idx}]}" "${r_names[${idx}]}" "${r_mtimes[${idx}]}" "${r_statuses[${idx}]}" "" "${entry_type}" "${project_path}"
-        done <<< "${indices}"
-    fi
+  fi
+  # Build remote bell set from bells_active file
+  local -A remote_bells
+  if [[ -n "${remote_state_dir}" && -s "${remote_state_dir}/bells_active" ]]; then
+    local _bsid
+    while IFS= read -r _bsid; do
+      [[ -n "${_bsid}" ]] && remote_bells["${_bsid}"]=1
+    done < "${remote_state_dir}/bells_active"
+  fi
+  # Collect into local arrays, then sort by mtime
+  local -a r_ids=() r_names=() r_mtimes=() r_statuses=()
+  declare -A r_mtimes_map
+  while read -r mt fn; do
+    r_mtimes_map["${fn}"]="${mt}"
+  done < <(_cs_stat "${project_dir}"/*.jsonl 2>/dev/null)
+  for f in "${project_dir}"/*.jsonl; do
+    [[ -f "${f}" ]] || continue
+    local sid="${f##*/}"
+    sid="${sid%.jsonl}"
+    [[ "${sid}" =~ ${UUID_RE} ]] || continue
+    [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
+    local mtime="${r_mtimes_map[${f}]}"
+    local name
+    name=$(cs_resolve_name "${sid}" "${f}")
+    [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
+    local rstatus="dormant"
+    [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
+    [[ -v "remote_bells[${sid}]" ]] && rstatus="bell"
+    r_ids+=("${sid}")
+    r_names+=("${name}")
+    r_mtimes+=("${mtime}")
+    r_statuses+=("${rstatus}")
+  done
+  # Sort by mtime descending and append to global ENTRIES
+  local rn=${#r_ids[@]}
+  if ((rn > 0)); then
+    local indices
+    indices=$(
+      for ((ri=0; ri < rn; ri++)); do
+        echo "${r_mtimes[${ri}]} ${ri}"
+      done | sort -rnk1
+    )
+    while read -r _ idx; do
+      cs_entry_append "${r_ids[${idx}]}" "${r_names[${idx}]}" "${r_mtimes[${idx}]}" "${r_statuses[${idx}]}" "" "${entry_type}" "${project_path}"
+    done <<< "${indices}"
+  fi
 }
 
 cs_build_all_entries() {
-    # Phase 1: local sessions
-    cs_scan_sessions
+  # Phase 1: local sessions
+  cs_scan_sessions
 
-    # Phase 2: remote/inactive (throttled)
-    if cs_remote_scan_needed; then
-        cs_discover_servers
-        cs_discover_inactive
-        LAST_REMOTE_SCAN=$(date +%s)
+  # Phase 2: remote/inactive (throttled)
+  if cs_remote_scan_needed; then
+    cs_discover_servers
+    cs_discover_inactive
+    LAST_REMOTE_SCAN=$(date +%s)
 
-        # Recompute display names if project set changed
-        local _path_set="${PWD}"
-        for entry in "${REMOTE_SERVERS[@]}"; do
-            _path_set+=$'\n'"${entry#*|}"
-        done
-        for entry in "${INACTIVE_PROJECTS[@]}"; do
-            _path_set+=$'\n'"${entry#*|}"
-        done
-        if [[ "${_path_set}" != "${LAST_PATH_SET}" ]]; then
-            LAST_PATH_SET="${_path_set}"
-            cs_compute_display_names
-            [[ -z "${CS_TESTING:-}" ]] && _tmux rename-session "${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}" 2>/dev/null || true
-        fi
-
-        # Rebuild cache
-        cs_cache_clear
-
-        local cache_start=${#ENTRIES_ID[@]}
-
-        # Remote servers
-        if ((${#REMOTE_SERVERS[@]} > 0)); then
-            cs_entry_append "__spacer_remote__" "" "0" "" "" "spacer" ""
-            cs_entry_append "__hdr_remote__" "other projects" "0" "" "" "header" ""
-
-            for entry in "${REMOTE_SERVERS[@]}"; do
-                local srv="${entry%%|*}"
-                local rpath="${entry#*|}"
-                local sanitized
-                sanitized=$(cs_sanitize_path "${rpath}")
-                local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${rpath}]:-${rpath##*/}}}"
-                cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
-
-                local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${srv}"
-                cs_scan_project_sessions "${PROJECTS_DIR}/${sanitized}" "${rpath}" "remote" "${remote_state}"
-            done
-        fi
-
-        # Inactive projects
-        if ((${#INACTIVE_PROJECTS[@]} > 0)); then
-            cs_entry_append "__spacer_inactive__" "" "0" "" "" "spacer" ""
-            cs_entry_append "__hdr_inactive__" "inactive" "0" "" "" "header" ""
-
-            for entry in "${INACTIVE_PROJECTS[@]}"; do
-                local sanitized="${entry%%|*}"
-                local ipath="${entry#*|}"
-                local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${ipath}]:-${ipath##*/}}}"
-                cs_entry_append "__inactive_${sanitized}__" "${leaf}" "0" "" "" "inactive" "${ipath}"
-            done
-        fi
-
-        cs_cache_save_from "${cache_start}"
-    else
-        cs_cache_restore
+    # Recompute display names if project set changed
+    local _path_set="${PWD}"
+    for entry in "${REMOTE_SERVERS[@]}"; do
+      _path_set+=$'\n'"${entry#*|}"
+    done
+    for entry in "${INACTIVE_PROJECTS[@]}"; do
+      _path_set+=$'\n'"${entry#*|}"
+    done
+    if [[ "${_path_set}" != "${LAST_PATH_SET}" ]]; then
+      LAST_PATH_SET="${_path_set}"
+      cs_compute_display_names
+      [[ -z "${CS_TESTING:-}" ]] && _tmux rename-session "${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}" 2>/dev/null || true
     fi
+
+    # Rebuild cache
+    cs_cache_clear
+
+    local cache_start=${#ENTRIES_ID[@]}
+
+    # Remote servers
+    if ((${#REMOTE_SERVERS[@]} > 0)); then
+      cs_entry_append "__spacer_remote__" "" "0" "" "" "spacer" ""
+      cs_entry_append "__hdr_remote__" "other projects" "0" "" "" "header" ""
+
+      for entry in "${REMOTE_SERVERS[@]}"; do
+        local srv="${entry%%|*}"
+        local rpath="${entry#*|}"
+        local sanitized
+        sanitized=$(cs_sanitize_path "${rpath}")
+        local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${rpath}]:-${rpath##*/}}}"
+        cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
+
+        local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${srv}"
+        cs_scan_project_sessions "${PROJECTS_DIR}/${sanitized}" "${rpath}" "remote" "${remote_state}"
+      done
+    fi
+
+    # Inactive projects
+    if ((${#INACTIVE_PROJECTS[@]} > 0)); then
+      cs_entry_append "__spacer_inactive__" "" "0" "" "" "spacer" ""
+      cs_entry_append "__hdr_inactive__" "inactive" "0" "" "" "header" ""
+
+      for entry in "${INACTIVE_PROJECTS[@]}"; do
+        local sanitized="${entry%%|*}"
+        local ipath="${entry#*|}"
+        local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${ipath}]:-${ipath##*/}}}"
+        cs_entry_append "__inactive_${sanitized}__" "${leaf}" "0" "" "" "inactive" "${ipath}"
+      done
+    fi
+
+    cs_cache_save_from "${cache_start}"
+  else
+    cs_cache_restore
+  fi
 }
 
 cs_after_remove() {
-    local removed_pane="$1"
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    local was_current=""
-    [[ -n "${removed_pane}" && "${removed_pane}" == "${cur_pane}" ]] && was_current=1
-    cs_rescan
-    if [[ -n "${was_current}" ]]; then
-        echo "" > "${STATE_DIR}/current_pane"
-        cs_show_welcome
-        _tmux select-pane -t "${PICKER_PANE}"
-    fi
+  local removed_pane="$1"
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  local was_current=""
+  [[ -n "${removed_pane}" && "${removed_pane}" == "${cur_pane}" ]] && was_current=1
+  cs_rescan
+  if [[ -n "${was_current}" ]]; then
+    echo "" > "${STATE_DIR}/current_pane"
+    cs_show_welcome
+    _tmux select-pane -t "${PICKER_PANE}"
+  fi
 }
 
 cs_fingerprint() {
-    local pf
-    pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-    local fp="focus:${pf}|menu:${MENU_ACTIVE}|search:${SEARCH_ACTIVE}:${SEARCH_TERM}:${SEARCH_FIELD_FOCUSED}|"
-    for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
-        fp+="${ENTRIES_ID[${fi}]}:${ENTRIES_STATUS[${fi}]}:${ENTRIES_MTIME[${fi}]}:${ENTRIES_TYPE[${fi}]}|"
-    done
-    echo "${fp}"
+  local pf
+  pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+  local fp="focus:${pf}|menu:${MENU_ACTIVE}|search:${SEARCH_ACTIVE}:${SEARCH_TERM}:${SEARCH_FIELD_FOCUSED}|"
+  for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
+    fp+="${ENTRIES_ID[${fi}]}:${ENTRIES_STATUS[${fi}]}:${ENTRIES_MTIME[${fi}]}:${ENTRIES_TYPE[${fi}]}|"
+  done
+  echo "${fp}"
 }
 
 # ── Age Formatting ────────────────────────────────
 cs_format_age() {
-    local diff=$((NOW - $1))
-    if ((diff < 60)); then
-        echo "<1m"
-    elif ((diff < 3600)); then
-        echo "$((diff / 60))m"
-    elif ((diff < 86400)); then
-        echo "$((diff / 3600))h"
-    elif ((diff < 604800)); then
-        echo "$((diff / 86400))d"
-    else
-        echo "$((diff / 604800))w"
-    fi
+  local diff=$((NOW - $1))
+  if ((diff < 60)); then
+    echo "<1m"
+  elif ((diff < 3600)); then
+    echo "$((diff / 60))m"
+  elif ((diff < 86400)); then
+    echo "$((diff / 3600))h"
+  elif ((diff < 604800)); then
+    echo "$((diff / 86400))d"
+  else
+    echo "$((diff / 604800))w"
+  fi
 }
 
 # ── Pane Lifecycle ────────────────────────────────
 cs_show_pane() {
-    local target_pane="$1"
-    # Verify target pane exists before attempting swap
-    cs_refresh_pane_cache
-    if ! cs_pane_alive "${target_pane}"; then
-        return 1
-    fi
-    local cur_pane picker_pane picker_session
-    cur_pane=$(cs_read_state current_pane)
-    picker_pane=$(cs_read_state picker_pane)
-    picker_session=$(_tmux display-message -t "${picker_pane}" -p '#{session_name}' 2>/dev/null)
+  local target_pane="$1"
+  # Verify target pane exists before attempting swap
+  cs_refresh_pane_cache
+  if ! cs_pane_alive "${target_pane}"; then
+    return 1
+  fi
+  local cur_pane picker_pane picker_session
+  cur_pane=$(cs_read_state current_pane)
+  picker_pane=$(cs_read_state picker_pane)
+  picker_session=$(_tmux display-message -t "${picker_pane}" -p '#{session_name}' 2>/dev/null)
 
-    # -b = join before (left of) target. Omit = join after (right of) target.
-    local join_dir="-b"
-    [[ "${PICKER_SIDE}" == "left" ]] && join_dir=""
+  # -b = join before (left of) target. Omit = join after (right of) target.
+  local join_dir="-b"
+  [[ "${PICKER_SIDE}" == "left" ]] && join_dir=""
 
-    if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]]; then
-        if cs_pane_alive "${cur_pane}"; then
-            # Park old session's terminal first (if visible)
-            local old_term=""
-            if cs_term_is_shown "${cur_pane}"; then
-                old_term=$(cs_term_pane_for "${cur_pane}")
-            fi
-            if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
-                cs_term_save_height "${old_term}" "${cur_pane}"
-                # Extended chain: park terminal, park session, join new
-                _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
-                     break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
-                     join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-                     resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-                     select-pane -t "${picker_pane}"
-                cs_rename_pane_window "${old_term}" "cs:term"
-            else
-                _tmux break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
-                     join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-                     resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-                     select-pane -t "${picker_pane}"
-            fi
-            # Rename the parked window
-            local parked_sid parked_name
-            parked_sid=$(cat "${STATE_DIR}/panes/${cur_pane#%}" 2>/dev/null || true)
-            parked_name="${parked_sid:0:8}"
-            for ((pi=0; pi < ${#ENTRIES_ID[@]}; pi++)); do
-                if [[ "${ENTRIES_ID[${pi}]}" == "${parked_sid}" ]]; then
-                    parked_name="${ENTRIES_NAME[${pi}]}"
-                    break
-                fi
-            done
-            cs_rename_pane_window "${cur_pane}" "${parked_name}"
-        else
-            _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-                 resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-                 select-pane -t "${picker_pane}"
+  if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]]; then
+    if cs_pane_alive "${cur_pane}"; then
+      # Park old session's terminal first (if visible)
+      local old_term=""
+      if cs_term_is_shown "${cur_pane}"; then
+        old_term=$(cs_term_pane_for "${cur_pane}")
+      fi
+      if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
+        cs_term_save_height "${old_term}" "${cur_pane}"
+        # Extended chain: park terminal, park session, join new
+        _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
+           break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
+           join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
+           resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
+           select-pane -t "${picker_pane}"
+        cs_rename_pane_window "${old_term}" "cs:term"
+      else
+        _tmux break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
+           join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
+           resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
+           select-pane -t "${picker_pane}"
+      fi
+      # Rename the parked window
+      local parked_sid parked_name
+      parked_sid=$(cat "${STATE_DIR}/panes/${cur_pane#%}" 2>/dev/null || true)
+      parked_name="${parked_sid:0:8}"
+      for ((pi=0; pi < ${#ENTRIES_ID[@]}; pi++)); do
+        if [[ "${ENTRIES_ID[${pi}]}" == "${parked_sid}" ]]; then
+          parked_name="${ENTRIES_NAME[${pi}]}"
+          break
         fi
+      done
+      cs_rename_pane_window "${cur_pane}" "${parked_name}"
     else
-        local visible
-        visible=$(_tmux list-panes -F '#{pane_id}' 2>/dev/null | grep "^${target_pane}$" || true)
-        if [[ -z "${visible}" ]]; then
-            _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-                 resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-                 select-pane -t "${picker_pane}"
-        fi
+      _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
+         resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
+         select-pane -t "${picker_pane}"
     fi
+  else
+    local visible
+    visible=$(_tmux list-panes -F '#{pane_id}' 2>/dev/null | grep "^${target_pane}$" || true)
+    if [[ -z "${visible}" ]]; then
+      _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
+         resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
+         select-pane -t "${picker_pane}"
+    fi
+  fi
 
-    echo "${target_pane}" > "${STATE_DIR}/current_pane"
-    local _bells_changed=0
-    if [[ -n "${cur_pane}" ]] && [[ -v "BELL_SET[${cur_pane}]" ]]; then
-        unset "BELL_SET[${cur_pane}]"
-        _bells_changed=1
-    fi
-    if [[ -v "BELL_SET[${target_pane}]" ]]; then
-        unset "BELL_SET[${target_pane}]"
-        _bells_changed=1
-    fi
-    ((_bells_changed)) && cs_sync_bells_active
+  echo "${target_pane}" > "${STATE_DIR}/current_pane"
+  local _bells_changed=0
+  if [[ -n "${cur_pane}" ]] && [[ -v "BELL_SET[${cur_pane}]" ]]; then
+    unset "BELL_SET[${cur_pane}]"
+    _bells_changed=1
+  fi
+  if [[ -v "BELL_SET[${target_pane}]" ]]; then
+    unset "BELL_SET[${target_pane}]"
+    _bells_changed=1
+  fi
+  ((_bells_changed)) && cs_sync_bells_active
 
-    # Attach new session's terminal (if that session has term shown)
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    if [[ "${target_pane}" != "${wp}" ]] && cs_term_is_shown "${target_pane}"; then
-        cs_term_show "${target_pane}"
-        _tmux resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" 2>/dev/null || true
-    fi
+  # Attach new session's terminal (if that session has term shown)
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  if [[ "${target_pane}" != "${wp}" ]] && cs_term_is_shown "${target_pane}"; then
+    cs_term_show "${target_pane}"
+    _tmux resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+  fi
 
-    # Let tmux settle layout before picker re-renders
-    sleep 0.05
+  # Let tmux settle layout before picker re-renders
+  sleep 0.05
 }
 
 # Focus the currently shown session pane
 cs_focus_session() {
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    if [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}"; then
-        _tmux select-pane -t "${cur_pane}"
-    fi
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  if [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}"; then
+    _tmux select-pane -t "${cur_pane}"
+  fi
 }
 
 cs_jump_to_local() {
-    local target="$1"
-    ((target == 0)) && target=10
-    local count=0 i
-    for ((i = 0; i < ${#ENTRIES_ID[@]}; i++)); do
-        [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] || continue
-        ((++count == target)) || continue
-        SELECTED=${i}
-        cs_activate_selected
-        cs_focus_session
-        DIRTY=1
-        return
-    done
+  local target="$1"
+  ((target == 0)) && target=10
+  local count=0 i
+  for ((i = 0; i < ${#ENTRIES_ID[@]}; i++)); do
+    [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] || continue
+    ((++count == target)) || continue
+    SELECTED=${i}
+    cs_activate_selected
+    cs_focus_session
+    DIRTY=1
+    return
+  done
 }
 
 # ── Terminal Pane ────────────────────────────────
 
 # Get terminal pane ID for a session pane (O(1) lookup)
 cs_term_pane_for() {
-    cat "${STATE_DIR}/term/${1#%}" 2>/dev/null || true
+  cat "${STATE_DIR}/term/${1#%}" 2>/dev/null || true
 }
 
 # Check if session's terminal should be visible
 cs_term_is_shown() {
-    [[ -f "${STATE_DIR}/term/${1#%}.shown" ]]
+  [[ -f "${STATE_DIR}/term/${1#%}.shown" ]]
 }
 
 # Compute terminal height in characters
 cs_term_compute_height() {
-    local session_pane="$1"
-    # Per-session runtime override (stored as percentage)
-    local pct="" h
-    h=$(cat "${STATE_DIR}/term/${session_pane#%}.height" 2>/dev/null || true)
-    if [[ -n "${h}" ]]; then
-        pct="${h}"
-    elif [[ "${TERMINAL_HEIGHT}" == *% ]]; then
-        pct="${TERMINAL_HEIGHT%\%}"
+  local session_pane="$1"
+  # Per-session runtime override (stored as percentage)
+  local pct="" h
+  h=$(cat "${STATE_DIR}/term/${session_pane#%}.height" 2>/dev/null || true)
+  if [[ -n "${h}" ]]; then
+    pct="${h}"
+  elif [[ "${TERMINAL_HEIGHT}" == *% ]]; then
+    pct="${TERMINAL_HEIGHT%\%}"
+  fi
+  if [[ -n "${pct}" ]]; then
+    local pane_h=0
+    if cs_pane_alive "${session_pane}"; then
+      pane_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || echo 0)
     fi
-    if [[ -n "${pct}" ]]; then
-        local pane_h=0
-        if cs_pane_alive "${session_pane}"; then
-            pane_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || echo 0)
-        fi
-        h=$(( (pane_h * pct + 50) / 100 ))
-    else
-        h="${TERMINAL_HEIGHT}"
-    fi
-    (( h < 3 )) && h=3
-    echo "${h}"
+    h=$(( (pane_h * pct + 50) / 100 ))
+  else
+    h="${TERMINAL_HEIGHT}"
+  fi
+  (( h < 3 )) && h=3
+  echo "${h}"
 }
 
 cs_term_save_height() {
-    local term_pane="$1" session_pane="$2"
-    local th sh
-    th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    sh=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
-    if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
-        echo $(( th * 100 / (th + sh) )) > "${STATE_DIR}/term/${session_pane#%}.height"
-    fi
+  local term_pane="$1" session_pane="$2"
+  local th sh
+  th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+  sh=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
+  if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
+    echo $(( th * 100 / (th + sh) )) > "${STATE_DIR}/term/${session_pane#%}.height"
+  fi
 }
 
 # Create a new terminal pane below the session pane.
 # Precondition: session_pane must already be visible in the picker window.
 cs_term_create() {
-    local session_pane="$1"
-    local height
-    height=$(cs_term_compute_height "${session_pane}")
-    local pane_id
-    pane_id=$(_tmux split-window -v -d -t "${session_pane}" -l "${height}" \
-        -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
-    echo "${pane_id}" > "${STATE_DIR}/term/${session_pane#%}"
-    echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+  local session_pane="$1"
+  local height
+  height=$(cs_term_compute_height "${session_pane}")
+  local pane_id
+  pane_id=$(_tmux split-window -v -d -t "${session_pane}" -l "${height}" \
+    -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+  echo "${pane_id}" > "${STATE_DIR}/term/${session_pane#%}"
+  echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
 }
 
 # Show terminal for a session. Auto-creates if needed, unparks if parked.
 cs_term_show() {
-    local session_pane="$1"
-    local term_pane
-    term_pane=$(cs_term_pane_for "${session_pane}")
-    cs_refresh_pane_cache
+  local session_pane="$1"
+  local term_pane
+  term_pane=$(cs_term_pane_for "${session_pane}")
+  cs_refresh_pane_cache
 
-    # No terminal or dead — create fresh
-    if [[ -z "${term_pane}" ]] || ! cs_pane_alive "${term_pane}"; then
-        [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
-        cs_term_create "${session_pane}"
-        return
-    fi
+  # No terminal or dead — create fresh
+  if [[ -z "${term_pane}" ]] || ! cs_pane_alive "${term_pane}"; then
+    [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
+    cs_term_create "${session_pane}"
+    return
+  fi
 
-    # Already visible in picker window — nothing to do
-    if _tmux list-panes -t "${PICKER_PANE}" -F '#{pane_id}' 2>/dev/null | grep -q "^${term_pane}$"; then
-        echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
-        return
-    fi
-
-    # Parked — unpark below session
-    local height
-    height=$(cs_term_compute_height "${session_pane}")
-    _tmux join-pane -v -d -s "${term_pane}" -t "${session_pane}" -l "${height}" 2>/dev/null || true
+  # Already visible in picker window — nothing to do
+  if _tmux list-panes -t "${PICKER_PANE}" -F '#{pane_id}' 2>/dev/null | grep -q "^${term_pane}$"; then
     echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+    return
+  fi
+
+  # Parked — unpark below session
+  local height
+  height=$(cs_term_compute_height "${session_pane}")
+  _tmux join-pane -v -d -s "${term_pane}" -t "${session_pane}" -l "${height}" 2>/dev/null || true
+  echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
 }
 
 # Park terminal in a hidden window.
 cs_term_hide() {
-    local session_pane="$1"
-    local term_pane
-    term_pane=$(cs_term_pane_for "${session_pane}")
-    cs_refresh_pane_cache
-    [[ -n "${term_pane}" ]] && cs_pane_alive "${term_pane}" || return 0
+  local session_pane="$1"
+  local term_pane
+  term_pane=$(cs_term_pane_for "${session_pane}")
+  cs_refresh_pane_cache
+  [[ -n "${term_pane}" ]] && cs_pane_alive "${term_pane}" || return 0
 
-    cs_term_save_height "${term_pane}" "${session_pane}"
+  cs_term_save_height "${term_pane}" "${session_pane}"
 
-    # Park
-    local picker_session
-    picker_session=$(_tmux display-message -t "${PICKER_PANE}" -p '#{session_name}' 2>/dev/null || true)
-    _tmux break-pane -d -s "${term_pane}" -t "${picker_session}:" 2>/dev/null || true
-    cs_rename_pane_window "${term_pane}" "cs:term"
-    rm -f "${STATE_DIR}/term/${session_pane#%}.shown"
+  # Park
+  local picker_session
+  picker_session=$(_tmux display-message -t "${PICKER_PANE}" -p '#{session_name}' 2>/dev/null || true)
+  _tmux break-pane -d -s "${term_pane}" -t "${picker_session}:" 2>/dev/null || true
+  cs_rename_pane_window "${term_pane}" "cs:term"
+  rm -f "${STATE_DIR}/term/${session_pane#%}.shown"
 }
 
 # Kill terminal and clean up all state files.
 cs_term_kill() {
-    local session_pane="$1"
-    local term_pane
-    term_pane=$(cs_term_pane_for "${session_pane}")
-    [[ -n "${term_pane}" ]] || return 0
-    _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
-    rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
+  local session_pane="$1"
+  local term_pane
+  term_pane=$(cs_term_pane_for "${session_pane}")
+  [[ -n "${term_pane}" ]] || return 0
+  _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
+  rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
 }
 
 # Toggle terminal visibility for current session (prefix+F).
 cs_term_toggle() {
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
-    # Don't toggle for welcome pane
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
+  # Don't toggle for welcome pane
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
 
-    if cs_term_is_shown "${cur_pane}"; then
-        cs_term_hide "${cur_pane}"
-    else
-        cs_term_show "${cur_pane}"
-    fi
-    _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
-    # Focus terminal on toggle-on
-    if cs_term_is_shown "${cur_pane}"; then
-        local term_pane
-        term_pane=$(cs_term_pane_for "${cur_pane}")
-        [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
-    fi
+  if cs_term_is_shown "${cur_pane}"; then
+    cs_term_hide "${cur_pane}"
+  else
+    cs_term_show "${cur_pane}"
+  fi
+  _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+  # Focus terminal on toggle-on
+  if cs_term_is_shown "${cur_pane}"; then
+    local term_pane
+    term_pane=$(cs_term_pane_for "${cur_pane}")
+    [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
+  fi
 }
 
 # Smart terminal: closed→open+focus, focused→focus claude, unfocused→focus.
 cs_term_smart() {
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
 
-    if ! cs_term_is_shown "${cur_pane}"; then
-        # Closed → open + focus
-        cs_term_show "${cur_pane}"
-        _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
-        local term_pane
-        term_pane=$(cs_term_pane_for "${cur_pane}")
-        [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
+  if ! cs_term_is_shown "${cur_pane}"; then
+    # Closed → open + focus
+    cs_term_show "${cur_pane}"
+    _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+    local term_pane
+    term_pane=$(cs_term_pane_for "${cur_pane}")
+    [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
+  else
+    local term_pane
+    term_pane=$(cs_term_pane_for "${cur_pane}")
+    local active_pane
+    active_pane=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
+    if [[ "${active_pane}" == "${term_pane}" ]]; then
+      # Focused → focus claude
+      _tmux select-pane -t "${cur_pane}" 2>/dev/null || true
     else
-        local term_pane
-        term_pane=$(cs_term_pane_for "${cur_pane}")
-        local active_pane
-        active_pane=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
-        if [[ "${active_pane}" == "${term_pane}" ]]; then
-            # Focused → focus claude
-            _tmux select-pane -t "${cur_pane}" 2>/dev/null || true
-        else
-            # Open + not focused → focus
-            [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
-        fi
+      # Open + not focused → focus
+      [[ -n "${term_pane}" ]] && _tmux select-pane -t "${term_pane}" 2>/dev/null || true
     fi
+  fi
 }
 
 # WINCH handler — re-pin picker width on terminal resize.
 cs_handle_winch() {
-    _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null
-    # Re-pin terminal height to saved percentage
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    if [[ -n "${cur_pane}" ]] && cs_term_is_shown "${cur_pane}"; then
-        local term_pane
-        term_pane=$(cs_term_pane_for "${cur_pane}")
-        if [[ -n "${term_pane}" ]]; then
-            local pct
-            pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
-            [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
-            [[ -z "${pct}" ]] && pct=35
-            local term_h sess_h
-            term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-            sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
-            if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
-                local new_h=$(( ((term_h + sess_h) * pct + 50) / 100 ))
-                (( new_h < 3 )) && new_h=3
-                _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
-            fi
-        fi
+  _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null
+  # Re-pin terminal height to saved percentage
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  if [[ -n "${cur_pane}" ]] && cs_term_is_shown "${cur_pane}"; then
+    local term_pane
+    term_pane=$(cs_term_pane_for "${cur_pane}")
+    if [[ -n "${term_pane}" ]]; then
+      local pct
+      pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
+      [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
+      [[ -z "${pct}" ]] && pct=35
+      local term_h sess_h
+      term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+      sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
+      if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
+        local new_h=$(( ((term_h + sess_h) * pct + 50) / 100 ))
+        (( new_h < 3 )) && new_h=3
+        _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
+      fi
     fi
-    DIRTY=1
+  fi
+  DIRTY=1
 }
 
 cs_new_session() {
-    # Kill existing uninitialized session if any
-    local old_new
-    old_new=$(cs_read_state new_pane)
-    if [[ -n "${old_new}" ]]; then
-        _tmux kill-pane -t "${old_new}" 2>/dev/null || true
-        rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane"
-    fi
-    local pane_id
-    pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec claude")
-    echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
-    echo "${pane_id}" > "${STATE_DIR}/new_pane"
-    cs_show_pane "${pane_id}"
+  # Kill existing uninitialized session if any
+  local old_new
+  old_new=$(cs_read_state new_pane)
+  if [[ -n "${old_new}" ]]; then
+    _tmux kill-pane -t "${old_new}" 2>/dev/null || true
+    rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane"
+  fi
+  local pane_id
+  pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec claude")
+  echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
+  echo "${pane_id}" > "${STATE_DIR}/new_pane"
+  cs_show_pane "${pane_id}"
 }
 
 cs_resume_session() {
-    local session_id="$1"
-    local pane_id
-    pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec claude --resume ${session_id@Q}")
-    echo "${session_id}" > "${STATE_DIR}/panes/${pane_id#%}"
-    cs_show_pane "${pane_id}"
+  local session_id="$1"
+  local pane_id
+  pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec claude --resume ${session_id@Q}")
+  echo "${session_id}" > "${STATE_DIR}/panes/${pane_id#%}"
+  cs_show_pane "${pane_id}"
 }
 
 cs_close_pane() {
-    local pane_id="$1"
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
+  local pane_id="$1"
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
 
-    # Get PID before killing so we can clean up Claude's session file
-    local pane_pid=""
-    if cs_pane_alive "${pane_id}"; then
-        pane_pid=$(_tmux display-message -t "${pane_id}" -p '#{pane_pid}' 2>/dev/null || true)
-    fi
+  # Get PID before killing so we can clean up Claude's session file
+  local pane_pid=""
+  if cs_pane_alive "${pane_id}"; then
+    pane_pid=$(_tmux display-message -t "${pane_id}" -p '#{pane_pid}' 2>/dev/null || true)
+  fi
 
-    # Kill associated terminal pane first
-    cs_term_kill "${pane_id}"
+  # Kill associated terminal pane first
+  cs_term_kill "${pane_id}"
 
-    if [[ "${cur_pane}" == "${pane_id}" ]]; then
-        _tmux break-pane -d -s "${pane_id}" 2>/dev/null || true
-    fi
+  if [[ "${cur_pane}" == "${pane_id}" ]]; then
+    _tmux break-pane -d -s "${pane_id}" 2>/dev/null || true
+  fi
 
-    _tmux kill-pane -t "${pane_id}" 2>/dev/null || true
-    rm -f "${STATE_DIR}/panes/${pane_id#%}"
+  _tmux kill-pane -t "${pane_id}" 2>/dev/null || true
+  rm -f "${STATE_DIR}/panes/${pane_id#%}"
 
-    # Remove Claude's stale session tracking file
-    if [[ -n "${pane_pid}" ]]; then
-        local _spid
-        _spid=$(_cs_find_session_pid "${pane_pid}") && rm -f "${SESSIONS_DIR}/${_spid}.json"
-    fi
+  # Remove Claude's stale session tracking file
+  if [[ -n "${pane_pid}" ]]; then
+    local _spid
+    _spid=$(_cs_find_session_pid "${pane_pid}") && rm -f "${SESSIONS_DIR}/${_spid}.json"
+  fi
 
-    # Clean up new_pane if this was the new session
-    local np
-    np=$(cs_read_state new_pane)
-    [[ "${np}" == "${pane_id}" ]] && rm -f "${STATE_DIR}/new_pane"
+  # Clean up new_pane if this was the new session
+  local np
+  np=$(cs_read_state new_pane)
+  [[ "${np}" == "${pane_id}" ]] && rm -f "${STATE_DIR}/new_pane"
 }
 
 # ── Welcome Pane ──────────────────────────────────
 cs_show_welcome() {
-    local n=${#ENTRIES_ID[@]}
-    local script="${STATE_DIR}/welcome.sh"
-    {
-        echo '#!/bin/bash'
-        echo 'clear'
-        echo 'echo ""'
-        echo 'echo "  claude-spaces"'
-        echo 'echo "  ─────────────────"'
-        local _wname="${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}"
-        echo "echo \"  Project: ${_wname} (${PWD})\""
-        echo "echo \"  Sessions: ${n}\""
-        echo 'echo ""'
-        echo 'echo "  Select a session in the picker (→)"'
-        echo 'echo "  or press :n for a new session."'
-        echo 'echo ""'
-        cs_help_text | while IFS= read -r line; do
-            line="${line//\\/\\\\}"
-            line="${line//\"/\\\"}"
-            line="${line//\`/\\\`}"
-            line="${line//\$/\\\$}"
-            line="${line//>/\\>}"
-            echo "echo \"${line}\""
-        done
-        cat << 'WELCOMEEOF'
+  local n=${#ENTRIES_ID[@]}
+  local script="${STATE_DIR}/welcome.sh"
+  {
+    echo '#!/bin/bash'
+    echo 'clear'
+    echo 'echo ""'
+    echo 'echo "  claude-spaces"'
+    echo 'echo "  ─────────────────"'
+    local _wname="${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}"
+    echo "echo \"  Project: ${_wname} (${PWD})\""
+    echo "echo \"  Sessions: ${n}\""
+    echo 'echo ""'
+    echo 'echo "  Select a session in the picker (→)"'
+    echo 'echo "  or press :n for a new session."'
+    echo 'echo ""'
+    cs_help_text | while IFS= read -r line; do
+      line="${line//\\/\\\\}"
+      line="${line//\"/\\\"}"
+      line="${line//\`/\\\`}"
+      line="${line//\$/\\\$}"
+      line="${line//>/\\>}"
+      echo "echo \"${line}\""
+    done
+    cat << 'WELCOMEEOF'
 echo ""
 recs=""
 if ! grep -q 'printf.*\\a.*dev/tty' ~/.claude/settings.json 2>/dev/null; then
-    recs+="    Add Stop hook in ~/.claude/settings.json\n"
+  recs+="    Add Stop hook in ~/.claude/settings.json\n"
 fi
 if [[ -n "${recs}" ]]; then
-    echo "  Recommended:"
-    echo -e "${recs}"
+  echo "  Recommended:"
+  echo -e "${recs}"
 fi
 sleep 99999
 WELCOMEEOF
-    } > "${script}"
-    chmod +x "${script}"
-    local welcome_pane
-    welcome_pane=$(_tmux new-window -d -P -F '#{pane_id}' "${script}")
-    echo "${welcome_pane}" > "${STATE_DIR}/welcome_pane"
-    cs_show_pane "${welcome_pane}"
+  } > "${script}"
+  chmod +x "${script}"
+  local welcome_pane
+  welcome_pane=$(_tmux new-window -d -P -F '#{pane_id}' "${script}")
+  echo "${welcome_pane}" > "${STATE_DIR}/welcome_pane"
+  cs_show_pane "${welcome_pane}"
 }
 
 cs_kill_welcome() {
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" ]] || return 0
-    # If it's the current pane, it'll get parked by cs_show_pane.
-    # Either way, kill it.
-    _tmux kill-pane -t "${wp}" 2>/dev/null || true
-    rm -f "${STATE_DIR}/welcome_pane"
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" ]] || return 0
+  # If it's the current pane, it'll get parked by cs_show_pane.
+  # Either way, kill it.
+  _tmux kill-pane -t "${wp}" 2>/dev/null || true
+  rm -f "${STATE_DIR}/welcome_pane"
 }
 
 cs_render_header_bar() {
-    local color="$1" text="$2" width="$3"
-    printf '\e[1;1H%b%*s\e[0m' "${color}" "${width}" ""
-    printf '\e[1;1H%b%s\e[0m' "${color}" "${text}"
+  local color="$1" text="$2" width="$3"
+  printf '\e[1;1H%b%*s\e[0m' "${color}" "${width}" ""
+  printf '\e[1;1H%b%s\e[0m' "${color}" "${text}"
 }
 
 cs_render_header() {
-    local width="$1"
-    local pname="${PROJECT_NAMES[${PWD_SANITIZED}]:-}"
-    local title_path
-    if [[ -n "${pname}" ]]; then
-        title_path="${pname}"
+  local width="$1"
+  local pname="${PROJECT_NAMES[${PWD_SANITIZED}]:-}"
+  local title_path
+  if [[ -n "${pname}" ]]; then
+    title_path="${pname}"
+  else
+    local dname="${DISPLAY_NAMES[${PWD}]:-}"
+    local leaf="${PWD##*/}"
+    if [[ -n "${dname}" && "${dname}" != "${leaf}" ]]; then
+      title_path="${dname}"
     else
-        local dname="${DISPLAY_NAMES[${PWD}]:-}"
-        local leaf="${PWD##*/}"
-        if [[ -n "${dname}" && "${dname}" != "${leaf}" ]]; then
-            title_path="${dname}"
-        else
-            title_path="${PWD/#${HOME}/\~$(whoami)}"
-        fi
+      title_path="${PWD/#${HOME}/\~$(whoami)}"
     fi
-    local max_title=$((width - 2))
-    if ((${#title_path} > max_title)); then
-        title_path="...${title_path: -$((max_title - 3))}"
-    fi
-    local title=" ${title_path} "
-    local pad=$(( (width - ${#title}) / 2 ))
-    ((pad < 0)) && pad=0
-    printf '\e[1;1H%b%*s\e[0m' "${CS_CLR_HEADER_BG}" "${width}" ""
-    printf '\e[1;%dH%b%s\e[0m' "$((pad + 1))" "${CS_CLR_HEADER_BG}" "${title}"
+  fi
+  local max_title=$((width - 2))
+  if ((${#title_path} > max_title)); then
+    title_path="...${title_path: -$((max_title - 3))}"
+  fi
+  local title=" ${title_path} "
+  local pad=$(( (width - ${#title}) / 2 ))
+  ((pad < 0)) && pad=0
+  printf '\e[1;1H%b%*s\e[0m' "${CS_CLR_HEADER_BG}" "${width}" ""
+  printf '\e[1;%dH%b%s\e[0m' "$((pad + 1))" "${CS_CLR_HEADER_BG}" "${title}"
 }
 
 cs_print_centered() {
-    local line="$1" text="$2" w="$3"
-    local pad=$(( (w - ${#text}) / 2 ))
-    ((pad < 0)) && pad=0
-    printf '\e[%d;1H\e[K%b%*s%s\e[0m' "${line}" "${CS_CLR_CHROME}" "${pad}" "" "${text}"
+  local line="$1" text="$2" w="$3"
+  local pad=$(( (w - ${#text}) / 2 ))
+  ((pad < 0)) && pad=0
+  printf '\e[%d;1H\e[K%b%*s%s\e[0m' "${line}" "${CS_CLR_CHROME}" "${pad}" "" "${text}"
 }
 
 # ── Picker TUI ────────────────────────────────────
 cs_menu_render() {
-    local width="$1" height="$2"
+  local width="$1" height="$2"
 
-    printf '\e[?25l\e[H'
-    cs_render_header_bar "${CS_CLR_HEADER_BG}" "Esc: cancel" "${width}"
+  printf '\e[?25l\e[H'
+  cs_render_header_bar "${CS_CLR_HEADER_BG}" "Esc: cancel" "${width}"
 
-    # Blank + highlighted session entry
-    local row=2
+  # Blank + highlighted session entry
+  local row=2
+  printf '\e[%d;1H\e[K' "${row}"
+  ((row++))
+  if ((SELECTED >= 0 && SELECTED < ${#ENTRIES_ID[@]})); then
+    local name="${ENTRIES_NAME[${SELECTED}]}"
+    local status="${ENTRIES_STATUS[${SELECTED}]}"
+    local color='\e[0m'
+    [[ "${status}" == "bell" ]] && color="${CS_CLR_BELL_MENU}"
+    printf '\e[%d;1H\e[K%b  %-*.*s\e[0m' "${row}" "${color}" "$((width - 2))" "$((width - 2))" "${name}"
+  else
     printf '\e[%d;1H\e[K' "${row}"
+  fi
+
+  # Blank + menu entries
+  ((row++))
+  printf '\e[%d;1H\e[K' "${row}"
+  local i
+  for ((i = 0; i < ${#MENU_KEYS[@]}; i++)); do
     ((row++))
-    if ((SELECTED >= 0 && SELECTED < ${#ENTRIES_ID[@]})); then
-        local name="${ENTRIES_NAME[${SELECTED}]}"
-        local status="${ENTRIES_STATUS[${SELECTED}]}"
-        local color='\e[0m'
-        [[ "${status}" == "bell" ]] && color="${CS_CLR_BELL_MENU}"
-        printf '\e[%d;1H\e[K%b  %-*.*s\e[0m' "${row}" "${color}" "$((width - 2))" "$((width - 2))" "${name}"
+    if [[ -z "${MENU_KEYS[${i}]}" ]]; then
+      printf '\e[%d;1H\e[K' "${row}"
     else
-        printf '\e[%d;1H\e[K' "${row}"
+      printf '\e[%d;1H\e[K  %b%s\e[0m  %b%s\e[0m' "${row}" "${CS_CLR_BOLD}" "${MENU_KEYS[${i}]}" "${CS_CLR_CHROME}" "${MENU_LABELS[${i}]}"
     fi
+  done
 
-    # Blank + menu entries
-    ((row++))
-    printf '\e[%d;1H\e[K' "${row}"
-    local i
-    for ((i = 0; i < ${#MENU_KEYS[@]}; i++)); do
-        ((row++))
-        if [[ -z "${MENU_KEYS[${i}]}" ]]; then
-            printf '\e[%d;1H\e[K' "${row}"
-        else
-            printf '\e[%d;1H\e[K  %b%s\e[0m  %b%s\e[0m' "${row}" "${CS_CLR_BOLD}" "${MENU_KEYS[${i}]}" "${CS_CLR_CHROME}" "${MENU_LABELS[${i}]}"
-        fi
-    done
-
-    # Clear remaining lines
-    ((row++))
-    printf '\e[%d;1H\e[J' "${row}"
+  # Clear remaining lines
+  ((row++))
+  printf '\e[%d;1H\e[J' "${row}"
 
 }
 
 cs_picker_render() {
-    NOW=$(date +%s)
-    local width height avail
-    width=$(tput cols)
-    height=$(tput lines)
+  NOW=$(date +%s)
+  local width height avail
+  width=$(tput cols)
+  height=$(tput lines)
 
-    if ((MENU_ACTIVE)); then
-        cs_menu_render "${width}" "${height}"
-        return
-    fi
+  if ((MENU_ACTIVE)); then
+    cs_menu_render "${width}" "${height}"
+    return
+  fi
 
-    avail=$((height - 5))
-    ((avail < 1)) && avail=1
+  avail=$((height - 5))
+  ((avail < 1)) && avail=1
 
-    local n=${#ENTRIES_ID[@]}
+  local n=${#ENTRIES_ID[@]}
 
-    # Adjust scroll
-    if ((SELECTED < SCROLL)); then
-        SCROLL=${SELECTED}
-    elif ((SELECTED >= SCROLL + avail)); then
-        SCROLL=$((SELECTED - avail + 1))
-    fi
+  # Adjust scroll
+  if ((SELECTED < SCROLL)); then
+    SCROLL=${SELECTED}
+  elif ((SELECTED >= SCROLL + avail)); then
+    SCROLL=$((SELECTED - avail + 1))
+  fi
 
-    # Hide cursor, home position (no full clear — paint over to avoid flash)
-    printf '\e[?25l\e]112\a\e[H'
+  # Hide cursor, home position (no full clear — paint over to avoid flash)
+  printf '\e[?25l\e]112\a\e[H'
 
-    # Header (or search bar when searching)
-    if ((SEARCH_ACTIVE)); then
-        local search_clr="${CS_CLR_SEARCH_BAR}"
-        ((!SEARCH_FIELD_FOCUSED)) && search_clr="${CS_CLR_HEADER_BG}"
-        cs_render_header_bar "${search_clr}" "/${SEARCH_TERM}" "${width}"
-    else
-        cs_render_header "${width}"
-    fi
+  # Header (or search bar when searching)
+  if ((SEARCH_ACTIVE)); then
+    local search_clr="${CS_CLR_SEARCH_BAR}"
+    ((!SEARCH_FIELD_FOCUSED)) && search_clr="${CS_CLR_HEADER_BG}"
+    cs_render_header_bar "${search_clr}" "/${SEARCH_TERM}" "${width}"
+  else
+    cs_render_header "${width}"
+  fi
 
-    if ((n == 0)); then
-        local empty_msg="No sessions found."
-        ((SEARCH_ACTIVE)) && empty_msg="No matches."
-        printf '\e[2;1H\e[K%b  %s\e[0m' "${CS_CLR_CHROME}" "${empty_msg}"
-        # Clear remaining lines
-        local cl
-        for ((cl = 3; cl < height; cl++)); do
-            printf '\e[%d;1H\e[K' "${cl}"
-        done
-        if ((SEARCH_ACTIVE)); then
-            printf '\e[%d;1H\e[K' "${height}"
-            if ((SEARCH_FIELD_FOCUSED)); then
-                printf '\e]12;#ffffff\a\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
-            fi
-        else
-            printf '\e[%d;1H\e[K' "${height}"
-        fi
-        return
-    fi
-
-    # Session list
-    local max_name=$((width - 4))
-    ((max_name < 5)) && max_name=5
-
-    local cur_pane picker_focused
-    cur_pane=$(cs_read_state current_pane)
-    picker_focused=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-
-    local i local_idx=0
-    for ((i = 0; i < SCROLL && i < n; i++)); do
-        [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] && ((local_idx++))
+  if ((n == 0)); then
+    local empty_msg="No sessions found."
+    ((SEARCH_ACTIVE)) && empty_msg="No matches."
+    printf '\e[2;1H\e[K%b  %s\e[0m' "${CS_CLR_CHROME}" "${empty_msg}"
+    # Clear remaining lines
+    local cl
+    for ((cl = 3; cl < height; cl++)); do
+      printf '\e[%d;1H\e[K' "${cl}"
     done
-    for ((i = SCROLL; i < SCROLL + avail && i < n; i++)); do
-        local line=$((i - SCROLL + 2))
-        printf '\e[%d;1H\e[K' "${line}"
-
-        local name="${ENTRIES_NAME[${i}]}"
-        local status="${ENTRIES_STATUS[${i}]}"
-        local pane="${ENTRIES_PANE[${i}]}"
-        local entry_type="${ENTRIES_TYPE[${i}]}"
-        local age
-        age=$(cs_format_age "${ENTRIES_MTIME[${i}]}")
-        if [[ "${entry_type}" == "local" ]] && ((ENTRIES_MTIME[i] >= RECENT_CUTOFF)) \
-            && ! [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
-            age="<${RECENT_THRESHOLD}m"
-        fi
-
-        # Header/spacer entries render separately
-        if [[ "${entry_type}" == "spacer" ]]; then
-            continue
-        fi
-        if [[ "${entry_type}" == "header" ]]; then
-            printf '%b─ %s ─\e[0m' "${CS_CLR_SECTION}" "${name}"
-            continue
-        fi
-
-        # Per-type: indent, color, show_age, prefix, index
-        local indent=0 line_color="${CS_CLR_DORMANT}" show_age=1 line_prefix="" idx_prefix=""
-        case "${entry_type}" in
-            local)
-                line_color="${CS_CLR_DORMANT}"
-                if [[ "${pane}" == "${cur_pane}" && -n "${cur_pane}" ]]; then
-                    line_color="${CS_CLR_ACTIVE}"
-                    if [[ "${picker_focused}" == "0" ]]; then
-                        if [[ "${PICKER_SIDE}" == "left" ]]; then
-                            line_prefix="> "
-                        else
-                            line_prefix="< "
-                        fi
-                    fi
-                elif [[ "${status}" == "managed" ]] && [[ -v "BELL_SET[${pane}]" ]]; then
-                    line_color="${CS_CLR_BELL}"
-                elif [[ "${status}" == "managed" ]]; then
-                    line_color="${CS_CLR_RUNNING}"
-                elif [[ "${status}" == "active_elsewhere" ]]; then
-                    line_color="${CS_CLR_LOCKED}"
-                fi
-                if ((SHOW_INDEX)); then
-                    if ((local_idx < 10)); then
-                        local digit=$(( (++local_idx) % 10 ))
-                        if [[ -z "${line_prefix}" ]]; then
-                            idx_prefix="${digit} "
-                        fi
-                    elif [[ -z "${line_prefix}" ]]; then
-                        idx_prefix="  "
-                    fi
-                fi
-                ;;
-            project)
-                line_color="${CS_CLR_RUNNING}" ; show_age=0
-                ;;
-            remote)
-                indent=2
-                if [[ "${status}" == "bell" ]]; then
-                    line_color="${CS_CLR_BELL}"
-                elif [[ "${status}" == "managed" ]]; then
-                    line_color="${CS_CLR_RUNNING}"
-                else
-                    line_color="${CS_CLR_DORMANT}"
-                fi
-                ;;
-            inactive)
-                line_color="${CS_CLR_DORMANT}" ; show_age=0
-                ;;
-        esac
-
-        # Compute available name width
-        local name_width=$((max_name - indent - ${#idx_prefix} - ${#line_prefix}))
-        if ((! show_age)); then
-            name_width=$((name_width + 4))
-        fi
-
-        # Truncate name
-        if [[ "${entry_type}" == "project" || "${entry_type}" == "inactive" ]]; then
-            name_width=$((name_width - 2))
-            if ((${#name} > name_width)); then
-                name="...${name: -$((name_width - 3))}"
-            fi
-        elif ((${#name} > name_width)); then
-            name="${name:0:$((name_width - 3))}..."
-        fi
-
-        # Indent string
-        local indent_str=""
-        ((indent > 0)) && printf -v indent_str '%*s' "${indent}" ""
-
-        # Selection background (skip for focused or search field focused)
-        local sel_bg=""
-        if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ "${picker_focused}" == "1" ]]; then
-            sel_bg="${CS_CLR_SELECTION}"
-            printf '%b' "${sel_bg}"
-        fi
-
-        # Render line — bold line_color when selected
-        if [[ -n "${sel_bg}" ]]; then
-            line_color='\e[1m'"${line_color}"
-        fi
-        local idx_color="${CS_CLR_CHROME}"
-        [[ -n "${sel_bg}" ]] && idx_color="${line_color}"
-        if ((show_age)); then
-            printf '%s%b%s\e[0m%b%b%s%-*.*s%4s' "${indent_str}" "${idx_color}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}"
-        else
-            printf '%s%b%s\e[0m%b%b%s%-*.*s' "${indent_str}" "${idx_color}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}"
-        fi
-        printf '\e[0m'
-    done
-
-    # Footer below session list
-    local last_entry_line
-    if ((n > SCROLL + avail)); then
-        last_entry_line=$((avail + 1))
-    else
-        last_entry_line=$((n - SCROLL + 1))
-    fi
-
-    # Scroll indicator
-    if ((n > avail)); then
-        local pct=$(( (SCROLL * 100) / (n - avail) ))
-        printf '\e[%d;1H\e[K%b%d%%\e[0m' "$((last_entry_line + 1))" "${CS_CLR_CHROME}" "${pct}"
-    else
-        printf '\e[%d;1H\e[K' "$((last_entry_line + 1))"
-    fi
-
     if ((SEARCH_ACTIVE)); then
-        # Clear from after scroll indicator to bottom (search field is in header)
-        local cl
-        for ((cl = last_entry_line + 2; cl <= height; cl++)); do
-            printf '\e[%d;1H\e[K' "${cl}"
-        done
-        if ((SEARCH_FIELD_FOCUSED)); then
-            printf '\e]12;#ffffff\a\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
-        fi
+      printf '\e[%d;1H\e[K' "${height}"
+      if ((SEARCH_FIELD_FOCUSED)); then
+        printf '\e]12;#ffffff\a\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
+      fi
     else
-        # Centered footer (context-sensitive)
-        local footer_line=$((last_entry_line + 2))
-        local selected_type="${ENTRIES_TYPE[${SELECTED}]:-local}"
-        if [[ "${selected_type}" == "remote" || "${selected_type}" == "project" || "${selected_type}" == "inactive" ]]; then
-            cs_print_centered "${footer_line}" "Enter:switch" "${width}"
-        else
-            cs_print_centered "${footer_line}" ": menu  / search" "${width}"
-        fi
-
-        # Quit row
-        local quit_line=$((footer_line + 1))
-        cs_print_centered "${quit_line}" "Q:detach  ?:help" "${width}"
-
-        # Version line
-        printf '\e[%d;1H\e[K' "$((quit_line + 1))"
-        local version_line=$((quit_line + 2))
-        cs_print_centered "${version_line}" "claude-spaces v${VERSION}" "${width}"
-
-        # Clear everything below
-        printf '\e[%d;1H\e[J' "$((version_line + 1))"
+      printf '\e[%d;1H\e[K' "${height}"
     fi
+    return
+  fi
+
+  # Session list
+  local max_name=$((width - 4))
+  ((max_name < 5)) && max_name=5
+
+  local cur_pane picker_focused
+  cur_pane=$(cs_read_state current_pane)
+  picker_focused=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+
+  local i local_idx=0
+  for ((i = 0; i < SCROLL && i < n; i++)); do
+    [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] && ((local_idx++))
+  done
+  for ((i = SCROLL; i < SCROLL + avail && i < n; i++)); do
+    local line=$((i - SCROLL + 2))
+    printf '\e[%d;1H\e[K' "${line}"
+
+    local name="${ENTRIES_NAME[${i}]}"
+    local status="${ENTRIES_STATUS[${i}]}"
+    local pane="${ENTRIES_PANE[${i}]}"
+    local entry_type="${ENTRIES_TYPE[${i}]}"
+    local age
+    age=$(cs_format_age "${ENTRIES_MTIME[${i}]}")
+    if [[ "${entry_type}" == "local" ]] && ((ENTRIES_MTIME[i] >= RECENT_CUTOFF)) \
+      && ! [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
+      age="<${RECENT_THRESHOLD}m"
+    fi
+
+    # Header/spacer entries render separately
+    if [[ "${entry_type}" == "spacer" ]]; then
+      continue
+    fi
+    if [[ "${entry_type}" == "header" ]]; then
+      printf '%b─ %s ─\e[0m' "${CS_CLR_SECTION}" "${name}"
+      continue
+    fi
+
+    # Per-type: indent, color, show_age, prefix, index
+    local indent=0 line_color="${CS_CLR_DORMANT}" show_age=1 line_prefix="" idx_prefix=""
+    case "${entry_type}" in
+      local)
+        line_color="${CS_CLR_DORMANT}"
+        if [[ "${pane}" == "${cur_pane}" && -n "${cur_pane}" ]]; then
+          line_color="${CS_CLR_ACTIVE}"
+          if [[ "${picker_focused}" == "0" ]]; then
+            if [[ "${PICKER_SIDE}" == "left" ]]; then
+              line_prefix="> "
+            else
+              line_prefix="< "
+            fi
+          fi
+        elif [[ "${status}" == "managed" ]] && [[ -v "BELL_SET[${pane}]" ]]; then
+          line_color="${CS_CLR_BELL}"
+        elif [[ "${status}" == "managed" ]]; then
+          line_color="${CS_CLR_RUNNING}"
+        elif [[ "${status}" == "active_elsewhere" ]]; then
+          line_color="${CS_CLR_LOCKED}"
+        fi
+        if ((SHOW_INDEX)); then
+          if ((local_idx < 10)); then
+            local digit=$(( (++local_idx) % 10 ))
+            if [[ -z "${line_prefix}" ]]; then
+              idx_prefix="${digit} "
+            fi
+          elif [[ -z "${line_prefix}" ]]; then
+            idx_prefix="  "
+          fi
+        fi
+        ;;
+      project)
+        line_color="${CS_CLR_RUNNING}" ; show_age=0
+        ;;
+      remote)
+        indent=2
+        if [[ "${status}" == "bell" ]]; then
+          line_color="${CS_CLR_BELL}"
+        elif [[ "${status}" == "managed" ]]; then
+          line_color="${CS_CLR_RUNNING}"
+        else
+          line_color="${CS_CLR_DORMANT}"
+        fi
+        ;;
+      inactive)
+        line_color="${CS_CLR_DORMANT}" ; show_age=0
+        ;;
+    esac
+
+    # Compute available name width
+    local name_width=$((max_name - indent - ${#idx_prefix} - ${#line_prefix}))
+    if ((! show_age)); then
+      name_width=$((name_width + 4))
+    fi
+
+    # Truncate name
+    if [[ "${entry_type}" == "project" || "${entry_type}" == "inactive" ]]; then
+      name_width=$((name_width - 2))
+      if ((${#name} > name_width)); then
+        name="...${name: -$((name_width - 3))}"
+      fi
+    elif ((${#name} > name_width)); then
+      name="${name:0:$((name_width - 3))}..."
+    fi
+
+    # Indent string
+    local indent_str=""
+    ((indent > 0)) && printf -v indent_str '%*s' "${indent}" ""
+
+    # Selection background (skip for focused or search field focused)
+    local sel_bg=""
+    if ((i == SELECTED)) && ((!SEARCH_FIELD_FOCUSED)) && [[ "${picker_focused}" == "1" ]]; then
+      sel_bg="${CS_CLR_SELECTION}"
+      printf '%b' "${sel_bg}"
+    fi
+
+    # Render line — bold line_color when selected
+    if [[ -n "${sel_bg}" ]]; then
+      line_color='\e[1m'"${line_color}"
+    fi
+    local idx_color="${CS_CLR_CHROME}"
+    [[ -n "${sel_bg}" ]] && idx_color="${line_color}"
+    if ((show_age)); then
+      printf '%s%b%s\e[0m%b%b%s%-*.*s%4s' "${indent_str}" "${idx_color}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}" "${age}"
+    else
+      printf '%s%b%s\e[0m%b%b%s%-*.*s' "${indent_str}" "${idx_color}" "${idx_prefix}" "${sel_bg}" "${line_color}" "${line_prefix}" "${name_width}" "${name_width}" "${name}"
+    fi
+    printf '\e[0m'
+  done
+
+  # Footer below session list
+  local last_entry_line
+  if ((n > SCROLL + avail)); then
+    last_entry_line=$((avail + 1))
+  else
+    last_entry_line=$((n - SCROLL + 1))
+  fi
+
+  # Scroll indicator
+  if ((n > avail)); then
+    local pct=$(( (SCROLL * 100) / (n - avail) ))
+    printf '\e[%d;1H\e[K%b%d%%\e[0m' "$((last_entry_line + 1))" "${CS_CLR_CHROME}" "${pct}"
+  else
+    printf '\e[%d;1H\e[K' "$((last_entry_line + 1))"
+  fi
+
+  if ((SEARCH_ACTIVE)); then
+    # Clear from after scroll indicator to bottom (search field is in header)
+    local cl
+    for ((cl = last_entry_line + 2; cl <= height; cl++)); do
+      printf '\e[%d;1H\e[K' "${cl}"
+    done
+    if ((SEARCH_FIELD_FOCUSED)); then
+      printf '\e]12;#ffffff\a\e[1;%dH\e[?25h' "$((2 + ${#SEARCH_TERM}))"
+    fi
+  else
+    # Centered footer (context-sensitive)
+    local footer_line=$((last_entry_line + 2))
+    local selected_type="${ENTRIES_TYPE[${SELECTED}]:-local}"
+    if [[ "${selected_type}" == "remote" || "${selected_type}" == "project" || "${selected_type}" == "inactive" ]]; then
+      cs_print_centered "${footer_line}" "Enter:switch" "${width}"
+    else
+      cs_print_centered "${footer_line}" ": menu  / search" "${width}"
+    fi
+
+    # Quit row
+    local quit_line=$((footer_line + 1))
+    cs_print_centered "${quit_line}" "Q:detach  ?:help" "${width}"
+
+    # Version line
+    printf '\e[%d;1H\e[K' "$((quit_line + 1))"
+    local version_line=$((quit_line + 2))
+    cs_print_centered "${version_line}" "claude-spaces v${VERSION}" "${width}"
+
+    # Clear everything below
+    printf '\e[%d;1H\e[J' "$((version_line + 1))"
+  fi
 }
 
 cs_picker_loop() {
-    SELECTED=0
-    SCROLL=0
-    DIRTY=1
-    LAST_FINGERPRINT=""
-    declare -gA BELL_SET
-    WINDOW_FOCUSED=1
+  SELECTED=0
+  SCROLL=0
+  DIRTY=1
+  LAST_FINGERPRINT=""
+  declare -gA BELL_SET
+  WINDOW_FOCUSED=1
 
-    PICKER_PANE=$(_tmux display-message -p '#{pane_id}')
-    WINCH_PENDING=0
-    trap 'WINCH_PENDING=1' WINCH
-    cs_rename_pane_window "${PICKER_PANE}" "cs:picker"
-    echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
-    echo $$ > "${STATE_DIR}/picker_pid"
+  PICKER_PANE=$(_tmux display-message -p '#{pane_id}')
+  WINCH_PENDING=0
+  trap 'WINCH_PENDING=1' WINCH
+  cs_rename_pane_window "${PICKER_PANE}" "cs:picker"
+  echo "${PICKER_PANE}" > "${STATE_DIR}/picker_pane"
+  echo $$ > "${STATE_DIR}/picker_pid"
 
-    # Clean stale state — only remove pane refs that are actually dead
-    cs_refresh_pane_cache
-    local cur
-    cur=$(cs_read_state current_pane)
-    if [[ -n "${cur}" ]] && ! cs_pane_alive "${cur}"; then
-        echo "" > "${STATE_DIR}/current_pane"
+  # Clean stale state — only remove pane refs that are actually dead
+  cs_refresh_pane_cache
+  local cur
+  cur=$(cs_read_state current_pane)
+  if [[ -n "${cur}" ]] && ! cs_pane_alive "${cur}"; then
+    echo "" > "${STATE_DIR}/current_pane"
+  fi
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  if [[ -n "${wp}" ]] && ! cs_pane_alive "${wp}"; then
+    rm -f "${STATE_DIR}/welcome_pane"
+  fi
+  for f in "${STATE_DIR}"/panes/*; do
+    [[ -f "${f}" ]] || continue
+    local pane_id
+    pane_id="%$(basename "${f}")"
+    if ! cs_pane_alive "${pane_id}"; then
+      rm -f "${f}"
     fi
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    if [[ -n "${wp}" ]] && ! cs_pane_alive "${wp}"; then
-        rm -f "${STATE_DIR}/welcome_pane"
+  done
+  # Clean stale terminal pane refs
+  for f in "${STATE_DIR}"/term/*; do
+    [[ -f "${f}" ]] || continue
+    local basename_f
+    basename_f=$(basename "${f}")
+    [[ "${basename_f}" == *.* ]] && continue
+    local term_pane_id
+    term_pane_id=$(cat "${f}" 2>/dev/null || true)
+    if [[ -n "${term_pane_id}" ]] && ! cs_pane_alive "${term_pane_id}"; then
+      rm -f "${f}" "${f}.shown" "${f}.height"
     fi
-    for f in "${STATE_DIR}"/panes/*; do
-        [[ -f "${f}" ]] || continue
-        local pane_id
-        pane_id="%$(basename "${f}")"
-        if ! cs_pane_alive "${pane_id}"; then
-            rm -f "${f}"
-        fi
-    done
-    # Clean stale terminal pane refs
-    for f in "${STATE_DIR}"/term/*; do
-        [[ -f "${f}" ]] || continue
-        local basename_f
-        basename_f=$(basename "${f}")
-        [[ "${basename_f}" == *.* ]] && continue
-        local term_pane_id
-        term_pane_id=$(cat "${f}" 2>/dev/null || true)
-        if [[ -n "${term_pane_id}" ]] && ! cs_pane_alive "${term_pane_id}"; then
-            rm -f "${f}" "${f}.shown" "${f}.height"
-        fi
-    done
+  done
 
-    # Install keybindings and bell hook
-    cs_install_keybindings
-    cs_install_bell_hook
+  # Install keybindings and bell hook
+  cs_install_keybindings
+  cs_install_bell_hook
 
-    stty -echo discard undef lnext undef 2>/dev/null || true
-    stty dsusp undef 2>/dev/null || true
-    trap 'stty echo 2>/dev/null; printf "\e[?25h\e[0m"; cs_remove_bell_hook; cs_remove_keybindings' EXIT
+  stty -echo discard undef lnext undef 2>/dev/null || true
+  stty dsusp undef 2>/dev/null || true
+  trap 'stty echo 2>/dev/null; printf "\e[?25h\e[0m"; cs_remove_bell_hook; cs_remove_keybindings' EXIT
 
+  cs_build_all_entries
+  cs_search_save_full
+
+  local n=${#ENTRIES_ID[@]}
+  cur=$(cs_read_state current_pane)
+  if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
+    # Left pane already exists (reload case) — sync SELECTED
+    local pidx
+    pidx=$(cs_find_entry_by_pane "${cur}")
+    [[ "${pidx}" != "-1" ]] && SELECTED=${pidx}
+  elif ((n == 0)); then
+    # No sessions — auto-create
+    cs_new_session
+    sleep 0.3
     cs_build_all_entries
     cs_search_save_full
+  else
+    cs_show_welcome
+    # Force focus to picker so user can navigate immediately
+    _tmux select-pane -t "${PICKER_PANE}"
+  fi
 
-    local n=${#ENTRIES_ID[@]}
-    cur=$(cs_read_state current_pane)
-    if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
-        # Left pane already exists (reload case) — sync SELECTED
-        local pidx
-        pidx=$(cs_find_entry_by_pane "${cur}")
-        [[ "${pidx}" != "-1" ]] && SELECTED=${pidx}
-    elif ((n == 0)); then
-        # No sessions — auto-create
-        cs_new_session
-        sleep 0.3
-        cs_build_all_entries
-        cs_search_save_full
-    else
-        cs_show_welcome
-        # Force focus to picker so user can navigate immediately
-        _tmux select-pane -t "${PICKER_PANE}"
-    fi
+  cs_picker_render
 
-    cs_picker_render
-
-    while true; do
-        local key=""
-        if IFS= read -rsn1 -t 1 key; then
-            if ((MENU_ACTIVE)); then
-                case "${key}" in
-                    $'\e')
-                        read -rsn2 -t 0.1 _ || true
-                        MENU_ACTIVE=0; DIRTY=1 ;;
-                    r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
-                    p) MENU_ACTIVE=0; cs_rename_project; DIRTY=1 ;;
-                    x) MENU_ACTIVE=0; cs_confirm_close; DIRTY=1 ;;
-                    h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
-                    o) MENU_ACTIVE=0; cs_hide_older; DIRTY=1 ;;
-                    v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
-                    c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
-                    d) MENU_ACTIVE=0; _tmux detach-client ;;
-                    s) MENU_ACTIVE=0; cs_confirm_shutdown; DIRTY=1 ;;
-                    *) MENU_ACTIVE=0; DIRTY=1 ;;
-                esac
-            elif ((SEARCH_ACTIVE)); then
-                if ((SEARCH_FIELD_FOCUSED)); then
-                    cs_search_handle_key "${key}"
-                else
-                    # In search results — limited keyset
-                    case "${key}" in
-                        j) cs_search_move_down; DIRTY=1 ;;
-                        k) cs_search_move_up; DIRTY=1 ;;
-                        J) cs_search_move_down
-                           if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-                               cs_activate_selected; cs_focus_session
-                           fi
-                           DIRTY=1 ;;
-                        K) cs_search_move_up
-                           if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
-                               cs_activate_selected; cs_focus_session
-                           fi
-                           DIRTY=1 ;;
-                        $'\e')
-                            local seq=""
-                            read -rsn2 -t 0.1 seq || true
-                            case "${seq}" in
-                                '[A') cs_search_move_up; DIRTY=1 ;;
-                                '[B') cs_search_move_down; DIRTY=1 ;;
-                                '[C') cs_search_exit; _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
-                                '[D') cs_search_exit; _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
-                                '') cs_search_exit; DIRTY=1 ;;
-                            esac
-                            ;;
-                        '')
-                            cs_search_exit
-                            cs_activate_selected
-                            cs_focus_session
-                            DIRTY=1
-                            ;;
-                    esac
-                fi
-            else
-                case "${key}" in
-                    j) cs_move_down; DIRTY=1 ;;
-                    k) cs_move_up; DIRTY=1 ;;
-                    J) local _pf; _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-                       [[ "${_pf}" == "0" ]] && cs_sync_highlight_local
-                       cs_move_down 1
-                       cs_activate_selected; cs_focus_session
-                       DIRTY=1 ;;
-                    K) local _pf; _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-                       [[ "${_pf}" == "0" ]] && cs_sync_highlight_local
-                       cs_move_up 1
-                       cs_activate_selected; cs_focus_session
-                       DIRTY=1 ;;
-                    H|L) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
-                    h) _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
-                    l) _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
-                    $'\e')
-                        local seq=""
-                        read -rsn2 -t 0.1 seq || true
-                        case "${seq}" in
-                            '[A') cs_move_up; DIRTY=1 ;;
-                            '[B') cs_move_down; DIRTY=1 ;;
-                            '[C') _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
-                            '[D') _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
-                        esac
-                        ;;
-                    '')
-                        cs_activate_selected
-                        cs_focus_session
-                        DIRTY=1
-                        ;;
-                    ' ') cs_activate_selected; DIRTY=1 ;;
-                    a|i) cs_focus_session; DIRTY=1 ;;
-                    /) cs_search_enter; DIRTY=1 ;;
-                    ':') cs_menu_enter ;;
-                    '?') cs_kill_welcome; cs_show_welcome; DIRTY=1 ;;
-                    Q) _tmux detach-client ;;
-                    '~') cs_term_toggle; DIRTY=1 ;;
-                    '`') cs_term_smart; DIRTY=1 ;;
-                    '|') cs_focus_session; DIRTY=1 ;;
-                    $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
-                    $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
-                    $'\x19') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_project; DIRTY=1 ;;
-                    $'\x14') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_hide; DIRTY=1 ;;
-                    $'\x16') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_shutdown; DIRTY=1 ;;
-                    $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
-                    $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
-                    $'\x06') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_close; DIRTY=1 ;;
-                    $'\x0e')
-                        _tmux select-pane -t "${PICKER_PANE}"
-                        stty echo 2>/dev/null || true
-                        printf '\e[?25h\e[0m'
-                        CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}" ;;
-                    $'\x0f')
-                        local _pf
-                        _pf=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
-                        if [[ "${_pf}" == "${PICKER_PANE}" ]]; then
-                            cs_focus_session
-                        else
-                            _tmux select-pane -t "${PICKER_PANE}"
-                        fi
-                        DIRTY=1
-                        ;;
-                    [0-9]) cs_jump_to_local "${key}" ;;
-                    $'\x12') cs_rescan; DIRTY=1 ;;
-                    R)
-                        stty echo 2>/dev/null || true
-                        printf '\e[?25h\e[0m'
-                        CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}"
-                        ;;
-                esac
-            fi
+  while true; do
+    local key=""
+    if IFS= read -rsn1 -t 1 key; then
+      if ((MENU_ACTIVE)); then
+        case "${key}" in
+          $'\e')
+            read -rsn2 -t 0.1 _ || true
+            MENU_ACTIVE=0; DIRTY=1 ;;
+          r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
+          p) MENU_ACTIVE=0; cs_rename_project; DIRTY=1 ;;
+          x) MENU_ACTIVE=0; cs_confirm_close; DIRTY=1 ;;
+          h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
+          o) MENU_ACTIVE=0; cs_hide_older; DIRTY=1 ;;
+          v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
+          c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
+          d) MENU_ACTIVE=0; _tmux detach-client ;;
+          s) MENU_ACTIVE=0; cs_confirm_shutdown; DIRTY=1 ;;
+          *) MENU_ACTIVE=0; DIRTY=1 ;;
+        esac
+      elif ((SEARCH_ACTIVE)); then
+        if ((SEARCH_FIELD_FOCUSED)); then
+          cs_search_handle_key "${key}"
         else
-            # Close menu if picker lost focus
-            if ((MENU_ACTIVE)); then
-                local _pf
-                _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-                if [[ "${_pf}" != "1" ]]; then
-                    MENU_ACTIVE=0
-                    DIRTY=1
-                fi
-            fi
-            # Timeout — check pending load, poll bells, rescan sessions
-            local pending
-            pending=$(cs_read_state pending_load)
-            if [[ -n "${pending}" ]]; then
-                rm -f "${STATE_DIR}/pending_load"
-                cs_rescan
-                local pidx
-                pidx=$(cs_find_entry_index "${pending}")
-                if [[ "${pidx}" != "-1" ]]; then
-                    SELECTED=${pidx}
-                    cs_activate_selected
-                    cs_focus_session
-                    DIRTY=1
-                fi
-            fi
-            cs_check_bells
-            if [[ -f "${STATE_DIR}/focus_in" ]]; then
-                rm -f "${STATE_DIR}/focus_in"
-                WINDOW_FOCUSED=1
-                local _fp
-                _fp=$(cs_read_state current_pane)
-                if [[ -n "${_fp}" ]] && [[ -v "BELL_SET[${_fp}]" ]]; then
-                    unset "BELL_SET[${_fp}]"
-                    cs_sync_bells_active
-                    DIRTY=1
-                fi
-            fi
-            if [[ -f "${STATE_DIR}/focus_out" ]]; then
-                rm -f "${STATE_DIR}/focus_out"
-                WINDOW_FOCUSED=0
-            fi
-            cs_rescan
-            if ((MENU_ACTIVE)) && [[ "${ENTRIES_ID[${SELECTED}]:-}" != "${MENU_TARGET_ID}" ]]; then
-                MENU_ACTIVE=0; DIRTY=1
-            fi
-            # Check if current session's terminal died externally
-            # (must be after cs_rescan which refreshes the pane cache)
-            local _cur_pane
-            _cur_pane=$(cs_read_state current_pane)
-            if [[ -n "${_cur_pane}" ]] && cs_term_is_shown "${_cur_pane}"; then
-                local _tp
-                _tp=$(cs_term_pane_for "${_cur_pane}")
-                if [[ -n "${_tp}" ]] && ! cs_pane_alive "${_tp}"; then
-                    rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height}
-                fi
-            fi
-            local fp
-            fp=$(cs_fingerprint)
-            if [[ "${fp}" != "${LAST_FINGERPRINT}" ]]; then
-                LAST_FINGERPRINT="${fp}"
-                DIRTY=1
-            fi
+          # In search results — limited keyset
+          case "${key}" in
+            j) cs_search_move_down; DIRTY=1 ;;
+            k) cs_search_move_up; DIRTY=1 ;;
+            J) cs_search_move_down
+               if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
+                 cs_activate_selected; cs_focus_session
+               fi
+               DIRTY=1 ;;
+            K) cs_search_move_up
+               if [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]]; then
+                 cs_activate_selected; cs_focus_session
+               fi
+               DIRTY=1 ;;
+            $'\e')
+              local seq=""
+              read -rsn2 -t 0.1 seq || true
+              case "${seq}" in
+                '[A') cs_search_move_up; DIRTY=1 ;;
+                '[B') cs_search_move_down; DIRTY=1 ;;
+                '[C') cs_search_exit; _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
+                '[D') cs_search_exit; _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
+                '') cs_search_exit; DIRTY=1 ;;
+              esac
+              ;;
+            '')
+              cs_search_exit
+              cs_activate_selected
+              cs_focus_session
+              DIRTY=1
+              ;;
+          esac
         fi
-        if ((WINCH_PENDING)); then
-            WINCH_PENDING=0
-            cs_handle_winch
+      else
+        case "${key}" in
+          j) cs_move_down; DIRTY=1 ;;
+          k) cs_move_up; DIRTY=1 ;;
+          J) local _pf; _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+             [[ "${_pf}" == "0" ]] && cs_sync_highlight_local
+             cs_move_down 1
+             cs_activate_selected; cs_focus_session
+             DIRTY=1 ;;
+          K) local _pf; _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+             [[ "${_pf}" == "0" ]] && cs_sync_highlight_local
+             cs_move_up 1
+             cs_activate_selected; cs_focus_session
+             DIRTY=1 ;;
+          H|L) cs_activate_selected; cs_focus_session; DIRTY=1 ;;
+          h) _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
+          l) _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
+          $'\e')
+            local seq=""
+            read -rsn2 -t 0.1 seq || true
+            case "${seq}" in
+              '[A') cs_move_up; DIRTY=1 ;;
+              '[B') cs_move_down; DIRTY=1 ;;
+              '[C') _tmux select-pane -R 2>/dev/null || true; DIRTY=1 ;;
+              '[D') _tmux select-pane -L 2>/dev/null || true; DIRTY=1 ;;
+            esac
+            ;;
+          '')
+            cs_activate_selected
+            cs_focus_session
+            DIRTY=1
+            ;;
+          ' ') cs_activate_selected; DIRTY=1 ;;
+          a|i) cs_focus_session; DIRTY=1 ;;
+          /) cs_search_enter; DIRTY=1 ;;
+          ':') cs_menu_enter ;;
+          '?') cs_kill_welcome; cs_show_welcome; DIRTY=1 ;;
+          Q) _tmux detach-client ;;
+          '~') cs_term_toggle; DIRTY=1 ;;
+          '`') cs_term_smart; DIRTY=1 ;;
+          '|') cs_focus_session; DIRTY=1 ;;
+          $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
+          $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
+          $'\x19') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_project; DIRTY=1 ;;
+          $'\x14') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_hide; DIRTY=1 ;;
+          $'\x16') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_shutdown; DIRTY=1 ;;
+          $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
+          $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
+          $'\x06') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_close; DIRTY=1 ;;
+          $'\x0e')
+            _tmux select-pane -t "${PICKER_PANE}"
+            stty echo 2>/dev/null || true
+            printf '\e[?25h\e[0m'
+            CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}" ;;
+          $'\x0f')
+            local _pf
+            _pf=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
+            if [[ "${_pf}" == "${PICKER_PANE}" ]]; then
+              cs_focus_session
+            else
+              _tmux select-pane -t "${PICKER_PANE}"
+            fi
+            DIRTY=1
+            ;;
+          [0-9]) cs_jump_to_local "${key}" ;;
+          $'\x12') cs_rescan; DIRTY=1 ;;
+          R)
+            stty echo 2>/dev/null || true
+            printf '\e[?25h\e[0m'
+            CS_PICKER=1 CS_STATE_DIR="${STATE_DIR}" exec "${SCRIPT_PATH}"
+            ;;
+        esac
+      fi
+    else
+      # Close menu if picker lost focus
+      if ((MENU_ACTIVE)); then
+        local _pf
+        _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+        if [[ "${_pf}" != "1" ]]; then
+          MENU_ACTIVE=0
+          DIRTY=1
         fi
-        if ((DIRTY)); then
-            cs_picker_render
-            DIRTY=0
-            LAST_FINGERPRINT=$(cs_fingerprint)
+      fi
+      # Timeout — check pending load, poll bells, rescan sessions
+      local pending
+      pending=$(cs_read_state pending_load)
+      if [[ -n "${pending}" ]]; then
+        rm -f "${STATE_DIR}/pending_load"
+        cs_rescan
+        local pidx
+        pidx=$(cs_find_entry_index "${pending}")
+        if [[ "${pidx}" != "-1" ]]; then
+          SELECTED=${pidx}
+          cs_activate_selected
+          cs_focus_session
+          DIRTY=1
         fi
-    done
+      fi
+      cs_check_bells
+      if [[ -f "${STATE_DIR}/focus_in" ]]; then
+        rm -f "${STATE_DIR}/focus_in"
+        WINDOW_FOCUSED=1
+        local _fp
+        _fp=$(cs_read_state current_pane)
+        if [[ -n "${_fp}" ]] && [[ -v "BELL_SET[${_fp}]" ]]; then
+          unset "BELL_SET[${_fp}]"
+          cs_sync_bells_active
+          DIRTY=1
+        fi
+      fi
+      if [[ -f "${STATE_DIR}/focus_out" ]]; then
+        rm -f "${STATE_DIR}/focus_out"
+        WINDOW_FOCUSED=0
+      fi
+      cs_rescan
+      if ((MENU_ACTIVE)) && [[ "${ENTRIES_ID[${SELECTED}]:-}" != "${MENU_TARGET_ID}" ]]; then
+        MENU_ACTIVE=0; DIRTY=1
+      fi
+      # Check if current session's terminal died externally
+      # (must be after cs_rescan which refreshes the pane cache)
+      local _cur_pane
+      _cur_pane=$(cs_read_state current_pane)
+      if [[ -n "${_cur_pane}" ]] && cs_term_is_shown "${_cur_pane}"; then
+        local _tp
+        _tp=$(cs_term_pane_for "${_cur_pane}")
+        if [[ -n "${_tp}" ]] && ! cs_pane_alive "${_tp}"; then
+          rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height}
+        fi
+      fi
+      local fp
+      fp=$(cs_fingerprint)
+      if [[ "${fp}" != "${LAST_FINGERPRINT}" ]]; then
+        LAST_FINGERPRINT="${fp}"
+        DIRTY=1
+      fi
+    fi
+    if ((WINCH_PENDING)); then
+      WINCH_PENDING=0
+      cs_handle_winch
+    fi
+    if ((DIRTY)); then
+      cs_picker_render
+      DIRTY=0
+      LAST_FINGERPRINT=$(cs_fingerprint)
+    fi
+  done
 }
 
 cs_move_down() {
-    local n=${#ENTRIES_ID[@]} local_only=${1:-0}
-    ((n == 0)) && return 0
-    local start=${SELECTED}
-    SELECTED=$(( (SELECTED + 1) % n ))
-    if ((local_only)); then
-        while [[ "${ENTRIES_TYPE[${SELECTED}]}" != "local" ]] && ((SELECTED != start)); do
-            SELECTED=$(( (SELECTED + 1) % n ))
-        done
-    else
-        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
-            SELECTED=$(( (SELECTED + 1) % n ))
-        done
-    fi
+  local n=${#ENTRIES_ID[@]} local_only=${1:-0}
+  ((n == 0)) && return 0
+  local start=${SELECTED}
+  SELECTED=$(( (SELECTED + 1) % n ))
+  if ((local_only)); then
+    while [[ "${ENTRIES_TYPE[${SELECTED}]}" != "local" ]] && ((SELECTED != start)); do
+      SELECTED=$(( (SELECTED + 1) % n ))
+    done
+  else
+    while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
+      SELECTED=$(( (SELECTED + 1) % n ))
+    done
+  fi
 }
 
 cs_move_up() {
-    local n=${#ENTRIES_ID[@]} local_only=${1:-0}
-    ((n == 0)) && return 0
-    local start=${SELECTED}
-    SELECTED=$(( (SELECTED - 1 + n) % n ))
-    if ((local_only)); then
-        while [[ "${ENTRIES_TYPE[${SELECTED}]}" != "local" ]] && ((SELECTED != start)); do
-            SELECTED=$(( (SELECTED - 1 + n) % n ))
-        done
-    else
-        while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
-            SELECTED=$(( (SELECTED - 1 + n) % n ))
-        done
-    fi
+  local n=${#ENTRIES_ID[@]} local_only=${1:-0}
+  ((n == 0)) && return 0
+  local start=${SELECTED}
+  SELECTED=$(( (SELECTED - 1 + n) % n ))
+  if ((local_only)); then
+    while [[ "${ENTRIES_TYPE[${SELECTED}]}" != "local" ]] && ((SELECTED != start)); do
+      SELECTED=$(( (SELECTED - 1 + n) % n ))
+    done
+  else
+    while [[ "${ENTRIES_TYPE[${SELECTED}]}" == "header" || "${ENTRIES_TYPE[${SELECTED}]}" == "spacer" ]] && ((SELECTED != start)); do
+      SELECTED=$(( (SELECTED - 1 + n) % n ))
+    done
+  fi
 }
 
 cs_del_kv() {
-    local file="$1" key="$2"
-    [[ -f "${file}" ]] || return 0
-    local tmp="${file}.tmp"
-    grep -v "^${key}=" "${file}" > "${tmp}" 2>/dev/null || true
-    mv "${tmp}" "${file}"
+  local file="$1" key="$2"
+  [[ -f "${file}" ]] || return 0
+  local tmp="${file}.tmp"
+  grep -v "^${key}=" "${file}" > "${tmp}" 2>/dev/null || true
+  mv "${tmp}" "${file}"
 }
 
 cs_set_kv() {
-    local file="$1" key="$2" value="$3"
-    # Escape sed special characters in value
-    local safe="${value//\\/\\\\}"
-    safe="${safe//|/\\|}"
-    safe="${safe//&/\\&}"
-    if grep -q "^${key}=" "${file}" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${key}=${safe}|" "${file}"
-    elif grep -q "^# ${key}=" "${file}" 2>/dev/null; then
-        sed -i "s|^# ${key}=.*|${key}=${safe}|" "${file}"
-    else
-        echo "${key}=${value}" >> "${file}"
-    fi
+  local file="$1" key="$2" value="$3"
+  # Escape sed special characters in value
+  local safe="${value//\\/\\\\}"
+  safe="${safe//|/\\|}"
+  safe="${safe//&/\\&}"
+  if grep -q "^${key}=" "${file}" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${safe}|" "${file}"
+  elif grep -q "^# ${key}=" "${file}" 2>/dev/null; then
+    sed -i "s|^# ${key}=.*|${key}=${safe}|" "${file}"
+  else
+    echo "${key}=${value}" >> "${file}"
+  fi
 }
 
 cs_switch_to_project() {
-    local target_path="$1"
-    local session_id="${2:-}"
-    echo "${target_path}" > "${STATE_DIR}/switch_target"
-    # If a specific session was requested, write pending_load to target state dir
-    if [[ -n "${session_id}" ]]; then
-        local target_sanitized
-        target_sanitized=$(cs_sanitize_path "${target_path}")
-        local base="${XDG_RUNTIME_DIR:-/tmp}"
-        local target_state="${base}/claude-spaces/${target_sanitized}"
-        if [[ -d "${target_state}" ]]; then
-            echo "${session_id}" > "${target_state}/pending_load"
-        fi
+  local target_path="$1"
+  local session_id="${2:-}"
+  echo "${target_path}" > "${STATE_DIR}/switch_target"
+  # If a specific session was requested, write pending_load to target state dir
+  if [[ -n "${session_id}" ]]; then
+    local target_sanitized
+    target_sanitized=$(cs_sanitize_path "${target_path}")
+    local base="${XDG_RUNTIME_DIR:-/tmp}"
+    local target_state="${base}/claude-spaces/${target_sanitized}"
+    if [[ -d "${target_state}" ]]; then
+      echo "${session_id}" > "${target_state}/pending_load"
     fi
-    _tmux detach-client
+  fi
+  _tmux detach-client
 }
 
 cs_sync_highlight_local() {
-    local cur
-    cur=$(cs_read_state current_pane)
-    if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
-        local pidx
-        pidx=$(cs_find_entry_by_pane "${cur}")
-        if [[ "${pidx}" != "-1" ]]; then
-            SELECTED=${pidx}
-            return
-        fi
+  local cur
+  cur=$(cs_read_state current_pane)
+  if [[ -n "${cur}" ]] && cs_pane_alive "${cur}"; then
+    local pidx
+    pidx=$(cs_find_entry_by_pane "${cur}")
+    if [[ "${pidx}" != "-1" ]]; then
+      SELECTED=${pidx}
+      return
     fi
-    for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
-        if [[ "${ENTRIES_TYPE[${fi}]}" != "header" && "${ENTRIES_TYPE[${fi}]}" != "spacer" ]]; then
-            SELECTED=${fi}
-            return
-        fi
-    done
+  fi
+  for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
+    if [[ "${ENTRIES_TYPE[${fi}]}" != "header" && "${ENTRIES_TYPE[${fi}]}" != "spacer" ]]; then
+      SELECTED=${fi}
+      return
+    fi
+  done
 }
 
 cs_activate_selected() {
-    local n=${#ENTRIES_ID[@]}
-    ((n == 0)) && return 0
+  local n=${#ENTRIES_ID[@]}
+  ((n == 0)) && return 0
 
-    local sid="${ENTRIES_ID[${SELECTED}]}"
-    local status="${ENTRIES_STATUS[${SELECTED}]}"
-    local pane="${ENTRIES_PANE[${SELECTED}]}"
-    local entry_type="${ENTRIES_TYPE[${SELECTED}]}"
-    local entry_path="${ENTRIES_PATH[${SELECTED}]}"
+  local sid="${ENTRIES_ID[${SELECTED}]}"
+  local status="${ENTRIES_STATUS[${SELECTED}]}"
+  local pane="${ENTRIES_PANE[${SELECTED}]}"
+  local entry_type="${ENTRIES_TYPE[${SELECTED}]}"
+  local entry_path="${ENTRIES_PATH[${SELECTED}]}"
 
-    # Handle non-local entry types
-    case "${entry_type}" in
-        header|spacer) return 0 ;;
-        project)
-            cs_switch_to_project "${entry_path}"
-            cs_sync_highlight_local
-            return 0
-            ;;
-        remote)
-            cs_switch_to_project "${entry_path}" "${sid}"
-            cs_sync_highlight_local
-            return 0
-            ;;
-        inactive)
-            cs_switch_to_project "${entry_path}"
-            cs_sync_highlight_local
-            return 0
-            ;;
-    esac
+  # Handle non-local entry types
+  case "${entry_type}" in
+    header|spacer) return 0 ;;
+    project)
+      cs_switch_to_project "${entry_path}"
+      cs_sync_highlight_local
+      return 0
+      ;;
+    remote)
+      cs_switch_to_project "${entry_path}" "${sid}"
+      cs_sync_highlight_local
+      return 0
+      ;;
+    inactive)
+      cs_switch_to_project "${entry_path}"
+      cs_sync_highlight_local
+      return 0
+      ;;
+  esac
 
-    # Auto-unhide if activating a hidden session
-    local did_unhide=0
-    if [[ "${status}" != "active_elsewhere" && -v "HIDDEN_SET[${sid}]" ]]; then
-        cs_unhide_session "${sid}"
-        did_unhide=1
+  # Auto-unhide if activating a hidden session
+  local did_unhide=0
+  if [[ "${status}" != "active_elsewhere" && -v "HIDDEN_SET[${sid}]" ]]; then
+    cs_unhide_session "${sid}"
+    did_unhide=1
+  fi
+
+  # Kill orphaned new pane if selecting something else
+  local new_p
+  new_p=$(cs_read_state new_pane)
+  if [[ -n "${new_p}" && "${pane}" != "${new_p}" ]]; then
+    local cp
+    cp=$(cs_read_state current_pane)
+    _tmux kill-pane -t "${new_p}" 2>/dev/null || true
+    rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}"
+    if [[ "${cp}" == "${new_p}" ]]; then
+      echo "" > "${STATE_DIR}/current_pane"
     fi
+  fi
 
-    # Kill orphaned new pane if selecting something else
-    local new_p
-    new_p=$(cs_read_state new_pane)
-    if [[ -n "${new_p}" && "${pane}" != "${new_p}" ]]; then
-        local cp
-        cp=$(cs_read_state current_pane)
-        _tmux kill-pane -t "${new_p}" 2>/dev/null || true
-        rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}"
-        if [[ "${cp}" == "${new_p}" ]]; then
-            echo "" > "${STATE_DIR}/current_pane"
-        fi
-    fi
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
 
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
+  case "${status}" in
+    active_elsewhere) return 0 ;;
+    managed)
+      if [[ "${pane}" == "${cur_pane}" ]]; then
+        # Already showing — second Enter focuses it
+        cs_focus_session
+      else
+        cs_show_pane "${pane}"
+        cs_kill_welcome
+      fi
+      ;;
+    dormant)
+      cs_resume_session "${sid}"
+      cs_kill_welcome
+      sleep "${CS_ACTIVATE_DELAY:-0.3}"
+      cs_rescan
+      ;;
+  esac
 
-    case "${status}" in
-        active_elsewhere) return 0 ;;
-        managed)
-            if [[ "${pane}" == "${cur_pane}" ]]; then
-                # Already showing — second Enter focuses it
-                cs_focus_session
-            else
-                cs_show_pane "${pane}"
-                cs_kill_welcome
-            fi
-            ;;
-        dormant)
-            cs_resume_session "${sid}"
-            cs_kill_welcome
-            sleep "${CS_ACTIVATE_DELAY:-0.3}"
-            cs_rescan
-            ;;
-    esac
-
-    if ((did_unhide)) && [[ "${status}" != "dormant" ]]; then
-        cs_rescan
-    fi
+  if ((did_unhide)) && [[ "${status}" != "dormant" ]]; then
+    cs_rescan
+  fi
 }
 
 cs_close_selected() {
-    local n=${#ENTRIES_ID[@]}
-    ((n == 0)) && return 0
-    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
+  local n=${#ENTRIES_ID[@]}
+  ((n == 0)) && return 0
+  [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
 
-    local status="${ENTRIES_STATUS[${SELECTED}]}"
-    local pane="${ENTRIES_PANE[${SELECTED}]}"
-    [[ "${status}" == "managed" && -n "${pane}" ]] || return 0
+  local status="${ENTRIES_STATUS[${SELECTED}]}"
+  local pane="${ENTRIES_PANE[${SELECTED}]}"
+  [[ "${status}" == "managed" && -n "${pane}" ]] || return 0
 
-    cs_close_pane "${pane}"
-    cs_after_remove "${pane}"
+  cs_close_pane "${pane}"
+  cs_after_remove "${pane}"
 }
 
 cs_confirm_close() {
-    local n=${#ENTRIES_ID[@]}
-    ((n == 0)) && return 0
-    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
+  local n=${#ENTRIES_ID[@]}
+  ((n == 0)) && return 0
+  [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
 
-    local status="${ENTRIES_STATUS[${SELECTED}]}"
-    local pane="${ENTRIES_PANE[${SELECTED}]}"
-    [[ "${status}" == "managed" && -n "${pane}" ]] || return 0
+  local status="${ENTRIES_STATUS[${SELECTED}]}"
+  local pane="${ENTRIES_PANE[${SELECTED}]}"
+  [[ "${status}" == "managed" && -n "${pane}" ]] || return 0
 
-    cs_confirm "${CS_CLR_PROMPT_WARN}" "Close? y/N" || return 0
-    cs_close_pane "${pane}"
-    cs_after_remove "${pane}"
+  cs_confirm "${CS_CLR_PROMPT_WARN}" "Close? y/N" || return 0
+  cs_close_pane "${pane}"
+  cs_after_remove "${pane}"
 }
 
 cs_confirm() {
-    local color="$1" text="$2"
-    local width
-    width=$(tput cols)
-    cs_render_header_bar "\e[7m${color}" "${text}" "${width}"
-    local confirm=""
-    read -rsn1 confirm
-    [[ "${confirm}" == "y" ]]
+  local color="$1" text="$2"
+  local width
+  width=$(tput cols)
+  cs_render_header_bar "\e[7m${color}" "${text}" "${width}"
+  local confirm=""
+  read -rsn1 confirm
+  [[ "${confirm}" == "y" ]]
 }
 
 cs_read_line() {
-    local initial="${1:-}"
-    CS_INPUT_RESULT="${initial}"
-    printf '%s' "${CS_INPUT_RESULT}"
-    while IFS= read -rsn1 ch; do
-        case "${ch}" in
-            $'\e')
-                read -rsn2 -t 0.1 _ || true
-                if [[ -z "${CS_INPUT_RESULT}" ]]; then
-                    return 1
-                fi
-                local _len=${#CS_INPUT_RESULT}
-                printf '%*s' "${_len}" "" | tr ' ' $'\b'
-                printf '%*s' "${_len}" ""
-                printf '%*s' "${_len}" "" | tr ' ' $'\b'
-                CS_INPUT_RESULT=""
-                ;;
-            $'\x7f'|$'\b')
-                if ((${#CS_INPUT_RESULT} > 0)); then
-                    CS_INPUT_RESULT="${CS_INPUT_RESULT%?}"
-                    printf '\b \b'
-                fi
-                ;;
-            "") return 0 ;;
-            *)
-                if [[ "${ch}" == [[:print:]] ]]; then
-                    CS_INPUT_RESULT+="${ch}"
-                    printf '%s' "${ch}"
-                fi
-                ;;
-        esac
-    done
-    return 1
+  local initial="${1:-}"
+  CS_INPUT_RESULT="${initial}"
+  printf '%s' "${CS_INPUT_RESULT}"
+  while IFS= read -rsn1 ch; do
+    case "${ch}" in
+      $'\e')
+        read -rsn2 -t 0.1 _ || true
+        if [[ -z "${CS_INPUT_RESULT}" ]]; then
+          return 1
+        fi
+        local _len=${#CS_INPUT_RESULT}
+        printf '%*s' "${_len}" "" | tr ' ' $'\b'
+        printf '%*s' "${_len}" ""
+        printf '%*s' "${_len}" "" | tr ' ' $'\b'
+        CS_INPUT_RESULT=""
+        ;;
+      $'\x7f'|$'\b')
+        if ((${#CS_INPUT_RESULT} > 0)); then
+          CS_INPUT_RESULT="${CS_INPUT_RESULT%?}"
+          printf '\b \b'
+        fi
+        ;;
+      "") return 0 ;;
+      *)
+        if [[ "${ch}" == [[:print:]] ]]; then
+          CS_INPUT_RESULT+="${ch}"
+          printf '%s' "${ch}"
+        fi
+        ;;
+    esac
+  done
+  return 1
 }
 
 cs_unhide_session() {
-    local sid="$1"
-    [[ -f "${HIDDEN_FILE}" ]] || return 0
-    local tmp="${HIDDEN_FILE}.tmp"
-    grep -vxF "${sid}" "${HIDDEN_FILE}" > "${tmp}" 2>/dev/null || true
-    mv "${tmp}" "${HIDDEN_FILE}"
-    unset "HIDDEN_SET[${sid}]"
+  local sid="$1"
+  [[ -f "${HIDDEN_FILE}" ]] || return 0
+  local tmp="${HIDDEN_FILE}.tmp"
+  grep -vxF "${sid}" "${HIDDEN_FILE}" > "${tmp}" 2>/dev/null || true
+  mv "${tmp}" "${HIDDEN_FILE}"
+  unset "HIDDEN_SET[${sid}]"
 }
 
 cs_confirm_hide() {
-    local n=${#ENTRIES_ID[@]}
-    ((n == 0)) && return 0
-    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
+  local n=${#ENTRIES_ID[@]}
+  ((n == 0)) && return 0
+  [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
 
-    local sid="${ENTRIES_ID[${SELECTED}]}"
-    [[ -v "HIDDEN_SET[${sid}]" ]] && return 0
+  local sid="${ENTRIES_ID[${SELECTED}]}"
+  [[ -v "HIDDEN_SET[${sid}]" ]] && return 0
 
-    cs_confirm "${CS_CLR_PROMPT_WARN}" "Hide? y/N" || return 0
+  cs_confirm "${CS_CLR_PROMPT_WARN}" "Hide? y/N" || return 0
 
-    local removed_pane=""
-    if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
-        removed_pane="${ENTRIES_PANE[${SELECTED}]}"
-        cs_close_pane "${removed_pane}"
-    fi
-    echo "${sid}" >> "${HIDDEN_FILE}"
-    cs_after_remove "${removed_pane}"
+  local removed_pane=""
+  if [[ "${ENTRIES_STATUS[${SELECTED}]}" == "managed" && -n "${ENTRIES_PANE[${SELECTED}]}" ]]; then
+    removed_pane="${ENTRIES_PANE[${SELECTED}]}"
+    cs_close_pane "${removed_pane}"
+  fi
+  echo "${sid}" >> "${HIDDEN_FILE}"
+  cs_after_remove "${removed_pane}"
 }
 
 cs_hide_older() {
-    local n=${#ENTRIES_ID[@]}
-    ((n == 0)) && return 0
-    [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
+  local n=${#ENTRIES_ID[@]}
+  ((n == 0)) && return 0
+  [[ "${ENTRIES_TYPE[${SELECTED}]}" == "local" ]] || return 0
 
-    local cutoff_mtime="${ENTRIES_MTIME[${SELECTED}]}"
+  local cutoff_mtime="${ENTRIES_MTIME[${SELECTED}]}"
 
-    # Count how many will be hidden
-    local count=0
-    for ((i = 0; i < n; i++)); do
-        [[ "${ENTRIES_TYPE[i]}" == "local" ]] || continue
-        ((ENTRIES_MTIME[i] > cutoff_mtime)) && continue
-        [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]] && continue
-        ((count++))
-    done
-    ((count == 0)) && return 0
+  # Count how many will be hidden
+  local count=0
+  for ((i = 0; i < n; i++)); do
+    [[ "${ENTRIES_TYPE[i]}" == "local" ]] || continue
+    ((ENTRIES_MTIME[i] > cutoff_mtime)) && continue
+    [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]] && continue
+    ((count++))
+  done
+  ((count == 0)) && return 0
 
-    cs_confirm "${CS_CLR_PROMPT_WARN}" "Hide ${count} sessions? y/N" || return 0
+  cs_confirm "${CS_CLR_PROMPT_WARN}" "Hide ${count} sessions? y/N" || return 0
 
-    # Track whether the current pane gets closed (for welcome screen)
-    local cur_pane
-    cur_pane=$(cs_read_state current_pane)
-    local removed_current=""
+  # Track whether the current pane gets closed (for welcome screen)
+  local cur_pane
+  cur_pane=$(cs_read_state current_pane)
+  local removed_current=""
 
-    for ((i = 0; i < n; i++)); do
-        [[ "${ENTRIES_TYPE[i]}" == "local" ]] || continue
-        ((ENTRIES_MTIME[i] > cutoff_mtime)) && continue
-        [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]] && continue
+  for ((i = 0; i < n; i++)); do
+    [[ "${ENTRIES_TYPE[i]}" == "local" ]] || continue
+    ((ENTRIES_MTIME[i] > cutoff_mtime)) && continue
+    [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]] && continue
 
-        # Close managed pane if any
-        if [[ "${ENTRIES_STATUS[i]}" == "managed" && -n "${ENTRIES_PANE[i]}" ]]; then
-            cs_close_pane "${ENTRIES_PANE[i]}"
-            [[ "${ENTRIES_PANE[i]}" == "${cur_pane}" ]] && removed_current="${cur_pane}"
-        fi
+    # Close managed pane if any
+    if [[ "${ENTRIES_STATUS[i]}" == "managed" && -n "${ENTRIES_PANE[i]}" ]]; then
+      cs_close_pane "${ENTRIES_PANE[i]}"
+      [[ "${ENTRIES_PANE[i]}" == "${cur_pane}" ]] && removed_current="${cur_pane}"
+    fi
 
-        echo "${ENTRIES_ID[i]}" >> "${HIDDEN_FILE}"
-        HIDDEN_SET["${ENTRIES_ID[i]}"]=1
-    done
+    echo "${ENTRIES_ID[i]}" >> "${HIDDEN_FILE}"
+    HIDDEN_SET["${ENTRIES_ID[i]}"]=1
+  done
 
-    cs_after_remove "${removed_current}"
+  cs_after_remove "${removed_current}"
 }
 
 cs_confirm_shutdown() {
-    cs_confirm "${CS_CLR_PROMPT_DANGER}" "Shutdown? y/N" || return 0
-    stty echo 2>/dev/null || true
-    printf '\e[?25h\e[0m'
-    cs_remove_bell_hook
-    cs_remove_keybindings
-    rm -rf "${STATE_DIR}"
-    _tmux kill-server 2>/dev/null || true
+  cs_confirm "${CS_CLR_PROMPT_DANGER}" "Shutdown? y/N" || return 0
+  stty echo 2>/dev/null || true
+  printf '\e[?25h\e[0m'
+  cs_remove_bell_hook
+  cs_remove_keybindings
+  rm -rf "${STATE_DIR}"
+  _tmux kill-server 2>/dev/null || true
 }
 
 cs_rename_selected() {
-    local n=${#ENTRIES_ID[@]}
-    [[ "${ENTRIES_TYPE[${SELECTED}]:-}" == "local" ]] || return 0
-    ((n == 0)) && return 0
+  local n=${#ENTRIES_ID[@]}
+  [[ "${ENTRIES_TYPE[${SELECTED}]:-}" == "local" ]] || return 0
+  ((n == 0)) && return 0
 
-    local sid="${ENTRIES_ID[${SELECTED}]}"
-    local width
-    width=$(tput cols)
+  local sid="${ENTRIES_ID[${SELECTED}]}"
+  local width
+  width=$(tput cols)
 
-    cs_render_header_bar "\e[7m${CS_CLR_PROMPT_WARN}" "Name: " "${width}"
-    printf '\e[1;7H\e[7m%b' "${CS_CLR_PROMPT_WARN}"
-    printf '\e[?25h'
-    if cs_read_line; then
-        if [[ -n "${CS_INPUT_RESULT}" ]]; then
-            cs_set_kv "${NAMES_FILE}" "${sid}" "${CS_INPUT_RESULT}"
-            cs_rescan
-        fi
+  cs_render_header_bar "\e[7m${CS_CLR_PROMPT_WARN}" "Name: " "${width}"
+  printf '\e[1;7H\e[7m%b' "${CS_CLR_PROMPT_WARN}"
+  printf '\e[?25h'
+  if cs_read_line; then
+    if [[ -n "${CS_INPUT_RESULT}" ]]; then
+      cs_set_kv "${NAMES_FILE}" "${sid}" "${CS_INPUT_RESULT}"
+      cs_rescan
     fi
-    printf '\e[?25l\e[0m'
+  fi
+  printf '\e[?25l\e[0m'
 }
 
 cs_rename_project() {
-    local target_path=""
-    local entry_type="${ENTRIES_TYPE[${SELECTED}]:-}"
-    local sanitized=""
-    case "${entry_type}" in
-        local|"") target_path="${PWD}"; sanitized="${PWD_SANITIZED}" ;;
-        project|remote|inactive) target_path="${ENTRIES_PATH[${SELECTED}]}"; sanitized=$(cs_sanitize_path "${target_path}") ;;
-        *) return 0 ;;
-    esac
-    [[ -n "${target_path}" ]] || return 0
+  local target_path=""
+  local entry_type="${ENTRIES_TYPE[${SELECTED}]:-}"
+  local sanitized=""
+  case "${entry_type}" in
+    local|"") target_path="${PWD}"; sanitized="${PWD_SANITIZED}" ;;
+    project|remote|inactive) target_path="${ENTRIES_PATH[${SELECTED}]}"; sanitized=$(cs_sanitize_path "${target_path}") ;;
+    *) return 0 ;;
+  esac
+  [[ -n "${target_path}" ]] || return 0
 
-    local old_name="${PROJECT_NAMES[${sanitized}]:-}"
-    local width
-    width=$(tput cols)
-    cs_render_header_bar "\e[7m${CS_CLR_PROMPT_WARN}" "Project: " "${width}"
-    printf '\e[1;10H\e[7m%b' "${CS_CLR_PROMPT_WARN}"
-    printf '\e[?25h'
-    if cs_read_line "${old_name}"; then
-        if [[ -n "${CS_INPUT_RESULT}" ]]; then
-            cs_set_kv "${PROJECT_NAMES_FILE}" "${sanitized}" "${CS_INPUT_RESULT}"
-            PROJECT_NAMES["${sanitized}"]="${CS_INPUT_RESULT}"
-        elif [[ -n "${old_name}" ]]; then
-            cs_del_kv "${PROJECT_NAMES_FILE}" "${sanitized}"
-            unset "PROJECT_NAMES[${sanitized}]"
-        fi
-        LAST_REMOTE_SCAN=0
-        LAST_PATH_SET=""
-        cs_rescan
+  local old_name="${PROJECT_NAMES[${sanitized}]:-}"
+  local width
+  width=$(tput cols)
+  cs_render_header_bar "\e[7m${CS_CLR_PROMPT_WARN}" "Project: " "${width}"
+  printf '\e[1;10H\e[7m%b' "${CS_CLR_PROMPT_WARN}"
+  printf '\e[?25h'
+  if cs_read_line "${old_name}"; then
+    if [[ -n "${CS_INPUT_RESULT}" ]]; then
+      cs_set_kv "${PROJECT_NAMES_FILE}" "${sanitized}" "${CS_INPUT_RESULT}"
+      PROJECT_NAMES["${sanitized}"]="${CS_INPUT_RESULT}"
+    elif [[ -n "${old_name}" ]]; then
+      cs_del_kv "${PROJECT_NAMES_FILE}" "${sanitized}"
+      unset "PROJECT_NAMES[${sanitized}]"
     fi
-    printf '\e[?25l\e[0m'
+    LAST_REMOTE_SCAN=0
+    LAST_PATH_SET=""
+    cs_rescan
+  fi
+  printf '\e[?25l\e[0m'
 }
 
 cs_install_bell_hook() {
-    local bells_file="${STATE_DIR}/bells"
-    : > "${bells_file}"
-    # Ensure bell detection works regardless of user's tmux.conf
-    _tmux set -s focus-events on
-    _tmux set -g bell-action any
-    _tmux setw -g monitor-bell on
-    # alert-bell fires with the window that belled — log its pane IDs
-    _tmux set-hook -g alert-bell "run-shell 'tmux list-panes -t \"#{window_id}\" -F \"#{pane_id}\" >> \"${bells_file}\"'"
-    # focus-in/out track window focus for bell suppression
-    _tmux set-hook -g client-focus-in "run-shell 'touch \"${STATE_DIR}/focus_in\"'"
-    _tmux set-hook -g client-focus-out "run-shell 'touch \"${STATE_DIR}/focus_out\"'"
+  local bells_file="${STATE_DIR}/bells"
+  : > "${bells_file}"
+  # Ensure bell detection works regardless of user's tmux.conf
+  _tmux set -s focus-events on
+  _tmux set -g bell-action any
+  _tmux setw -g monitor-bell on
+  # alert-bell fires with the window that belled — log its pane IDs
+  _tmux set-hook -g alert-bell "run-shell 'tmux list-panes -t \"#{window_id}\" -F \"#{pane_id}\" >> \"${bells_file}\"'"
+  # focus-in/out track window focus for bell suppression
+  _tmux set-hook -g client-focus-in "run-shell 'touch \"${STATE_DIR}/focus_in\"'"
+  _tmux set-hook -g client-focus-out "run-shell 'touch \"${STATE_DIR}/focus_out\"'"
 }
 
 cs_remove_bell_hook() {
-    _tmux set-hook -gu alert-bell 2>/dev/null || true
-    _tmux set-hook -gu client-focus-in 2>/dev/null || true
-    _tmux set-hook -gu client-focus-out 2>/dev/null || true
+  _tmux set-hook -gu alert-bell 2>/dev/null || true
+  _tmux set-hook -gu client-focus-in 2>/dev/null || true
+  _tmux set-hook -gu client-focus-out 2>/dev/null || true
 }
 
 cs_bind() {
-    local action="$1" defaults="$2"
-    shift 2
-    local tmux_args=("$@")
-    local keys="${BIND_OVERRIDES[bind_${action}]:-${defaults}}"
-    local key_list key
-    IFS=',' read -ra key_list <<< "${keys}"
-    for key in "${key_list[@]}"; do
-        key="${key// /}"
-        _tmux bind-key "${key}" "${tmux_args[@]}"
-    done
+  local action="$1" defaults="$2"
+  shift 2
+  local tmux_args=("$@")
+  local keys="${BIND_OVERRIDES[bind_${action}]:-${defaults}}"
+  local key_list key
+  IFS=',' read -ra key_list <<< "${keys}"
+  for key in "${key_list[@]}"; do
+    key="${key// /}"
+    _tmux bind-key "${key}" "${tmux_args[@]}"
+  done
 }
 
 cs_install_keybindings() {
-    local user_prefix
-    user_prefix=$(_tmux show-options -gv prefix 2>/dev/null || echo "C-b")
+  local user_prefix
+  user_prefix=$(_tmux show-options -gv prefix 2>/dev/null || echo "C-b")
 
-    if [[ -n "${CS_PREFIX:-}" ]]; then
-        _tmux set-option -g prefix "${CS_PREFIX}"
-        user_prefix="${CS_PREFIX}"
-    fi
+  if [[ -n "${CS_PREFIX:-}" ]]; then
+    _tmux set-option -g prefix "${CS_PREFIX}"
+    user_prefix="${CS_PREFIX}"
+  fi
 
-    # Wipe prefix table only (preserves root/mouse/copy-mode)
-    _tmux unbind-key -a -T prefix
+  # Wipe prefix table only (preserves root/mouse/copy-mode)
+  _tmux unbind-key -a -T prefix
 
-    # Re-bind send-prefix so double-prefix sends the literal key
-    _tmux bind-key "${user_prefix}" send-prefix
+  # Re-bind send-prefix so double-prefix sends the literal key
+  _tmux bind-key "${user_prefix}" send-prefix
 
-    # Terminal
-    cs_bind terminal '`' send-keys -t "${PICKER_PANE}" '`'
-    cs_bind toggle_terminal t send-keys -t "${PICKER_PANE}" "~"
-    _tmux bind-key a send-keys '`'
+  # Terminal
+  cs_bind terminal '`' send-keys -t "${PICKER_PANE}" '`'
+  cs_bind toggle_terminal t send-keys -t "${PICKER_PANE}" "~"
+  _tmux bind-key a send-keys '`'
 
-    # Focus claude pane (reuses existing | trigger)
-    cs_bind focus_claude 'Enter,i' send-keys -t "${PICKER_PANE}" "|"
+  # Focus claude pane (reuses existing | trigger)
+  cs_bind focus_claude 'Enter,i' send-keys -t "${PICKER_PANE}" "|"
 
-    # Session navigation (sends J/K to picker = move+activate+focus)
-    cs_bind nav_next 'J,S-Down' send-keys -t "${PICKER_PANE}" "J"
-    cs_bind nav_prev 'K,S-Up' send-keys -t "${PICKER_PANE}" "K"
+  # Session navigation (sends J/K to picker = move+activate+focus)
+  cs_bind nav_next 'J,S-Down' send-keys -t "${PICKER_PANE}" "J"
+  cs_bind nav_prev 'K,S-Up' send-keys -t "${PICKER_PANE}" "K"
 
-    # Pane movement
-    cs_bind pane_left 'h,Left,S-Left' select-pane -L
-    cs_bind pane_right 'l,Right,S-Right' select-pane -R
-    cs_bind pane_up 'k,Up' select-pane -U
-    cs_bind pane_down 'j,Down' select-pane -D
+  # Pane movement
+  cs_bind pane_left 'h,Left,S-Left' select-pane -L
+  cs_bind pane_right 'l,Right,S-Right' select-pane -R
+  cs_bind pane_up 'k,Up' select-pane -U
+  cs_bind pane_down 'j,Down' select-pane -D
 
-    # Smart focus: picker↔claude toggle
-    cs_bind focus_picker Space send-keys -t "${PICKER_PANE}" $'\x0f'
+  # Smart focus: picker↔claude toggle
+  cs_bind focus_picker Space send-keys -t "${PICKER_PANE}" $'\x0f'
 
-    # Detach
-    cs_bind detach d detach-client
+  # Detach
+  cs_bind detach d detach-client
 
-    # Zoom
-    cs_bind zoom z resize-pane -Z
+  # Zoom
+  cs_bind zoom z resize-pane -Z
 
-    # Copy/paste
-    cs_bind copy_mode '[' copy-mode
-    cs_bind paste ']' paste-buffer
+  # Copy/paste
+  cs_bind copy_mode '[' copy-mode
+  cs_bind paste ']' paste-buffer
 
-    # Refresh/rescan (dedicated trigger)
-    cs_bind refresh Tab send-keys -t "${PICKER_PANE}" $'\x12'
+  # Refresh/rescan (dedicated trigger)
+  cs_bind refresh Tab send-keys -t "${PICKER_PANE}" $'\x12'
 
-    # Command menu: focus picker + enter menu
-    cs_bind menu ':' send-keys -t "${PICKER_PANE}" $'\x05'
+  # Command menu: focus picker + enter menu
+  cs_bind menu ':' send-keys -t "${PICKER_PANE}" $'\x05'
 
-    # tmux command prompt (escape hatch)
-    _tmux bind-key F12 command-prompt
+  # tmux command prompt (escape hatch)
+  _tmux bind-key F12 command-prompt
 
-    # Search and new-session: non-printable triggers, picker handles focus-steal
-    cs_bind search / send-keys -t "${PICKER_PANE}" $'\x01'
-    cs_bind new_session c send-keys -t "${PICKER_PANE}" $'\x02'
-    cs_bind close x send-keys -t "${PICKER_PANE}" $'\x06'
-    cs_bind rename r send-keys -t "${PICKER_PANE}" $'\x10'
-    cs_bind rename_project p send-keys -t "${PICKER_PANE}" $'\x19'
-    cs_bind hide H send-keys -t "${PICKER_PANE}" $'\x14'
-    cs_bind shutdown s send-keys -t "${PICKER_PANE}" $'\x16'
-    cs_bind reload R send-keys -t "${PICKER_PANE}" $'\x0e'
-    cs_bind help '?' send-keys -t "${PICKER_PANE}" '?'
+  # Search and new-session: non-printable triggers, picker handles focus-steal
+  cs_bind search / send-keys -t "${PICKER_PANE}" $'\x01'
+  cs_bind new_session c send-keys -t "${PICKER_PANE}" $'\x02'
+  cs_bind close x send-keys -t "${PICKER_PANE}" $'\x06'
+  cs_bind rename r send-keys -t "${PICKER_PANE}" $'\x10'
+  cs_bind rename_project p send-keys -t "${PICKER_PANE}" $'\x19'
+  cs_bind hide H send-keys -t "${PICKER_PANE}" $'\x14'
+  cs_bind shutdown s send-keys -t "${PICKER_PANE}" $'\x16'
+  cs_bind reload R send-keys -t "${PICKER_PANE}" $'\x0e'
+  cs_bind help '?' send-keys -t "${PICKER_PANE}" '?'
 
-    _tmux bind-key PPage copy-mode -u
+  _tmux bind-key PPage copy-mode -u
 
-    # Resize (always meta+arrows)
-    _tmux bind-key -r M-Up resize-pane -U 2
-    _tmux bind-key -r M-Down resize-pane -D 2
-    _tmux bind-key -r M-Left resize-pane -L 2
-    _tmux bind-key -r M-Right resize-pane -R 2
+  # Resize (always meta+arrows)
+  _tmux bind-key -r M-Up resize-pane -U 2
+  _tmux bind-key -r M-Down resize-pane -D 2
+  _tmux bind-key -r M-Left resize-pane -L 2
+  _tmux bind-key -r M-Right resize-pane -R 2
 
-    # Jump to Nth local session (1-9, 0=10th)
-    local n
-    for n in 1 2 3 4 5 6 7 8 9 0; do
-        _tmux bind-key "${n}" send-keys -t "${PICKER_PANE}" "${n}"
-    done
+  # Jump to Nth local session (1-9, 0=10th)
+  local n
+  for n in 1 2 3 4 5 6 7 8 9 0; do
+    _tmux bind-key "${n}" send-keys -t "${PICKER_PANE}" "${n}"
+  done
 }
 
 cs_remove_keybindings() {
-    _tmux unbind-key -a -T prefix 2>/dev/null || true
+  _tmux unbind-key -a -T prefix 2>/dev/null || true
 }
 
 cs_check_bells() {
-    local bells_file="${STATE_DIR}/bells"
-    [[ -s "${bells_file}" ]] || return 0
+  local bells_file="${STATE_DIR}/bells"
+  [[ -s "${bells_file}" ]] || return 0
 
-    # Read and clear
-    local pane_id
-    while IFS= read -r pane_id; do
-        [[ -n "${pane_id}" ]] || continue
-        if ! [[ -v "BELL_SET[${pane_id}]" ]]; then
-            BELL_SET["${pane_id}"]=1
-            DIRTY=1
-        fi
-    done < "${bells_file}"
-    : > "${bells_file}"
-
-    # Suppress bell for active session when window is focused
-    if ((WINDOW_FOCUSED)); then
-        local cur_pane
-        cur_pane=$(cs_read_state current_pane)
-        if [[ -n "${cur_pane}" ]] && [[ -v "BELL_SET[${cur_pane}]" ]]; then
-            unset "BELL_SET[${cur_pane}]"
-        fi
+  # Read and clear
+  local pane_id
+  while IFS= read -r pane_id; do
+    [[ -n "${pane_id}" ]] || continue
+    if ! [[ -v "BELL_SET[${pane_id}]" ]]; then
+      BELL_SET["${pane_id}"]=1
+      DIRTY=1
     fi
+  done < "${bells_file}"
+  : > "${bells_file}"
 
-    cs_sync_bells_active
+  # Suppress bell for active session when window is focused
+  if ((WINDOW_FOCUSED)); then
+    local cur_pane
+    cur_pane=$(cs_read_state current_pane)
+    if [[ -n "${cur_pane}" ]] && [[ -v "BELL_SET[${cur_pane}]" ]]; then
+      unset "BELL_SET[${cur_pane}]"
+    fi
+  fi
+
+  cs_sync_bells_active
 }
 
 cs_sync_bells_active() {
-    local bells_file="${STATE_DIR}/bells_active"
-    if ((${#BELL_SET[@]} == 0)); then
-        [[ -f "${bells_file}" ]] && rm -f "${bells_file}"
-        return 0
-    fi
-    local pane_id sid
-    {
-        for pane_id in "${!BELL_SET[@]}"; do
-            sid=$(cat "${STATE_DIR}/panes/${pane_id#%}" 2>/dev/null) || continue
-            [[ -n "${sid}" && "${sid}" != "new" ]] && printf '%s\n' "${sid}"
-        done
-    } > "${bells_file}.tmp"
-    mv "${bells_file}.tmp" "${bells_file}"
+  local bells_file="${STATE_DIR}/bells_active"
+  if ((${#BELL_SET[@]} == 0)); then
+    [[ -f "${bells_file}" ]] && rm -f "${bells_file}"
+    return 0
+  fi
+  local pane_id sid
+  {
+    for pane_id in "${!BELL_SET[@]}"; do
+      sid=$(cat "${STATE_DIR}/panes/${pane_id#%}" 2>/dev/null) || continue
+      [[ -n "${sid}" && "${sid}" != "new" ]] && printf '%s\n' "${sid}"
+    done
+  } > "${bells_file}.tmp"
+  mv "${bells_file}.tmp" "${bells_file}"
 }
 
 # ── Reset ─────────────────────────────────────────
 cs_reset() {
-    cs_init_state
+  cs_init_state
 
-    # Kill terminal panes first
-    for f in "${STATE_DIR}"/term/*; do
-        [[ -f "${f}" ]] || continue
-        [[ "$(basename "${f}")" == *.* ]] && continue
-        local tp
-        tp=$(cat "${f}" 2>/dev/null || true)
-        [[ -n "${tp}" ]] && { _tmux kill-pane -t "${tp}" 2>/dev/null || true; }
-    done
+  # Kill terminal panes first
+  for f in "${STATE_DIR}"/term/*; do
+    [[ -f "${f}" ]] || continue
+    [[ "$(basename "${f}")" == *.* ]] && continue
+    local tp
+    tp=$(cat "${f}" 2>/dev/null || true)
+    [[ -n "${tp}" ]] && { _tmux kill-pane -t "${tp}" 2>/dev/null || true; }
+  done
 
-    for f in "${STATE_DIR}"/panes/*; do
-        [[ -f "${f}" ]] || continue
-        _tmux kill-pane -t "%$(basename "${f}")" 2>/dev/null || true
-    done
+  for f in "${STATE_DIR}"/panes/*; do
+    [[ -f "${f}" ]] || continue
+    _tmux kill-pane -t "%$(basename "${f}")" 2>/dev/null || true
+  done
 
-    local wp
-    wp=$(cs_read_state welcome_pane)
-    [[ -n "${wp}" ]] && _tmux kill-pane -t "${wp}" 2>/dev/null || true
+  local wp
+  wp=$(cs_read_state welcome_pane)
+  [[ -n "${wp}" ]] && _tmux kill-pane -t "${wp}" 2>/dev/null || true
 
-    local pp
-    pp=$(cs_read_state picker_pane)
-    [[ -n "${pp}" ]] && _tmux kill-pane -t "${pp}" 2>/dev/null || true
+  local pp
+  pp=$(cs_read_state picker_pane)
+  [[ -n "${pp}" ]] && _tmux kill-pane -t "${pp}" 2>/dev/null || true
 
-    cs_remove_bell_hook
-    cs_remove_keybindings
+  cs_remove_bell_hook
+  cs_remove_keybindings
 
-    rm -rf "${STATE_DIR}"
-    rm -f "${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${TMUX_SERVER}"
-    _tmux kill-server 2>/dev/null || true
-    echo "Reset complete."
+  rm -rf "${STATE_DIR}"
+  rm -f "${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${TMUX_SERVER}"
+  _tmux kill-server 2>/dev/null || true
+  echo "Reset complete."
 }
 
 # ── Launcher ──────────────────────────────────────
 cs_launch() {
-    while true; do
-        cs_load_config
-        cs_init_state
+  while true; do
+    cs_load_config
+    cs_init_state
 
-        local session_name
-        session_name="cs$(cs_sanitize_path "${PWD}")"
+    local session_name
+    session_name="cs$(cs_sanitize_path "${PWD}")"
 
-        if ! _tmux has-session 2>/dev/null; then
-            _tmux new-session -d -s "${session_name}" \
-                "CS_PICKER=1 CS_STATE_DIR=${STATE_DIR@Q} exec ${SCRIPT_PATH@Q}"
-            if [[ -n "${TMUX_CONF}" && -f "${TMUX_CONF}" ]]; then
-                _tmux source-file "${TMUX_CONF}" 2>/dev/null || true
-            fi
-            _tmux set -g window-status-format ''
-            _tmux set -g window-status-current-format ''
-            _tmux set -g status-left-length 50
-            _tmux set -s focus-events on
-            _tmux set -s extended-keys on
-            _tmux set -g bell-action any
-            _tmux setw -g monitor-bell on
-        fi
+    if ! _tmux has-session 2>/dev/null; then
+      _tmux new-session -d -s "${session_name}" \
+        "CS_PICKER=1 CS_STATE_DIR=${STATE_DIR@Q} exec ${SCRIPT_PATH@Q}"
+      if [[ -n "${TMUX_CONF}" && -f "${TMUX_CONF}" ]]; then
+        _tmux source-file "${TMUX_CONF}" 2>/dev/null || true
+      fi
+      _tmux set -g window-status-format ''
+      _tmux set -g window-status-current-format ''
+      _tmux set -g status-left-length 50
+      _tmux set -s focus-events on
+      _tmux set -s extended-keys on
+      _tmux set -g bell-action any
+      _tmux setw -g monitor-bell on
+    fi
 
-        # Block until detach (NOT exec — we need control back for project switching)
-        command tmux -L "${TMUX_SERVER}" attach-session
+    # Block until detach (NOT exec — we need control back for project switching)
+    command tmux -L "${TMUX_SERVER}" attach-session
 
-        # Check for project switch
-        if [[ -f "${STATE_DIR}/switch_target" ]]; then
-            local target_path
-            target_path=$(cat "${STATE_DIR}/switch_target")
-            rm -f "${STATE_DIR}/switch_target"
-            if [[ -d "${target_path}" ]]; then
-                cd "${target_path}" || break
-                TMUX_SERVER=$(cs_server_name "$PWD")
-                continue
-            fi
-        fi
-        break  # normal detach
-    done
+    # Check for project switch
+    if [[ -f "${STATE_DIR}/switch_target" ]]; then
+      local target_path
+      target_path=$(cat "${STATE_DIR}/switch_target")
+      rm -f "${STATE_DIR}/switch_target"
+      if [[ -d "${target_path}" ]]; then
+        cd "${target_path}" || break
+        TMUX_SERVER=$(cs_server_name "$PWD")
+        continue
+      fi
+    fi
+    break  # normal detach
+  done
 }
 
 # ── Entrypoint ────────────────────────────────────
 cs_preflight
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    echo "claude-spaces v${VERSION} — tmux session picker for Claude Code"
-    echo ""
-    echo "Usage:"
-    echo "  claude-spaces          Launch picker"
-    echo "  claude-spaces --reset    Kill all managed panes, clear state"
-    echo "  claude-spaces --restart  Reset and relaunch"
-    echo "  claude-spaces --help     Show this help"
-    echo ""
-    cs_help_text
-    echo ""
-    echo "Config: ${CONFIG_FILE}"
-    exit 0
+  echo "claude-spaces v${VERSION} — tmux session picker for Claude Code"
+  echo ""
+  echo "Usage:"
+  echo "  claude-spaces          Launch picker"
+  echo "  claude-spaces --reset    Kill all managed panes, clear state"
+  echo "  claude-spaces --restart  Reset and relaunch"
+  echo "  claude-spaces --help     Show this help"
+  echo ""
+  cs_help_text
+  echo ""
+  echo "Config: ${CONFIG_FILE}"
+  exit 0
 fi
 
 if [[ "${1:-}" == "--reset" ]]; then
-    cs_load_config
-    cs_reset
-    exit 0
+  cs_load_config
+  cs_reset
+  exit 0
 fi
 
 if [[ "${1:-}" == "--restart" ]]; then
-    cs_load_config
-    cs_reset
-    exec "${SCRIPT_PATH}"
+  cs_load_config
+  cs_reset
+  exec "${SCRIPT_PATH}"
 fi
 
 if [[ "${CS_PICKER:-}" == "1" ]]; then
-    STATE_DIR="${CS_STATE_DIR:-}"
-    if [[ -z "${STATE_DIR}" ]]; then
-        echo "ERROR: CS_STATE_DIR not set"
-        exit 1
-    fi
-    cs_load_config
-    cs_picker_loop
+  STATE_DIR="${CS_STATE_DIR:-}"
+  if [[ -z "${STATE_DIR}" ]]; then
+    echo "ERROR: CS_STATE_DIR not set"
+    exit 1
+  fi
+  cs_load_config
+  cs_picker_loop
 else
-    cs_launch "$@"
+  cs_launch "$@"
 fi
