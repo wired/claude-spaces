@@ -2067,7 +2067,7 @@ cs_picker_render() {
 
         # Quit row
         local quit_line=$((footer_line + 1))
-        cs_print_centered "${quit_line}" "Q:detach" "${width}"
+        cs_print_centered "${quit_line}" "Q:detach  ?:help" "${width}"
 
         # Version line
         printf '\e[%d;1H\e[K' "$((quit_line + 1))"
@@ -2251,6 +2251,7 @@ cs_picker_loop() {
                     a|i) cs_focus_session; DIRTY=1 ;;
                     /) cs_search_enter; DIRTY=1 ;;
                     ':') cs_menu_enter ;;
+                    '?') cs_kill_welcome; cs_show_welcome; DIRTY=1 ;;
                     Q) _tmux detach-client ;;
                     '~') cs_term_toggle; DIRTY=1 ;;
                     '`') cs_term_smart; DIRTY=1 ;;
@@ -2832,6 +2833,7 @@ cs_install_keybindings() {
     cs_bind hide H send-keys -t "${PICKER_PANE}" $'\x14'
     cs_bind shutdown s send-keys -t "${PICKER_PANE}" $'\x16'
     cs_bind reload R send-keys -t "${PICKER_PANE}" $'\x0e'
+    cs_bind help '?' send-keys -t "${PICKER_PANE}" '?'
 
     _tmux bind-key PPage copy-mode -u
 
