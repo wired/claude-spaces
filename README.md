@@ -40,7 +40,7 @@ make install                                        # /usr/local/bin (may need s
 PREFIX=~/.local make install                        # ~/.local/bin
 ```
 
-Requires bash 4+, tmux 3.0+, jq.
+Requires bash 4.3+, tmux 3.0+, jq.
 
 ## Quick Start
 
@@ -65,6 +65,11 @@ are discovered and can be resumed.
 
 This allows you to use claude-spaces with worktrees as well, you just have to
 create them yourself.
+
+**Project names** — when multiple projects share the same directory name, the
+picker automatically disambiguates them with minimal path suffixes. You can
+also set custom names via `prefix + p` or the `:` command menu — useful for
+worktrees or any project where the directory name isn't descriptive enough.
 
 **Bell detection** — when Claude finishes in a background session, the picker
 highlights it in red. Never miss a completed task again.
