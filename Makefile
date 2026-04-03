@@ -61,6 +61,7 @@ update-packages:
 	if [ -n "$(DRY_RUN)" ]; then \
 		echo "[dry-run] SHA256: $${SHA}"; \
 		echo "[dry-run] Update $(AUR_DIR)/PKGBUILD: pkgver=$(V), sha256=$${SHA}"; \
+		echo "[dry-run] Generate $(AUR_DIR)/.SRCINFO"; \
 		echo "[dry-run] Update $(BREW_DIR)/Formula/claude-spaces.rb: v$(V), sha256=$${SHA}"; \
 		echo "[dry-run] Commit both repos: claude-spaces v$(V)"; \
 	else \
@@ -70,7 +71,7 @@ update-packages:
 		sed -i "s/sha256sums=('.*')/sha256sums=('$${SHA}')/" $(AUR_DIR)/PKGBUILD; \
 		sed -i 's|/tags/v.*\.tar\.gz|/tags/v$(V).tar.gz|' $(BREW_DIR)/Formula/claude-spaces.rb; \
 		sed -i 's/sha256 ".*"/sha256 "'$${SHA}'"/' $(BREW_DIR)/Formula/claude-spaces.rb; \
-		cd $(AUR_DIR) && git add PKGBUILD && git commit -m "claude-spaces v$(V)"; \
+		cd $(AUR_DIR) && makepkg --printsrcinfo > .SRCINFO && git add PKGBUILD .SRCINFO && git commit -m "claude-spaces v$(V)"; \
 		cd $(BREW_DIR) && git add Formula/claude-spaces.rb && git commit -m "claude-spaces v$(V)"; \
 		echo "Committed. Push when ready:"; \
 		echo "  cd $(AUR_DIR) && git push"; \
