@@ -27,7 +27,7 @@ release:
 		echo "[dry-run] sed: $(V)-dev -> $(V) in claude-spaces README.md"; \
 		echo "[dry-run] git commit v$(V)"; \
 		echo "[dry-run] git tag v$(V)"; \
-		echo "[dry-run] git push --follow-tags"; \
+		echo "[dry-run] git push && git push origin v$(V)"; \
 		NEXT=$$(echo "$(V)" | awk -F. '{print $$1"."$$2"."$$3+1}'); \
 		echo "[dry-run] sed: $(V) -> $${NEXT}-dev in claude-spaces README.md"; \
 		echo "[dry-run] git commit Bump version to $${NEXT}-dev"; \
@@ -39,7 +39,7 @@ release:
 		git add claude-spaces README.md; \
 		git commit -m "v$(V)"; \
 		git tag "v$(V)"; \
-		git push --follow-tags; \
+		git push && git push origin "v$(V)"; \
 		NEXT=$$(echo "$(V)" | awk -F. '{print $$1"."$$2"."$$3+1}'); \
 		sed -i "s/# Version $(V)/# Version $${NEXT}-dev/" claude-spaces; \
 		sed -i "s/VERSION=\"$(V)\"/VERSION=\"$${NEXT}-dev\"/" claude-spaces; \
