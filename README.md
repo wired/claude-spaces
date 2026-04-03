@@ -31,6 +31,15 @@ every project, with instant switching and background activity alerts.
          left slot                    picker (30 cols default)
 ```
 
+## WARNING
+
+claude-spaces avoids altering Claude Code's internal files. We only read from
+`~/.claude` and write all state to claude-spaces-specific directories.
+
+That said, this is a hobby project and Claude was involved with most of the
+code, so I encourage caution. Test it out before using it with valuable
+projects.
+
 ## Install
 
 ```
