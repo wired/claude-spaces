@@ -2132,6 +2132,7 @@ cs_picker_loop() {
     cs_install_bell_hook
 
     stty -echo discard undef lnext undef 2>/dev/null || true
+    stty dsusp undef 2>/dev/null || true
     trap 'stty echo 2>/dev/null; printf "\e[?25h\e[0m"; cs_remove_bell_hook; cs_remove_keybindings' EXIT
 
     cs_build_all_entries
