@@ -26,6 +26,17 @@ context pushed by a Claude skill.
 - What viewer runs in the pane (plain cat, bat for syntax, glow for markdown)
 - Whether the pane should clear on session switch or show last content
 
+### Jump Index Priority Mode
+
+Currently, jump shortcuts (1-0) prioritize active sessions (local managed/active_elsewhere,
+remote managed/bell), then fill remaining slots with dormant in display order. This works
+well in practice but can let one remote project hog slots when many projects are discovered.
+
+Evaluate whether a `jump_priority=local` config option is needed — it would assign all local
+sessions first (regardless of status), then fill remaining slots with active remote sessions.
+Simpler mental model, avoids cross-project fairness issues, but loses the "active first"
+guarantee that makes the current default useful.
+
 ### Shared Per-Project Terminal
 
 One shell shared across all sessions in a project, instead of per-session terminals.
