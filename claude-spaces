@@ -2879,6 +2879,13 @@ cs_install_keybindings() {
   cs_bind help '?' send-keys -t "${PICKER_PANE}" '?'
 
   _tmux bind-key PPage copy-mode -u
+  _tmux bind-key NPage send-keys -X page-down
+  _tmux bind-key S-PPage copy-mode '\;' send-keys -X halfpage-up
+  _tmux bind-key S-NPage send-keys -X halfpage-down
+  _tmux bind-key -T copy-mode-vi S-PPage send-keys -X halfpage-up
+  _tmux bind-key -T copy-mode-vi S-NPage send-keys -X halfpage-down
+  _tmux bind-key -T copy-mode S-PPage send-keys -X halfpage-up
+  _tmux bind-key -T copy-mode S-NPage send-keys -X halfpage-down
 
   # Resize (always meta+arrows)
   _tmux bind-key -r M-Up resize-pane -U 2
