@@ -137,7 +137,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | Key | Action |
 |-----|--------|
 | `j` / `k` / `↑` / `↓` | Move cursor (skips headers) |
-| `1`-`9`, `0` | Jump to Nth local session (0 = 10th) + focus |
+| `1`-`9`, `0` | Jump to Nth session (0 = 10th) + focus |
 | `Enter` | Load + focus session (remote/inactive: switch project) |
 | `Space` | Load session (stay in picker) |
 | `H` / `L` | Load + focus session |
@@ -164,7 +164,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + l` / `prefix + →` / `prefix + S-→` | Select pane right |
 | `prefix + J` / `prefix + S-↓` | Next session + focus |
 | `prefix + K` / `prefix + S-↑` | Prev session + focus |
-| `prefix + 1`-`9`, `0` | Jump to Nth local session + focus |
+| `prefix + 1`-`9`, `0` | Jump to Nth session + focus |
 | `prefix + /` | Focus picker + search |
 | `prefix + c` | New session |
 | `prefix + x` | Close session (with confirm) |

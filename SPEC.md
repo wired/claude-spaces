@@ -100,7 +100,7 @@ configurable via `bind_*` keys in the config file.
 | Key              | Action                                                      |
 |------------------|-------------------------------------------------------------|
 | `j` / `k` / `↑` / `↓` | Move cursor (skips headers/spacers)                  |
-| `1`-`9`, `0`     | Jump to Nth local session (0 = 10th) + focus                |
+| `1`-`9`, `0`     | Jump to Nth session (0 = 10th) + focus                      |
 | `Enter`          | Load + focus session (remote/inactive: switch project)      |
 | `Space`          | Load session (stay in picker)                               |
 | `H` / `L`       | Load + focus session                                        |

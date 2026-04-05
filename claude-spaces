@@ -1448,12 +1448,12 @@ cs_focus_session() {
   fi
 }
 
-cs_jump_to_local() {
+cs_jump_to_session() {
   local target="$1"
   ((target == 0)) && target=10
   local count=0 i
   for ((i = 0; i < ${#ENTRIES_ID[@]}; i++)); do
-    [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] || continue
+    [[ "${ENTRIES_TYPE[${i}]}" == "local" || "${ENTRIES_TYPE[${i}]}" == "remote" ]] || continue
     ((++count == target)) || continue
     SELECTED=${i}
     cs_activate_selected
@@ -1914,7 +1914,7 @@ cs_picker_render() {
 
   local i local_idx=0
   for ((i = 0; i < SCROLL && i < n; i++)); do
-    [[ "${ENTRIES_TYPE[${i}]}" == "local" ]] && ((local_idx++))
+    [[ "${ENTRIES_TYPE[${i}]}" == "local" || "${ENTRIES_TYPE[${i}]}" == "remote" ]] && ((local_idx++))
   done
   for ((i = SCROLL; i < SCROLL + avail && i < n; i++)); do
     local line=$((i - SCROLL + 2))
@@ -1977,6 +1977,18 @@ cs_picker_render() {
         ;;
       remote)
         indent=2
+        if ((SHOW_INDEX)); then
+          if ((local_idx < 10)); then
+            local digit=$(( (++local_idx) % 10 ))
+            if [[ -z "${line_prefix}" ]]; then
+              idx_prefix="${digit} "
+              indent=0
+            fi
+          elif [[ -z "${line_prefix}" ]]; then
+            idx_prefix="  "
+            indent=0
+          fi
+        fi
         if [[ "${status}" == "bell" ]]; then
           line_color="${CS_CLR_BELL}"
         elif [[ "${status}" == "managed" ]]; then
@@ -2280,7 +2292,7 @@ cs_picker_loop() {
             fi
             DIRTY=1
             ;;
-          [0-9]) cs_jump_to_local "${key}" ;;
+          [0-9]) cs_jump_to_session "${key}" ;;
           $'\x12') cs_rescan; DIRTY=1 ;;
           R)
             stty echo 2>/dev/null || true
@@ -2843,7 +2855,7 @@ cs_install_keybindings() {
   _tmux bind-key -r M-Left resize-pane -L 2
   _tmux bind-key -r M-Right resize-pane -R 2
 
-  # Jump to Nth local session (1-9, 0=10th)
+  # Jump to Nth session (1-9, 0=10th)
   local n
   for n in 1 2 3 4 5 6 7 8 9 0; do
     _tmux bind-key "${n}" send-keys -t "${PICKER_PANE}" "${n}"
