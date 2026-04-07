@@ -38,6 +38,7 @@ Ephemeral. Stale refs cleaned up on picker startup.
 | `current_pane`    | Pane ID currently displayed in left slot    |
 | `welcome_pane`    | Pane ID of welcome screen (if showing)      |
 | `new_pane`        | Pane ID of uninitialized new session        |
+| `new_pane_auto_name` | Auto-name for forked session (presence = fork) |
 | `bells`           | Pane IDs that belled (written by alert-bell hook) |
 | `project_path`    | Real filesystem path for this project       |
 | `switch_target`   | Target path for cross-server switching      |
