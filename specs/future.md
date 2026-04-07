@@ -2,7 +2,6 @@
 
 Parent: [SPEC.md](../SPEC.md)
 
-- **Session forking**: Use `claude --fork-session` to branch from an existing session
 - **tmux capture-pane preview**: Show last few lines of a session without switching to it
 
 ### Context Pane

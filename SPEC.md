@@ -121,6 +121,7 @@ any non-matching key to cancel.
 |-----|--------|
 | `r` | Rename session |
 | `p` | Rename project |
+| `f` | Fork session (with confirm) |
 | `x` | Close (with confirm) |
 | `h` | Hide (with confirm) |
 | `o` | Hide this & older (with confirm) |
@@ -144,6 +145,7 @@ Default key assignments are documented in README.md. The available actions:
 | Pane movement | `bind_pane_left`, `bind_pane_right`, `bind_pane_up`, `bind_pane_down` | Directional pane movement |
 | Search | `bind_search` | Focus picker + enter search mode |
 | New session | `bind_new_session` | Create new Claude session |
+| Fork session | `bind_fork` | Fork with confirm prompt |
 | Close session | `bind_close` | Close with confirm prompt |
 | Rename session | `bind_rename` | Rename selected session |
 | Rename project | `bind_rename_project` | Rename project of selected entry |

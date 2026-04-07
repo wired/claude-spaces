@@ -64,16 +64,22 @@ load_functions() {
 
 # ── Mock overrides ───────────────────────────────
 mock_cs_new_session() {
+  local auto_name="${2:-}"
   local old_new
   old_new=$(cs_read_state new_pane)
   if [[ -n "${old_new}" ]]; then
     _tmux kill-pane -t "${old_new}" 2>/dev/null || true
-    rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane"
+    rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane" "${STATE_DIR}/new_pane_auto_name"
   fi
   local pane_id
   pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
   echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
   echo "${pane_id}" > "${STATE_DIR}/new_pane"
+  if [[ -n "${auto_name}" ]]; then
+    echo "${auto_name}" > "${STATE_DIR}/new_pane_auto_name"
+  else
+    rm -f "${STATE_DIR}/new_pane_auto_name"
+  fi
   cs_show_pane "${pane_id}"
 }
 

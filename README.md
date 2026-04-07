@@ -144,7 +144,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `a` / `i` | Focus Claude pane |
 | `h` / `l` / `←` / `→` | Move between panes |
 | `/` | Search/filter sessions |
-| `:` | Command menu (new, rename, close, hide, shutdown) |
+| `:` | Command menu (new, fork, rename, close, hide, shutdown) |
 | `?` | Show help screen |
 | `Q` | Detach (exit) |
 | `R` | Reload picker in-place (picks up code changes) |
@@ -167,6 +167,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + 1`-`9`, `0` | Jump to Nth session + focus |
 | `prefix + /` | Focus picker + search |
 | `prefix + c` | New session |
+| `prefix + f` | Fork session (with confirm) |
 | `prefix + x` | Close session (with confirm) |
 | `prefix + r` | Rename session |
 | `prefix + p` | Rename project |
@@ -264,6 +265,7 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # bind_paste=]
 # bind_search=/
 # bind_new_session=c
+# bind_fork=f
 # bind_close=x
 # bind_rename=r
 # bind_rename_project=p
