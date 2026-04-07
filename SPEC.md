@@ -79,12 +79,12 @@ Discovered from `~/.claude/projects/*/` dirs that have JSONL files but no runnin
 
 ### Other entry types
 
-| Type     | Style              | Selectable | Description                     |
-|----------|--------------------|------------|---------------------------------|
-| Header   | bold dim + rules   | no (skipped) | Section divider               |
-| Spacer   | blank line         | no (skipped) | Gap before headers            |
-| Project  | white text         | yes        | Remote project name             |
-| Inactive | dim text           | yes        | Inactive project name           |
+| Type     | Style                      | Selectable   | Description                                    |
+|----------|----------------------------|--------------|------------------------------------------------|
+| Header   | centered, bold dim + rules | no (skipped) | Section divider                                |
+| Spacer   | blank line                 | no (skipped) | Gap before sections and between project groups |
+| Project  | white text                 | yes          | Remote project name                            |
+| Inactive | dim text                   | yes          | Inactive project name                          |
 
 Focused state detected at render time via `_tmux display-message -t $PICKER_PANE -p '#{pane_active}'`.
 

@@ -1291,12 +1291,18 @@ cs_build_all_entries() {
       cs_entry_append "__spacer_remote__" "" "0" "" "" "spacer" ""
       cs_entry_append "__hdr_remote__" "other projects" "0" "" "" "header" ""
 
+      local first_project=1
       for entry in "${REMOTE_SERVERS[@]}"; do
         local srv="${entry%%|*}"
         local rpath="${entry#*|}"
         local sanitized
         sanitized=$(cs_sanitize_path "${rpath}")
         local leaf="${PROJECT_NAMES[${sanitized}]:-${DISPLAY_NAMES[${rpath}]:-${rpath##*/}}}"
+        if ((first_project)); then
+          first_project=0
+        else
+          cs_entry_append "__spacer_proj_${sanitized}__" "" "0" "" "" "spacer" ""
+        fi
         cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
 
         local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${srv}"
@@ -1987,7 +1993,10 @@ cs_picker_render() {
       continue
     fi
     if [[ "${entry_type}" == "header" ]]; then
-      printf '%b─ %s ─\e[0m' "${CS_CLR_SECTION}" "${name}"
+      local hdr="─ ${name} ─"
+      local hpad=$(( (width - ${#hdr}) / 2 ))
+      ((hpad < 0)) && hpad=0
+      printf '%*s%b%s\e[0m' "${hpad}" "" "${CS_CLR_SECTION}" "${hdr}"
       continue
     fi
 

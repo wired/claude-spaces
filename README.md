@@ -19,12 +19,15 @@ every project, with instant switching and background activity alerts.
 |  or welcome screen                 | sessions                14h  |
 |                                    | configure verbose...     4h  |
 |                                    |                              |
-|                                    | ─ other projects ─           |
+|                                    |      ─ other projects ─      |
 |                                    | on-point-camera              |
 |                                    |   test-framework          2h |
 |                                    |   camera firmware         3h |
 |                                    |                              |
-|                                    | ─ inactive ─                 |
+|                                    | old-webapp                   |
+|                                    |   fix route bug           1d |
+|                                    |                              |
+|                                    |         ─ inactive ─         |
 |                                    | old-project                  |
 |                                    |                              |
 |                                    | : menu  / search             |
