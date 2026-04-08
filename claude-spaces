@@ -61,6 +61,7 @@ cs_server_name() {
 TMUX_SERVER=$(cs_server_name "$PWD")
 TMUX_CONF="${HOME}/.tmux.conf"
 TERMINAL_HEIGHT="35%"
+TERMINAL_WIDTH="45%"
 SHOW_INDEX=1
 CS_PREFIX=""
 declare -gA BIND_OVERRIDES=()
@@ -122,6 +123,7 @@ cs_load_config() {
       window_name_len) WINDOW_NAME_LEN="${value}" ;;
       tmux_conf) TMUX_CONF="${value}" ;;
       terminal_height) TERMINAL_HEIGHT="${value}" ;;
+      terminal_width) TERMINAL_WIDTH="${value}" ;;
       show_index) SHOW_INDEX="${value}" ;;
       prefix) CS_PREFIX="${value}" ;;
       color_header_bg) CS_CLR_HEADER_BG="${value}" ;;
@@ -168,6 +170,9 @@ cs_create_default_config() {
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
 # terminal_height=35%
 
+# Terminal pane width (side orientation): characters or percentage
+# terminal_width=45%
+
 # Show jump index [1]-[0] next to first 10 local sessions
 # show_index=1
 
@@ -177,6 +182,7 @@ cs_create_default_config() {
 # Keybinding overrides (comma-separated for multiple keys)
 # bind_terminal=`
 # bind_toggle_terminal=t
+# bind_side_terminal=Tab
 # bind_focus_claude=Enter,i
 # bind_nav_next=J,S-Down
 # bind_nav_prev=K,S-Up
@@ -196,7 +202,7 @@ cs_create_default_config() {
 # bind_hide=H
 # bind_shutdown=s
 # bind_reload=R
-# bind_refresh=Tab
+# bind_refresh=+
 # bind_menu=:
 
 # Color overrides (ANSI escape sequences, e.g. \e[1;32m)
@@ -236,12 +242,13 @@ cs_help_text() {
   echo "    J/K, S-Arrows  Next/prev session + focus"
   echo "    Space          Picker/Claude toggle"
   echo "    Enter/i        Focus Claude pane"
-  echo "    \`              Terminal (smart toggle)"
+  echo "    \`              Terminal bottom (smart)"
+  echo "    Tab            Terminal side (smart)"
   echo "    t              Toggle terminal on/off"
   echo "    a              Literal grave (\`)"
   echo "    c  New   f  Fork   x  Close   r  Rename"
   echo "    H  Hide  s  Shutdown"
-  echo "    R  Reload picker"
+  echo "    R  Reload picker   +  Refresh/rescan"
   echo "    z              Zoom pane"
   echo "    :              Command menu"
   echo "    ?  Help   d  Detach"
@@ -1394,7 +1401,7 @@ cs_show_pane() {
         old_term=$(cs_term_pane_for "${cur_pane}")
       fi
       if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
-        cs_term_save_height "${old_term}" "${cur_pane}"
+        cs_term_save_size "${old_term}" "${cur_pane}"
         # Extended chain: park terminal, park session, join new
         _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
            break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
@@ -1450,7 +1457,9 @@ cs_show_pane() {
   local wp
   wp=$(cs_read_state welcome_pane)
   if [[ "${target_pane}" != "${wp}" ]] && cs_term_is_shown "${target_pane}"; then
-    cs_term_show "${target_pane}"
+    local _restore_orient
+    _restore_orient=$(cs_term_orient "${target_pane}")
+    cs_term_show "${target_pane}" "${_restore_orient}"
     _tmux resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" 2>/dev/null || true
   fi
 
@@ -1561,44 +1570,146 @@ cs_term_save_height() {
   fi
 }
 
-# Create a new terminal pane below the session pane.
+# Get terminal orientation for a session pane (default: bottom)
+cs_term_orient() {
+  cat "${STATE_DIR}/term/${1#%}.orient" 2>/dev/null || echo "bottom"
+}
+
+cs_term_save_width() {
+  local term_pane="$1" session_pane="$2"
+  local tw sw
+  tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null || true)
+  sw=$(_tmux display-message -t "${session_pane}" -p '#{pane_width}' 2>/dev/null || true)
+  if [[ -n "${tw}" && -n "${sw}" ]] && (( tw + sw > 0 )); then
+    echo $(( tw * 100 / (tw + sw) )) > "${STATE_DIR}/term/${session_pane#%}.width"
+  fi
+}
+
+cs_term_save_size() {
+  local term_pane="$1" session_pane="$2"
+  if [[ "$(cs_term_orient "${session_pane}")" == "side" ]]; then
+    cs_term_save_width "${term_pane}" "${session_pane}"
+  else
+    cs_term_save_height "${term_pane}" "${session_pane}"
+  fi
+}
+
+# Compute terminal width for side orientation
+cs_term_compute_width() {
+  local session_pane="$1"
+  local pct="" w
+  w=$(cat "${STATE_DIR}/term/${session_pane#%}.width" 2>/dev/null || true)
+  if [[ -n "${w}" ]]; then
+    pct="${w}"
+  elif [[ "${TERMINAL_WIDTH}" == *% ]]; then
+    pct="${TERMINAL_WIDTH%\%}"
+  fi
+  if [[ -n "${pct}" ]]; then
+    local pane_w=0
+    if cs_pane_alive "${session_pane}"; then
+      pane_w=$(_tmux display-message -t "${session_pane}" -p '#{pane_width}' 2>/dev/null || echo 0)
+    fi
+    w=$(( (pane_w * pct + 50) / 100 ))
+  else
+    w="${TERMINAL_WIDTH}"
+  fi
+  (( w < 10 )) && w=10
+  echo "${w}"
+}
+
+# Create a new terminal pane for the session pane.
 # Precondition: session_pane must already be visible in the picker window.
 cs_term_create() {
   local session_pane="$1"
-  local height
-  height=$(cs_term_compute_height "${session_pane}")
+  local orient="${2:-bottom}"
   local pane_id
-  pane_id=$(_tmux split-window -v -d -t "${session_pane}" -l "${height}" \
-    -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+  if [[ "${orient}" == "side" ]]; then
+    local width
+    width=$(cs_term_compute_width "${session_pane}")
+    local side_flag=""
+    [[ "${PICKER_SIDE}" == "right" ]] && side_flag="-b"
+    pane_id=$(_tmux split-window -h ${side_flag} -d -t "${session_pane}" -l "${width}" \
+      -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+  else
+    local height
+    height=$(cs_term_compute_height "${session_pane}")
+    pane_id=$(_tmux split-window -v -d -t "${session_pane}" -l "${height}" \
+      -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+  fi
   echo "${pane_id}" > "${STATE_DIR}/term/${session_pane#%}"
   echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+  echo "${orient}" > "${STATE_DIR}/term/${session_pane#%}.orient"
+  # Save initial ratio so WINCH handler can preserve it
+  if [[ "${orient}" == "side" ]]; then
+    cs_term_save_width "${pane_id}" "${session_pane}"
+  else
+    cs_term_save_height "${pane_id}" "${session_pane}"
+  fi
 }
 
 # Show terminal for a session. Auto-creates if needed, unparks if parked.
+# orient: "bottom" (vertical split below) or "side" (horizontal split opposite picker)
 cs_term_show() {
   local session_pane="$1"
+  local orient="${2:-bottom}"
   local term_pane
   term_pane=$(cs_term_pane_for "${session_pane}")
   cs_refresh_pane_cache
 
   # No terminal or dead — create fresh
   if [[ -z "${term_pane}" ]] || ! cs_pane_alive "${term_pane}"; then
-    [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
-    cs_term_create "${session_pane}"
+    [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height,.width,.orient}
+    cs_term_create "${session_pane}" "${orient}"
     return
   fi
 
-  # Already visible in picker window — nothing to do
+  # Check if visible in picker window
   if _tmux list-panes -t "${PICKER_PANE}" -F '#{pane_id}' 2>/dev/null | grep -q "^${term_pane}$"; then
+    local cur_orient
+    cur_orient=$(cs_term_orient "${session_pane}")
+    if [[ "${cur_orient}" == "${orient}" ]]; then
+      # Already visible in correct orientation — nothing to do
+      echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+      return
+    fi
+    # Orientation mismatch — atomic break + rejoin
+    cs_term_save_size "${term_pane}" "${session_pane}"
+    local picker_session
+    picker_session=$(_tmux display-message -t "${PICKER_PANE}" -p '#{session_name}' 2>/dev/null || true)
+    if [[ "${orient}" == "side" ]]; then
+      local width
+      width=$(cs_term_compute_width "${session_pane}")
+      local side_flag=""
+      [[ "${PICKER_SIDE}" == "right" ]] && side_flag="-b"
+      _tmux break-pane -d -s "${term_pane}" -t "${picker_session}:" \; \
+           join-pane -h ${side_flag} -d -s "${term_pane}" -t "${session_pane}" -l "${width}" \; \
+           resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+    else
+      local height
+      height=$(cs_term_compute_height "${session_pane}")
+      _tmux break-pane -d -s "${term_pane}" -t "${picker_session}:" \; \
+           join-pane -v -d -s "${term_pane}" -t "${session_pane}" -l "${height}" \; \
+           resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+    fi
     echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+    echo "${orient}" > "${STATE_DIR}/term/${session_pane#%}.orient"
     return
   fi
 
-  # Parked — unpark below session
-  local height
-  height=$(cs_term_compute_height "${session_pane}")
-  _tmux join-pane -v -d -s "${term_pane}" -t "${session_pane}" -l "${height}" 2>/dev/null || true
+  # Parked — unpark in requested orientation
+  if [[ "${orient}" == "side" ]]; then
+    local width
+    width=$(cs_term_compute_width "${session_pane}")
+    local side_flag=""
+    [[ "${PICKER_SIDE}" == "right" ]] && side_flag="-b"
+    _tmux join-pane -h ${side_flag} -d -s "${term_pane}" -t "${session_pane}" -l "${width}" 2>/dev/null || true
+  else
+    local height
+    height=$(cs_term_compute_height "${session_pane}")
+    _tmux join-pane -v -d -s "${term_pane}" -t "${session_pane}" -l "${height}" 2>/dev/null || true
+  fi
   echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
+  echo "${orient}" > "${STATE_DIR}/term/${session_pane#%}.orient"
 }
 
 # Park terminal in a hidden window.
@@ -1609,7 +1720,7 @@ cs_term_hide() {
   cs_refresh_pane_cache
   [[ -n "${term_pane}" ]] && cs_pane_alive "${term_pane}" || return 0
 
-  cs_term_save_height "${term_pane}" "${session_pane}"
+  cs_term_save_size "${term_pane}" "${session_pane}"
 
   # Park
   local picker_session
@@ -1626,7 +1737,7 @@ cs_term_kill() {
   term_pane=$(cs_term_pane_for "${session_pane}")
   [[ -n "${term_pane}" ]] || return 0
   _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
-  rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height}
+  rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height,.width,.orient}
 }
 
 # Toggle terminal visibility for current session (prefix+F).
@@ -1642,7 +1753,7 @@ cs_term_toggle() {
   if cs_term_is_shown "${cur_pane}"; then
     cs_term_hide "${cur_pane}"
   else
-    cs_term_show "${cur_pane}"
+    cs_term_show "${cur_pane}" "bottom"
   fi
   _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
   # Focus terminal on toggle-on
@@ -1653,8 +1764,9 @@ cs_term_toggle() {
   fi
 }
 
-# Smart terminal: closed→open+focus, focused→focus claude, unfocused→focus.
+# Smart terminal: closed/wrong-orient→open+focus, focused→focus claude, unfocused→focus.
 cs_term_smart() {
+  local orient="${1:-bottom}"
   local cur_pane
   cur_pane=$(cs_read_state current_pane)
   [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
@@ -1662,9 +1774,9 @@ cs_term_smart() {
   wp=$(cs_read_state welcome_pane)
   [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
 
-  if ! cs_term_is_shown "${cur_pane}"; then
-    # Closed → open + focus
-    cs_term_show "${cur_pane}"
+  if ! cs_term_is_shown "${cur_pane}" || [[ "$(cs_term_orient "${cur_pane}")" != "${orient}" ]]; then
+    # Closed or wrong orientation → open in requested orientation + focus
+    cs_term_show "${cur_pane}" "${orient}"
     _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
     local term_pane
     term_pane=$(cs_term_pane_for "${cur_pane}")
@@ -1687,24 +1799,41 @@ cs_term_smart() {
 # WINCH handler — re-pin picker width on terminal resize.
 cs_handle_winch() {
   _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null
-  # Re-pin terminal height to saved percentage
+  # Re-pin terminal size to saved percentage
   local cur_pane
   cur_pane=$(cs_read_state current_pane)
   if [[ -n "${cur_pane}" ]] && cs_term_is_shown "${cur_pane}"; then
     local term_pane
     term_pane=$(cs_term_pane_for "${cur_pane}")
     if [[ -n "${term_pane}" ]]; then
-      local pct
-      pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
-      [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
-      [[ -z "${pct}" ]] && pct=35
-      local term_h sess_h
-      term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
-      sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
-      if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
-        local new_h=$(( ((term_h + sess_h) * pct + 50) / 100 ))
-        (( new_h < 3 )) && new_h=3
-        _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
+      local orient
+      orient=$(cs_term_orient "${cur_pane}")
+      if [[ "${orient}" == "side" ]]; then
+        local pct
+        pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.width" 2>/dev/null || true)
+        [[ -z "${pct}" && "${TERMINAL_WIDTH}" == *% ]] && pct="${TERMINAL_WIDTH%\%}"
+        [[ -z "${pct}" ]] && pct=45
+        local term_w sess_w
+        term_w=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null || true)
+        sess_w=$(_tmux display-message -t "${cur_pane}" -p '#{pane_width}' 2>/dev/null || true)
+        if [[ -n "${term_w}" && -n "${sess_w}" ]] && (( term_w + sess_w > 0 )); then
+          local new_w=$(( ((term_w + sess_w) * pct + 50) / 100 ))
+          (( new_w < 10 )) && new_w=10
+          _tmux resize-pane -t "${term_pane}" -x "${new_w}" 2>/dev/null || true
+        fi
+      else
+        local pct
+        pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
+        [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
+        [[ -z "${pct}" ]] && pct=35
+        local term_h sess_h
+        term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
+        sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
+        if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
+          local new_h=$(( ((term_h + sess_h) * pct + 50) / 100 ))
+          (( new_h < 3 )) && new_h=3
+          _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
+        fi
       fi
     fi
   fi
@@ -2326,7 +2455,8 @@ cs_picker_loop() {
           '?') cs_kill_welcome; cs_show_welcome; DIRTY=1 ;;
           Q) _tmux detach-client ;;
           '~') cs_term_toggle; DIRTY=1 ;;
-          '`') cs_term_smart; DIRTY=1 ;;
+          '`') cs_term_smart bottom; DIRTY=1 ;;
+          $'\t') cs_term_smart side; DIRTY=1 ;;
           '|') cs_focus_session; DIRTY=1 ;;
           $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
           $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
@@ -2414,7 +2544,7 @@ cs_picker_loop() {
         local _tp
         _tp=$(cs_term_pane_for "${_cur_pane}")
         if [[ -n "${_tp}" ]] && ! cs_pane_alive "${_tp}"; then
-          rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height}
+          rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height,.width,.orient}
         fi
       fi
       local fp
@@ -2871,6 +3001,7 @@ cs_install_keybindings() {
 
   # Terminal
   cs_bind terminal '`' send-keys -t "${PICKER_PANE}" '`'
+  cs_bind side_terminal Tab send-keys -t "${PICKER_PANE}" $'\t'
   cs_bind toggle_terminal t send-keys -t "${PICKER_PANE}" "~"
   _tmux bind-key a send-keys '`'
 
@@ -2901,7 +3032,7 @@ cs_install_keybindings() {
   cs_bind paste ']' paste-buffer
 
   # Refresh/rescan (dedicated trigger)
-  cs_bind refresh Tab send-keys -t "${PICKER_PANE}" $'\x12'
+  cs_bind refresh + send-keys -t "${PICKER_PANE}" $'\x12'
 
   # Command menu: focus picker + enter menu
   cs_bind menu ':' send-keys -t "${PICKER_PANE}" $'\x05'

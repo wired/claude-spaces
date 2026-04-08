@@ -117,10 +117,10 @@ worktrees or any project where the directory name isn't descriptive enough.
 **Bell detection** — when Claude finishes in a background session, the picker
 highlights it in red. Never miss a completed task again.
 
-**Per-session terminal** — each session gets its own shell pane below it.
-`` prefix + ` `` opens the terminal and toggles focus between it and the Claude
-pane (it never closes it). `prefix + t` toggles terminal visibility on/off.
-Resize freely — height is saved per-session.
+**Per-session terminal** — each session gets its own shell pane, either below
+it (`` prefix + ` ``) or to the side (`` prefix + Tab ``). Both open the terminal
+and toggle focus between it and the Claude pane. `prefix + t` toggles terminal
+visibility on/off. Resize freely — size is saved per-session.
 
 **Search and filter** — type `/` to filter sessions by name across all
 sections. Matches update as you type.
@@ -158,7 +158,8 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 |-----|--------|
 | `prefix + Enter` / `prefix + i` | Focus Claude pane |
 | `prefix + Space` | Toggle picker / Claude pane |
-| `` prefix + ` `` | Smart terminal (open/focus toggle) |
+| `` prefix + ` `` | Smart terminal — bottom (open/focus toggle) |
+| `prefix + Tab` | Smart terminal — side (open/focus toggle) |
 | `prefix + t` | Toggle terminal on/off (unconditional) |
 | `prefix + a` | Literal grave (`` ` ``) |
 | `prefix + h` / `prefix + ←` / `prefix + S-←` | Select pane left |
@@ -184,7 +185,7 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + d` | Detach |
 | `prefix + :` | Command menu |
 | `prefix + ?` | Show help screen |
-| `prefix + Tab` | Refresh/rescan |
+| `prefix + +` | Refresh/rescan |
 | `prefix + F12` | tmux command prompt (escape hatch) |
 | `prefix + M-↑/↓` | Resize pane vertically |
 | `prefix + M-←/→` | Resize pane horizontally |
@@ -245,6 +246,9 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
 # terminal_height=35%
 
+# Terminal pane width (side orientation): characters or percentage
+# terminal_width=45%
+
 # Show jump index next to first 10 local sessions
 # show_index=1
 
@@ -253,6 +257,7 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 
 # Keybinding overrides (comma-separated for multiple keys)
 # bind_terminal=`
+# bind_side_terminal=Tab
 # bind_toggle_terminal=t
 # bind_focus_claude=Enter,i
 # bind_nav_next=J,S-Down
@@ -275,7 +280,7 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # bind_hide=H
 # bind_shutdown=s
 # bind_reload=R
-# bind_refresh=Tab
+# bind_refresh=+
 # bind_menu=:
 ```
 

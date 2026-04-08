@@ -1418,7 +1418,7 @@ test_term_dies_externally() {
     local tp
     tp=$(cs_term_pane_for "${pane_a}")
     if [[ -n "${tp}" ]] && ! cs_pane_alive "${tp}"; then
-      rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height}
+      rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height,.width,.orient}
     fi
   fi
 
@@ -1494,7 +1494,7 @@ test_term_across_reload() {
     local tpid
     tpid=$(cat "${f}" 2>/dev/null || true)
     if [[ -n "${tpid}" ]] && ! cs_pane_alive "${tpid}"; then
-      rm -f "${f}" "${f}.shown" "${f}.height"
+      rm -f "${f}" "${f}.shown" "${f}.height" "${f}.width" "${f}.orient"
     fi
   done
 
@@ -1558,6 +1558,219 @@ test_term_winch_repin() {
   (( diff <= 3 )) || { echo "    pct drifted after grow: init=${init_pct}% now=${fin_pct}% (diff=${diff})"; return 1; }
 
   cs_assert_consistent "term_winch"
+}
+
+test_term_side_create_and_kill() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  [[ -n "${pane_a}" ]] || { echo "    no current_pane"; return 1; }
+
+  cs_term_create "${pane_a}" "side"
+  sleep 0.05
+
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  [[ -n "${term_pane}" ]] || { echo "    no term pane"; return 1; }
+  pane_alive "${term_pane}" || { echo "    term pane dead"; return 1; }
+  [[ -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    no term state file"; return 1; }
+  [[ -f "${STATE_DIR}/term/${pane_a#%}.shown" ]] || { echo "    no .shown file"; return 1; }
+  local orient
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side"; return 1; }
+
+  cs_term_kill "${pane_a}"
+  sleep 0.05
+
+  cs_refresh_pane_cache
+  pane_alive "${term_pane}" && { echo "    term still alive after kill"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.orient" ]] || { echo "    .orient not cleaned"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.width" ]] || { echo "    .width not cleaned"; return 1; }
+
+  cs_assert_consistent "term_side_create_kill"
+}
+
+test_term_side_smart_open() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  # Smart side: closed → open + focus
+  cs_term_smart side
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after smart side"; return 1; }
+  local orient
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side"; return 1; }
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  pane_alive "${term_pane}" || { echo "    term dead"; return 1; }
+  cs_assert_consistent "term_side_smart_open" || return 1
+
+  # Smart side again while focused on term → focus claude
+  _tmux select-pane -t "${term_pane}" 2>/dev/null
+  cs_term_smart side
+  sleep 0.05
+  local active
+  active=$(_tmux display-message -p '#{pane_id}' 2>/dev/null)
+  [[ "${active}" == "${pane_a}" ]] || { echo "    expected focus on claude, got ${active}"; return 1; }
+
+  # Smart side again → focus terminal
+  cs_term_smart side
+  sleep 0.05
+  active=$(_tmux display-message -p '#{pane_id}' 2>/dev/null)
+  [[ "${active}" == "${term_pane}" ]] || { echo "    expected focus on term, got ${active}"; return 1; }
+
+  cs_assert_consistent "term_side_smart_cycle"
+}
+
+test_term_orient_switch() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  # Open bottom
+  cs_term_smart bottom
+  sleep 0.05
+  local orient
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "bottom" ]] || { echo "    orient=${orient}, expected bottom"; return 1; }
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  pane_alive "${term_pane}" || { echo "    term dead after bottom"; return 1; }
+
+  # Switch to side — same pane ID, different orientation
+  cs_term_smart side
+  sleep 0.05
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side after switch"; return 1; }
+  local term_pane2
+  term_pane2=$(cs_term_pane_for "${pane_a}")
+  [[ "${term_pane}" == "${term_pane2}" ]] || { echo "    pane changed: ${term_pane} → ${term_pane2}"; return 1; }
+  pane_alive "${term_pane}" || { echo "    term dead after switch"; return 1; }
+
+  # Switch back to bottom
+  cs_term_smart bottom
+  sleep 0.05
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "bottom" ]] || { echo "    orient=${orient}, expected bottom after switch back"; return 1; }
+  term_pane2=$(cs_term_pane_for "${pane_a}")
+  [[ "${term_pane}" == "${term_pane2}" ]] || { echo "    pane changed on switch back"; return 1; }
+
+  cs_assert_consistent "term_orient_switch"
+}
+
+test_term_side_swap() {
+  local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  cs_create_mock_session "${sid_a}" "session A"
+  cs_create_mock_session "${sid_b}" "session B"
+  cs_scan_sessions
+  cs_resume_session "${sid_a}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  # Open side terminal on A
+  cs_term_smart side
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    A term not shown"; return 1; }
+  local orient
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    A orient=${orient}, expected side"; return 1; }
+
+  # Swap to B
+  cs_resume_session "${sid_b}"
+  sleep 0.1
+  local pane_b
+  pane_b=$(cs_read_state current_pane)
+  [[ "${pane_b}" != "${pane_a}" ]] || { echo "    pane didn't change"; return 1; }
+  cs_assert_consistent "term_side_swap_to_b" || return 1
+
+  # A's terminal should still be "shown" (will restore on swap back)
+  cs_term_is_shown "${pane_a}" || { echo "    A term shown flag cleared"; return 1; }
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    A orient changed while parked"; return 1; }
+
+  # Swap back to A
+  cs_resume_session "${sid_a}"
+  sleep 0.1
+  cs_term_is_shown "${pane_a}" || { echo "    A term not shown after swap back"; return 1; }
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    A orient=${orient} after restore, expected side"; return 1; }
+
+  cs_assert_consistent "term_side_swap_back"
+}
+
+test_term_side_winch_repin() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_smart side
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+
+  # Record initial percentage
+  local init_tw init_sw init_pct
+  init_tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null)
+  init_sw=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  init_pct=$(( init_tw * 100 / (init_tw + init_sw) ))
+
+  # Shrink window
+  _tmux resize-window -x 80 2>/dev/null || true
+  sleep 0.05
+
+  cs_handle_winch
+  sleep 0.05
+
+  local new_tw new_sw new_pct
+  new_tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null)
+  new_sw=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  new_pct=$(( new_tw * 100 / (new_tw + new_sw) ))
+
+  local diff=$(( new_pct - init_pct ))
+  (( diff < 0 )) && diff=$(( -diff ))
+  (( diff <= 5 )) || { echo "    pct drifted: init=${init_pct}% now=${new_pct}% (diff=${diff})"; return 1; }
+
+  # Grow back
+  _tmux resize-window -x 160 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+
+  local fin_tw fin_sw fin_pct
+  fin_tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null)
+  fin_sw=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  fin_pct=$(( fin_tw * 100 / (fin_tw + fin_sw) ))
+
+  diff=$(( fin_pct - init_pct ))
+  (( diff < 0 )) && diff=$(( -diff ))
+  (( diff <= 5 )) || { echo "    pct drifted after grow: init=${init_pct}% now=${fin_pct}% (diff=${diff})"; return 1; }
+
+  cs_assert_consistent "term_side_winch"
 }
 
 # ── Main ─────────────────────────────────────────
@@ -1630,6 +1843,11 @@ main() {
   run_test "term height persists"        test_term_height_persists
   run_test "term across reload"          test_term_across_reload
   run_test "term WINCH re-pin"           test_term_winch_repin
+  run_test "term side create and kill"   test_term_side_create_and_kill
+  run_test "term side smart open"        test_term_side_smart_open
+  run_test "term orient switch"          test_term_orient_switch
+  run_test "term side swap"              test_term_side_swap
+  run_test "term side WINCH re-pin"      test_term_side_winch_repin
 
   echo ""
   echo "══════════════════════════════════"
