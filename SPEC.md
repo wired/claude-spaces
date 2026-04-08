@@ -161,7 +161,7 @@ Default key assignments are documented in README.md. The available actions:
 | Refresh | `bind_refresh` | Force rescan |
 
 Hardcoded (not configurable): PgUp (copy mode + scroll), 1-9/0 (jump to Nth
-session), M-arrows (resize), F12 (tmux command prompt), `a` (literal grave).
+session), M-arrows (resize ×2), C-arrows (resize ×5), F12 (tmux command prompt), `a` (literal grave).
 
 > See [specs/mechanics.md](specs/mechanics.md) for pane swap sequence, bell detection, and binding lifecycle.
 

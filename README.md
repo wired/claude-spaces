@@ -187,8 +187,8 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `prefix + ?` | Show help screen |
 | `prefix + +` | Refresh/rescan |
 | `prefix + F12` | tmux command prompt (escape hatch) |
-| `prefix + M-↑/↓` | Resize pane vertically |
-| `prefix + M-←/→` | Resize pane horizontally |
+| `prefix + M-↑/↓/←/→` | Resize pane (2 cells) |
+| `prefix + C-↑/↓/←/→` | Resize pane (5 cells) |
 
 </details>
 

@@ -3061,11 +3061,15 @@ cs_install_keybindings() {
   _tmux bind-key -T copy-mode S-PPage send-keys -X halfpage-up
   _tmux bind-key -T copy-mode S-NPage send-keys -X halfpage-down
 
-  # Resize (always meta+arrows)
+  # Resize (M-arrows ×2, C-arrows ×5)
   _tmux bind-key -r M-Up resize-pane -U 2
   _tmux bind-key -r M-Down resize-pane -D 2
   _tmux bind-key -r M-Left resize-pane -L 2
   _tmux bind-key -r M-Right resize-pane -R 2
+  _tmux bind-key -r C-Up resize-pane -U 5
+  _tmux bind-key -r C-Down resize-pane -D 5
+  _tmux bind-key -r C-Left resize-pane -L 5
+  _tmux bind-key -r C-Right resize-pane -R 5
 
   # Jump to Nth session (1-9, 0=10th)
   local n
