@@ -249,6 +249,12 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # Terminal pane width (side orientation): characters or percentage
 # terminal_width=45%
 
+# Minimum Claude pane width when side terminal is open (characters)
+# min_claude_width=10
+
+# Minimum Claude pane height when bottom terminal is open (characters)
+# min_claude_height=10
+
 # Show jump index next to first 10 local sessions
 # show_index=1
 

@@ -1773,6 +1773,72 @@ test_term_side_winch_repin() {
   cs_assert_consistent "term_side_winch"
 }
 
+test_term_min_claude_width() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  # Set absolute width larger than available space minus min
+  local pane_w
+  pane_w=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  local old_tw="${TERMINAL_WIDTH}"
+  local old_mcw="${MIN_CLAUDE_WIDTH}"
+  MIN_CLAUDE_WIDTH=30
+  TERMINAL_WIDTH=$(( pane_w - 10 ))  # would leave only 10 for claude
+
+  cs_term_smart side
+  sleep 0.05
+
+  local term_pane sess_w
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  sess_w=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+
+  (( sess_w >= MIN_CLAUDE_WIDTH )) || { echo "    claude pane too narrow: ${sess_w} < ${MIN_CLAUDE_WIDTH}"; TERMINAL_WIDTH="${old_tw}"; MIN_CLAUDE_WIDTH="${old_mcw}"; return 1; }
+
+  cs_term_kill "${pane_a}"
+  TERMINAL_WIDTH="${old_tw}"
+  MIN_CLAUDE_WIDTH="${old_mcw}"
+  cs_assert_consistent "min_claude_width"
+}
+
+test_term_min_claude_height() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  # Set absolute height larger than available space minus min
+  local pane_h
+  pane_h=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+  local old_th="${TERMINAL_HEIGHT}"
+  local old_mch="${MIN_CLAUDE_HEIGHT}"
+  MIN_CLAUDE_HEIGHT=10
+  TERMINAL_HEIGHT=$(( pane_h - 5 ))  # would leave only 5 for claude
+
+  cs_term_smart bottom
+  sleep 0.05
+
+  local term_pane sess_h
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  sess_h=$(_tmux display-message -t "${pane_a}" -p '#{pane_height}' 2>/dev/null)
+
+  (( sess_h >= MIN_CLAUDE_HEIGHT )) || { echo "    claude pane too short: ${sess_h} < ${MIN_CLAUDE_HEIGHT}"; TERMINAL_HEIGHT="${old_th}"; MIN_CLAUDE_HEIGHT="${old_mch}"; return 1; }
+
+  cs_term_kill "${pane_a}"
+  TERMINAL_HEIGHT="${old_th}"
+  MIN_CLAUDE_HEIGHT="${old_mch}"
+  cs_assert_consistent "min_claude_height"
+}
+
 # ── Main ─────────────────────────────────────────
 main() {
   echo "claude-spaces integration tests"
@@ -1848,6 +1914,8 @@ main() {
   run_test "term orient switch"          test_term_orient_switch
   run_test "term side swap"              test_term_side_swap
   run_test "term side WINCH re-pin"      test_term_side_winch_repin
+  run_test "term min claude width"       test_term_min_claude_width
+  run_test "term min claude height"      test_term_min_claude_height
 
   echo ""
   echo "══════════════════════════════════"

@@ -62,6 +62,8 @@ TMUX_SERVER=$(cs_server_name "$PWD")
 TMUX_CONF="${HOME}/.tmux.conf"
 TERMINAL_HEIGHT="35%"
 TERMINAL_WIDTH="45%"
+MIN_CLAUDE_WIDTH=10
+MIN_CLAUDE_HEIGHT=10
 SHOW_INDEX=1
 CS_PREFIX=""
 declare -gA BIND_OVERRIDES=()
@@ -124,6 +126,8 @@ cs_load_config() {
       tmux_conf) TMUX_CONF="${value}" ;;
       terminal_height) TERMINAL_HEIGHT="${value}" ;;
       terminal_width) TERMINAL_WIDTH="${value}" ;;
+      min_claude_width) MIN_CLAUDE_WIDTH="${value}" ;;
+      min_claude_height) MIN_CLAUDE_HEIGHT="${value}" ;;
       show_index) SHOW_INDEX="${value}" ;;
       prefix) CS_PREFIX="${value}" ;;
       color_header_bg) CS_CLR_HEADER_BG="${value}" ;;
@@ -172,6 +176,12 @@ cs_create_default_config() {
 
 # Terminal pane width (side orientation): characters or percentage
 # terminal_width=45%
+
+# Minimum Claude pane width when side terminal is open (characters)
+# min_claude_width=10
+
+# Minimum Claude pane height when bottom terminal is open (characters)
+# min_claude_height=10
 
 # Show jump index [1]-[0] next to first 10 local sessions
 # show_index=1
@@ -1539,34 +1549,33 @@ cs_term_is_shown() {
 # Compute terminal height in characters
 cs_term_compute_height() {
   local session_pane="$1"
-  # Per-session runtime override (stored as percentage)
-  local pct="" h
-  h=$(cat "${STATE_DIR}/term/${session_pane#%}.height" 2>/dev/null || true)
-  if [[ -n "${h}" ]]; then
-    pct="${h}"
-  elif [[ "${TERMINAL_HEIGHT}" == *% ]]; then
-    pct="${TERMINAL_HEIGHT%\%}"
+  local h="${TERMINAL_HEIGHT}"
+  if [[ "${h}" == *% ]]; then
+    local saved
+    saved=$(cat "${STATE_DIR}/term/${session_pane#%}.height" 2>/dev/null || true)
+    [[ -n "${saved}" ]] && h="${saved}"
   fi
-  if [[ -n "${pct}" ]]; then
-    local pane_h=0
-    if cs_pane_alive "${session_pane}"; then
-      pane_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || echo 0)
-    fi
-    h=$(( (pane_h * pct + 50) / 100 ))
-  else
-    h="${TERMINAL_HEIGHT}"
+  local pane_h=0
+  if cs_pane_alive "${session_pane}"; then
+    pane_h=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || echo 0)
   fi
+  if [[ "${h}" == *% ]]; then
+    h=$(( (pane_h * ${h%\%} + 50) / 100 ))
+  fi
+  local max_h=$(( pane_h - MIN_CLAUDE_HEIGHT - 1 ))
+  (( max_h > 0 && h > max_h )) && h="${max_h}"
   (( h < 3 )) && h=3
   echo "${h}"
 }
 
 cs_term_save_height() {
+  [[ "${TERMINAL_HEIGHT}" != *% ]] && return 0
   local term_pane="$1" session_pane="$2"
   local th sh
   th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
   sh=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
   if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
-    echo $(( th * 100 / (th + sh) )) > "${STATE_DIR}/term/${session_pane#%}.height"
+    echo "$(( th * 100 / (th + sh) ))%" > "${STATE_DIR}/term/${session_pane#%}.height"
   fi
 }
 
@@ -1576,12 +1585,13 @@ cs_term_orient() {
 }
 
 cs_term_save_width() {
+  [[ "${TERMINAL_WIDTH}" != *% ]] && return 0
   local term_pane="$1" session_pane="$2"
   local tw sw
   tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null || true)
   sw=$(_tmux display-message -t "${session_pane}" -p '#{pane_width}' 2>/dev/null || true)
   if [[ -n "${tw}" && -n "${sw}" ]] && (( tw + sw > 0 )); then
-    echo $(( tw * 100 / (tw + sw) )) > "${STATE_DIR}/term/${session_pane#%}.width"
+    echo "$(( tw * 100 / (tw + sw) ))%" > "${STATE_DIR}/term/${session_pane#%}.width"
   fi
 }
 
@@ -1597,22 +1607,21 @@ cs_term_save_size() {
 # Compute terminal width for side orientation
 cs_term_compute_width() {
   local session_pane="$1"
-  local pct="" w
-  w=$(cat "${STATE_DIR}/term/${session_pane#%}.width" 2>/dev/null || true)
-  if [[ -n "${w}" ]]; then
-    pct="${w}"
-  elif [[ "${TERMINAL_WIDTH}" == *% ]]; then
-    pct="${TERMINAL_WIDTH%\%}"
+  local w="${TERMINAL_WIDTH}"
+  if [[ "${w}" == *% ]]; then
+    local saved
+    saved=$(cat "${STATE_DIR}/term/${session_pane#%}.width" 2>/dev/null || true)
+    [[ -n "${saved}" ]] && w="${saved}"
   fi
-  if [[ -n "${pct}" ]]; then
-    local pane_w=0
-    if cs_pane_alive "${session_pane}"; then
-      pane_w=$(_tmux display-message -t "${session_pane}" -p '#{pane_width}' 2>/dev/null || echo 0)
-    fi
-    w=$(( (pane_w * pct + 50) / 100 ))
-  else
-    w="${TERMINAL_WIDTH}"
+  local pane_w=0
+  if cs_pane_alive "${session_pane}"; then
+    pane_w=$(_tmux display-message -t "${session_pane}" -p '#{pane_width}' 2>/dev/null || echo 0)
   fi
+  if [[ "${w}" == *% ]]; then
+    w=$(( (pane_w * ${w%\%} + 50) / 100 ))
+  fi
+  local max_w=$(( pane_w - MIN_CLAUDE_WIDTH - 1 ))
+  (( max_w > 0 && w > max_w )) && w="${max_w}"
   (( w < 10 )) && w=10
   echo "${w}"
 }
@@ -1809,28 +1818,46 @@ cs_handle_winch() {
       local orient
       orient=$(cs_term_orient "${cur_pane}")
       if [[ "${orient}" == "side" ]]; then
-        local pct
-        pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.width" 2>/dev/null || true)
-        [[ -z "${pct}" && "${TERMINAL_WIDTH}" == *% ]] && pct="${TERMINAL_WIDTH%\%}"
-        [[ -z "${pct}" ]] && pct=45
+        local saved="${TERMINAL_WIDTH}"
+        if [[ "${saved}" == *% ]]; then
+          local _s
+          _s=$(cat "${STATE_DIR}/term/${cur_pane#%}.width" 2>/dev/null || true)
+          [[ -n "${_s}" ]] && saved="${_s}"
+        fi
         local term_w sess_w
         term_w=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null || true)
         sess_w=$(_tmux display-message -t "${cur_pane}" -p '#{pane_width}' 2>/dev/null || true)
         if [[ -n "${term_w}" && -n "${sess_w}" ]] && (( term_w + sess_w > 0 )); then
-          local new_w=$(( ((term_w + sess_w) * pct + 50) / 100 ))
+          local new_w
+          if [[ "${saved}" == *% ]]; then
+            new_w=$(( ((term_w + sess_w) * ${saved%\%} + 50) / 100 ))
+          else
+            new_w="${saved}"
+          fi
+          local max_w=$(( (term_w + sess_w) - MIN_CLAUDE_WIDTH ))
+          (( max_w > 0 && new_w > max_w )) && new_w="${max_w}"
           (( new_w < 10 )) && new_w=10
           _tmux resize-pane -t "${term_pane}" -x "${new_w}" 2>/dev/null || true
         fi
       else
-        local pct
-        pct=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
-        [[ -z "${pct}" && "${TERMINAL_HEIGHT}" == *% ]] && pct="${TERMINAL_HEIGHT%\%}"
-        [[ -z "${pct}" ]] && pct=35
+        local saved="${TERMINAL_HEIGHT}"
+        if [[ "${saved}" == *% ]]; then
+          local _s
+          _s=$(cat "${STATE_DIR}/term/${cur_pane#%}.height" 2>/dev/null || true)
+          [[ -n "${_s}" ]] && saved="${_s}"
+        fi
         local term_h sess_h
         term_h=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
         sess_h=$(_tmux display-message -t "${cur_pane}" -p '#{pane_height}' 2>/dev/null || true)
         if [[ -n "${term_h}" && -n "${sess_h}" ]] && (( term_h + sess_h > 0 )); then
-          local new_h=$(( ((term_h + sess_h) * pct + 50) / 100 ))
+          local new_h
+          if [[ "${saved}" == *% ]]; then
+            new_h=$(( ((term_h + sess_h) * ${saved%\%} + 50) / 100 ))
+          else
+            new_h="${saved}"
+          fi
+          local max_h=$(( (term_h + sess_h) - MIN_CLAUDE_HEIGHT ))
+          (( max_h > 0 && new_h > max_h )) && new_h="${max_h}"
           (( new_h < 3 )) && new_h=3
           _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
         fi
@@ -2323,7 +2350,7 @@ cs_picker_loop() {
     local term_pane_id
     term_pane_id=$(cat "${f}" 2>/dev/null || true)
     if [[ -n "${term_pane_id}" ]] && ! cs_pane_alive "${term_pane_id}"; then
-      rm -f "${f}" "${f}.shown" "${f}.height"
+      rm -f "${f}"{,.shown,.height,.width,.orient}
     fi
   done
 
