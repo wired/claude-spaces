@@ -667,7 +667,11 @@ cs_scan_sessions() {
     if cs_pane_alive "${pane_id}"; then
       managed_panes["${sid}"]="${pane_id}"
     else
+      cs_term_kill "${pane_id}"
       rm -f "${f}"
+      local _cp
+      _cp=$(cs_read_state current_pane)
+      [[ "${_cp}" == "${pane_id}" ]] && echo "" > "${STATE_DIR}/current_pane"
     fi
   done
 
@@ -1437,6 +1441,8 @@ cs_show_pane() {
       done
       cs_rename_pane_window "${cur_pane}" "${parked_name}"
     else
+      cs_term_kill "${cur_pane}"
+      rm -f "${STATE_DIR}/panes/${cur_pane#%}"
       _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
          resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
          select-pane -t "${picker_pane}"

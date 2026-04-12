@@ -1839,6 +1839,62 @@ test_term_min_claude_height() {
   cs_assert_consistent "min_claude_height"
 }
 
+test_session_dies_externally_with_term() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  [[ -n "${term_pane}" ]] && pane_alive "${term_pane}" || { echo "    term not created"; return 1; }
+
+  _tmux kill-pane -t "${pane_a}" 2>/dev/null || true
+  sleep 0.05
+
+  cs_scan_sessions
+  sleep 0.05
+
+  pane_alive "${term_pane}" && { echo "    orphan terminal not killed by scan"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.shown" ]] || { echo "    .shown not cleaned"; return 1; }
+  [[ ! -f "${STATE_DIR}/panes/${pane_a#%}" ]] || { echo "    panes state not cleaned"; return 1; }
+
+  cs_assert_consistent "session_dies_ext"
+}
+
+test_session_dies_resume_cleans_orphan() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+  cs_term_toggle
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  [[ -n "${term_pane}" ]] && pane_alive "${term_pane}" || { echo "    term not created"; return 1; }
+
+  _tmux kill-pane -t "${pane_a}" 2>/dev/null || true
+  sleep 0.05
+
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  pane_alive "${term_pane}" && { echo "    orphan terminal not killed on resume"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}" ]] || { echo "    term state not cleaned"; return 1; }
+
+  cs_assert_consistent "session_dies_resume"
+}
+
 # ── Main ─────────────────────────────────────────
 main() {
   echo "claude-spaces integration tests"
@@ -1916,6 +1972,8 @@ main() {
   run_test "term side WINCH re-pin"      test_term_side_winch_repin
   run_test "term min claude width"       test_term_min_claude_width
   run_test "term min claude height"      test_term_min_claude_height
+  run_test "session dies with term"      test_session_dies_externally_with_term
+  run_test "session dies resume cleans"  test_session_dies_resume_cleans_orphan
 
   echo ""
   echo "══════════════════════════════════"
