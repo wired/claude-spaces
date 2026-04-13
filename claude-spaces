@@ -34,6 +34,10 @@ _cs_realpath() {
   echo "$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
 }
 SCRIPT_PATH="$(_cs_realpath "$0")"
+cs_normalize_pwd() {
+  cd -P "${PWD}" || exit 1
+}
+cs_normalize_pwd
 CLAUDE_DIR="${HOME}/.claude"
 PROJECTS_DIR="${CLAUDE_DIR}/projects"
 SESSIONS_DIR="${CLAUDE_DIR}/sessions"
@@ -3291,6 +3295,7 @@ cs_launch() {
       rm -f "${STATE_DIR}/switch_target"
       if [[ -d "${target_path}" ]]; then
         cd "${target_path}" || break
+        cs_normalize_pwd
         TMUX_SERVER=$(cs_server_name "$PWD")
         continue
       fi

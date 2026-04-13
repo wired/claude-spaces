@@ -983,6 +983,62 @@ test_project_path_persistence() {
   [[ "${pp}" == "${PWD}" ]] || { echo "    project_path mismatch: '${pp}' != '${PWD}'"; return 1; }
 }
 
+test_symlinked_cwd_finds_sessions() {
+  local real_dir="${TEST_TMP}/real-project"
+  local link_dir="${TEST_TMP}/link-project"
+  mkdir -p "${real_dir}"
+  ln -snf "${real_dir}" "${link_dir}"
+
+  local real_canonical
+  real_canonical=$(cd "${real_dir}" && pwd -P)
+
+  local real_sanitized
+  real_sanitized=$(cs_sanitize_path "${real_canonical}")
+  local real_project_dir="${PROJECTS_DIR}/${real_sanitized}"
+  mkdir -p "${real_project_dir}"
+
+  local sid="11111111-1111-1111-1111-111111111111"
+  printf '{"type":"user","message":{"role":"user","content":"hello symlink"},"sessionId":"%s"}\n' \
+    "${sid}" > "${real_project_dir}/${sid}.jsonl"
+
+  local saved_pwd="${PWD}"
+  local saved_cwd
+  saved_cwd=$(command pwd)
+
+  cd "${link_dir}"
+  cs_normalize_pwd
+
+  local ok=1
+  if [[ "${PWD}" != "${real_canonical}" ]]; then
+    echo "    PWD not normalized: expected '${real_canonical}', got '${PWD}'"
+    ok=0
+  else
+    cs_scan_sessions
+    local idx
+    idx=$(find_entry_index "${sid}")
+    if [[ "${idx}" == "-1" ]]; then
+      echo "    session not found after symlink normalization"
+      ok=0
+    fi
+  fi
+
+  cd "${saved_cwd}"
+  PWD="${saved_pwd}"
+  rm -rf "${real_dir}" "${link_dir}" "${real_project_dir}"
+
+  ((ok)) || return 1
+}
+
+test_normalize_pwd_exits_on_missing() {
+  local dead_dir="${TEST_TMP}/dead-$$"
+  mkdir "${dead_dir}"
+  rmdir "${dead_dir}"
+
+  local rc=0
+  (PWD="${dead_dir}"; cs_normalize_pwd) 2>/dev/null || rc=$?
+  [[ "${rc}" == "1" ]] || { echo "    expected exit 1, got ${rc}"; return 1; }
+}
+
 test_discover_remote_servers() {
   # Create a second tmux server
   local remote_server="cs-fake-remote-$$"
@@ -2044,6 +2100,8 @@ main() {
   run_test "del_kv"                       test_del_kv
   run_test "active-elsewhere detection"   test_active_elsewhere_detection
   run_test "project path persistence"    test_project_path_persistence
+  run_test "symlinked cwd finds sessions" test_symlinked_cwd_finds_sessions
+  run_test "normalize_pwd exits on missing" test_normalize_pwd_exits_on_missing
   run_test "discover remote servers"     test_discover_remote_servers
   run_test "discover inactive projects"  test_discover_inactive_projects
   run_test "header skip navigation"      test_header_skip_navigation
