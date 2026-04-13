@@ -43,6 +43,16 @@ CONFIG_FILE="${CS_CONFIG_DIR}/config"
 NAMES_FILE="${CS_DATA_DIR}/names"
 HIDDEN_FILE="${CS_DATA_DIR}/hidden"
 PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
+# State root: under XDG_RUNTIME_DIR the parent is already per-user 0700, so we
+# keep the original path for compatibility. Under /tmp fallback, append -${UID}
+# to prevent cross-user collisions on shared hosts.
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
+  CS_STATE_ROOT="${XDG_RUNTIME_DIR}/claude-spaces"
+else
+  CS_STATE_ROOT="/tmp/claude-spaces-${UID}"
+fi
+# Pre-namespace path; used only for legacy detection/cleanup under /tmp fallback.
+CS_LEGACY_ROOT="/tmp/claude-spaces"
 
 # ── Defaults ──────────────────────────────────────
 PICKER_WIDTH="30"
@@ -310,11 +320,32 @@ cs_sanitize_path() {
 }
 PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
 
+# Refuse to operate on a malformed STATE_DIR. Used before any rm -rf.
+cs_assert_state_dir_safe() {
+  if [[ -z "${PWD_SANITIZED}" \
+        || "${STATE_DIR}" == "${CS_STATE_ROOT}" \
+        || "${STATE_DIR}" == "${CS_STATE_ROOT}/" \
+        || "${PWD_SANITIZED}" == "/" \
+        || "${PWD_SANITIZED}" == "." ]]; then
+    echo "ERROR: refusing to operate on malformed STATE_DIR='${STATE_DIR}'" >&2
+    exit 1
+  fi
+}
+
 cs_init_state() {
+  # Guard CS_STATE_ROOT against pre-existing symlink/wrong-owner attacks.
+  [[ -L "${CS_STATE_ROOT}" ]] && { echo "ERROR: ${CS_STATE_ROOT} is a symlink — aborting" >&2; exit 1; }
+  [[ -e "${CS_STATE_ROOT}" && ! -O "${CS_STATE_ROOT}" ]] && { echo "ERROR: ${CS_STATE_ROOT} not owned by current user" >&2; exit 1; }
+  # SC2174: only one level deep here (parent /tmp or XDG_RUNTIME_DIR pre-exists).
+  # shellcheck disable=SC2174
+  mkdir -m 700 -p "${CS_STATE_ROOT}"
+  chmod 700 "${CS_STATE_ROOT}" || { echo "ERROR: chmod 700 ${CS_STATE_ROOT} failed" >&2; exit 1; }
+  [[ -L "${CS_STATE_ROOT}" || ! -O "${CS_STATE_ROOT}" ]] && { echo "ERROR: ${CS_STATE_ROOT} swapped after mkdir" >&2; exit 1; }
+
   PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
   local sanitized="${PWD_SANITIZED}"
-  local base="${XDG_RUNTIME_DIR:-/tmp}"
-  STATE_DIR="${base}/claude-spaces/${sanitized}"
+  STATE_DIR="${CS_STATE_ROOT}/${sanitized}"
+  cs_assert_state_dir_safe
   # If picker pane from previous run is dead, wipe stale state
   cs_refresh_pane_cache
   local old_picker
@@ -325,8 +356,8 @@ cs_init_state() {
   mkdir -p "${STATE_DIR}/panes" "${STATE_DIR}/term"
   echo "${PWD}" > "${STATE_DIR}/project_path"
   # Server → state dir mapping for cross-server discovery
-  mkdir -p "${base}/claude-spaces/.servers"
-  ln -snf "${STATE_DIR}" "${base}/claude-spaces/.servers/${TMUX_SERVER}"
+  mkdir -p "${CS_STATE_ROOT}/.servers"
+  ln -snf "${STATE_DIR}" "${CS_STATE_ROOT}/.servers/${TMUX_SERVER}"
 }
 
 cs_read_state() { cat "${STATE_DIR}/$1" 2>/dev/null || true; }
@@ -1187,8 +1218,7 @@ cs_discover_servers() {
     name=$(basename "${sock}")
     [[ "${name}" == "${my_server}" ]] && continue
     [[ "${name}" == cs-test-* ]] && continue
-    local base="${XDG_RUNTIME_DIR:-/tmp}"
-    local remote_state="${base}/claude-spaces/.servers/${name}"
+    local remote_state="${CS_STATE_ROOT}/.servers/${name}"
     local remote_path=""
     if [[ -f "${remote_state}/project_path" ]]; then
       remote_path=$(cat "${remote_state}/project_path")
@@ -1201,7 +1231,6 @@ cs_discover_servers() {
 
 cs_discover_inactive() {
   INACTIVE_PROJECTS=()
-  local base="${XDG_RUNTIME_DIR:-/tmp}"
   # Build set of active sanitized paths (current + remote servers)
   local -A active_set
   active_set["$(cs_sanitize_path "${PWD}")"]=1
@@ -1221,7 +1250,7 @@ cs_discover_inactive() {
     [[ -v "active_set[${sanitized}]" ]] && continue
     # Resolve path
     local path=""
-    local state_dir="${base}/claude-spaces/${sanitized}"
+    local state_dir="${CS_STATE_ROOT}/${sanitized}"
     if [[ -f "${state_dir}/project_path" ]]; then
       path=$(cat "${state_dir}/project_path")
     else
@@ -1342,7 +1371,7 @@ cs_build_all_entries() {
         fi
         cs_entry_append "__proj_${sanitized}__" "${leaf}" "0" "" "" "project" "${rpath}"
 
-        local remote_state="${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${srv}"
+        local remote_state="${CS_STATE_ROOT}/.servers/${srv}"
         cs_scan_project_sessions "${PROJECTS_DIR}/${sanitized}" "${rpath}" "remote" "${remote_state}"
       done
     fi
@@ -2678,8 +2707,7 @@ cs_switch_to_project() {
   if [[ -n "${session_id}" ]]; then
     local target_sanitized
     target_sanitized=$(cs_sanitize_path "${target_path}")
-    local base="${XDG_RUNTIME_DIR:-/tmp}"
-    local target_state="${base}/claude-spaces/${target_sanitized}"
+    local target_state="${CS_STATE_ROOT}/${target_sanitized}"
     if [[ -d "${target_state}" ]]; then
       echo "${session_id}" > "${target_state}/pending_load"
     fi
@@ -3185,7 +3213,11 @@ cs_sync_bells_active() {
 
 # ── Reset ─────────────────────────────────────────
 cs_reset() {
-  cs_init_state
+  # Compute STATE_DIR inline (skip cs_init_state's guards — we're tearing down,
+  # so a corrupted/unsafe CS_STATE_ROOT shouldn't block recovery).
+  PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
+  STATE_DIR="${CS_STATE_ROOT}/${PWD_SANITIZED}"
+  cs_assert_state_dir_safe
 
   # Kill terminal panes first
   for f in "${STATE_DIR}"/term/*; do
@@ -3213,7 +3245,14 @@ cs_reset() {
   cs_remove_keybindings
 
   rm -rf "${STATE_DIR}"
-  rm -f "${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/.servers/${TMUX_SERVER}"
+  rm -f "${CS_STATE_ROOT}/.servers/${TMUX_SERVER}"
+
+  # Legacy cleanup (pre-namespace versions stored state under shared /tmp)
+  if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+    rm -rf "${CS_LEGACY_ROOT:?}/${PWD_SANITIZED:?}" 2>/dev/null || true
+    rmdir "${CS_LEGACY_ROOT}" 2>/dev/null || true
+  fi
+
   _tmux kill-server 2>/dev/null || true
   echo "Reset complete."
 }
@@ -3260,6 +3299,30 @@ cs_launch() {
   done
 }
 
+# ── Migration check ───────────────────────────────
+cs_check_legacy_root() {
+  [[ -n "${XDG_RUNTIME_DIR:-}" ]] && return 0
+  local sanitized
+  sanitized=$(cs_sanitize_path "${PWD}")
+  local legacy="${CS_LEGACY_ROOT}/${sanitized}"
+  [[ -L "${legacy}" || ! -d "${legacy}" || ! -O "${legacy}" ]] && return 0
+  cat >&2 <<EOF
+################################################################
+#                                                              #
+#  claude-spaces: legacy state dir detected                    #
+#                                                              #
+#  Path: ${legacy}
+#                                                              #
+#  State is now per-user namespaced for security. To migrate:  #
+#                                                              #
+#    claude-spaces --restart   # clean up and relaunch         #
+#    claude-spaces --reset     # clean up only                 #
+#                                                              #
+################################################################
+EOF
+  exit 1
+}
+
 # ── Entrypoint ────────────────────────────────────
 cs_preflight
 
@@ -3299,5 +3362,6 @@ if [[ "${CS_PICKER:-}" == "1" ]]; then
   cs_load_config
   cs_picker_loop
 else
+  cs_check_legacy_root
   cs_launch "$@"
 fi

@@ -294,6 +294,9 @@ cs_test_setup() {
   HIDDEN_FILE="${CS_DATA_DIR}/hidden"
   PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
   STATE_DIR="${TEST_TMP}/state"
+  CS_STATE_ROOT="${TEST_TMP}/state-root"
+  CS_LEGACY_ROOT="${TEST_TMP}/legacy-root"
+  mkdir -p "${CS_STATE_ROOT}"
 
   : > "${CONFIG_FILE}"
   : > "${HIDDEN_FILE}"
@@ -984,13 +987,12 @@ test_discover_remote_servers() {
   # Create a second tmux server
   local remote_server="cs-fake-remote-$$"
   local remote_sanitized="-fake-remote-$$"
-  local base="${XDG_RUNTIME_DIR:-/tmp}"
   local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
-  local remote_state="${base}/claude-spaces/${remote_sanitized}"
+  local remote_state="${CS_STATE_ROOT}/${remote_sanitized}"
   mkdir -p "${remote_state}"
   echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
-  mkdir -p "${base}/claude-spaces/.servers"
-  ln -snf "${remote_state}" "${base}/claude-spaces/.servers/${remote_server}"
+  mkdir -p "${CS_STATE_ROOT}/.servers"
+  ln -snf "${remote_state}" "${CS_STATE_ROOT}/.servers/${remote_server}"
   mkdir -p "/tmp/fake-remote-project"
   command tmux -L "${remote_server}" new-session -d -s test "sleep 99999"
   sleep 0.05
@@ -1005,7 +1007,7 @@ test_discover_remote_servers() {
       break
     fi
   done
-  [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; rm -f "${base}/claude-spaces/.servers/${remote_server}"; return 1; }
+  [[ ${found} -eq 1 ]] || { echo "    remote server not discovered"; command tmux -L "${remote_server}" kill-server 2>/dev/null; [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"; rm -rf "${remote_state}" "/tmp/fake-remote-project"; rm -f "${CS_STATE_ROOT}/.servers/${remote_server}"; return 1; }
 
   # Should NOT include our own server
   for entry in "${REMOTE_SERVERS[@]}"; do
@@ -1015,7 +1017,7 @@ test_discover_remote_servers() {
       command tmux -L "${remote_server}" kill-server 2>/dev/null
       [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
       rm -rf "${remote_state}" "/tmp/fake-remote-project"
-      rm -f "${base}/claude-spaces/.servers/${remote_server}"
+      rm -f "${CS_STATE_ROOT}/.servers/${remote_server}"
       return 1
     fi
   done
@@ -1024,7 +1026,7 @@ test_discover_remote_servers() {
   command tmux -L "${remote_server}" kill-server 2>/dev/null
   [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
   rm -rf "${remote_state}" "/tmp/fake-remote-project"
-  rm -f "${base}/claude-spaces/.servers/${remote_server}"
+  rm -f "${CS_STATE_ROOT}/.servers/${remote_server}"
 }
 
 test_discover_inactive_projects() {
@@ -1032,8 +1034,7 @@ test_discover_inactive_projects() {
   local inactive_sanitized="-tmp-inactive-test-$$"
   local inactive_dir="${PROJECTS_DIR}/${inactive_sanitized}"
   mkdir -p "${inactive_dir}"
-  local base="${XDG_RUNTIME_DIR:-/tmp}"
-  local inactive_state="${base}/claude-spaces/${inactive_sanitized}"
+  local inactive_state="${CS_STATE_ROOT}/${inactive_sanitized}"
   mkdir -p "${inactive_state}"
   echo "/tmp/inactive-test-$$" > "${inactive_state}/project_path"
   mkdir -p "/tmp/inactive-test-$$"
@@ -1946,6 +1947,22 @@ EOF
   fi
 }
 
+test_state_root_symlink_guard() {
+  local fake_target="${TEST_TMP}/legitdir"
+  local symlink_path="${TEST_TMP}/state-root-symlink"
+  mkdir -p "${fake_target}"
+  ln -s "${fake_target}" "${symlink_path}"
+
+  # Run cs_init_state in a subshell so its exit doesn't kill the test runner.
+  local exit_code=0
+  ( CS_STATE_ROOT="${symlink_path}"; cs_init_state ) >/dev/null 2>&1 || exit_code=$?
+
+  rm -f "${symlink_path}"
+  rm -rf "${fake_target}"
+
+  [[ ${exit_code} -ne 0 ]] || { echo "    cs_init_state did not reject symlink CS_STATE_ROOT"; return 1; }
+}
+
 test_hook_injection_safe() {
   local marker="/tmp/PWNED_HOOK_$$"
   rm -f "${marker}"
@@ -2060,6 +2077,7 @@ main() {
   run_test "welcome injection safe"      test_welcome_injection_safe
   run_test "hook injection safe"         test_hook_injection_safe
   run_test "config injection safe"       test_config_injection_safe
+  run_test "state root symlink guard"    test_state_root_symlink_guard
 
   echo ""
   echo "══════════════════════════════════"

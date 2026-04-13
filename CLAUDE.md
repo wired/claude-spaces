@@ -37,7 +37,10 @@ Session list is stored as parallel arrays: `ENTRIES_ID`, `ENTRIES_NAME`, `ENTRIE
 
 ### State dir is ephemeral
 
-`${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/<sanitized-cwd>/` — runtime only, wiped on reboot.
+Under `XDG_RUNTIME_DIR`: `${XDG_RUNTIME_DIR}/claude-spaces/<sanitized-cwd>/`.
+Under `/tmp` fallback: `/tmp/claude-spaces-${UID}/<sanitized-cwd>/` — UID-suffixed
+so shared hosts don't collide. Root created mode 0700 with symlink/ownership guards.
+Runtime only, wiped on reboot.
 Stale pane refs are cleaned up automatically on picker startup.
 
 ### Pane existence checking
