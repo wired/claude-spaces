@@ -81,7 +81,7 @@ each operation. Requires a real tmux — nothing is mocked at the tmux level.
 - `_tmux` for all tmux calls (never bare `tmux`)
 - Config in `${XDG_CONFIG_HOME:-~/.config}/claude-spaces/config`, data (names, hidden) in `${XDG_DATA_HOME:-~/.local/share}/claude-spaces/`
 - Indent 2 spaces
-- Bash 4.3+ required (associative arrays, namerefs)
+- Bash 4.4+ required (associative arrays, namerefs, `${var@Q}`)
 
 ## Versioning
 

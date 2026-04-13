@@ -1653,6 +1653,7 @@ cs_term_compute_width() {
 cs_term_create() {
   local session_pane="$1"
   local orient="${2:-bottom}"
+  local _sh="${SHELL:-/bin/bash}"
   local pane_id
   if [[ "${orient}" == "side" ]]; then
     local width
@@ -1660,12 +1661,12 @@ cs_term_create() {
     local side_flag=""
     [[ "${PICKER_SIDE}" == "right" ]] && side_flag="-b"
     pane_id=$(_tmux split-window -h ${side_flag} -d -t "${session_pane}" -l "${width}" \
-      -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+      -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${_sh@Q}")
   else
     local height
     height=$(cs_term_compute_height "${session_pane}")
     pane_id=$(_tmux split-window -v -d -t "${session_pane}" -l "${height}" \
-      -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${SHELL:-/bin/bash}")
+      -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${_sh@Q}")
   fi
   echo "${pane_id}" > "${STATE_DIR}/term/${session_pane#%}"
   echo "1" > "${STATE_DIR}/term/${session_pane#%}.shown"
