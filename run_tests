@@ -1920,6 +1920,32 @@ test_welcome_injection_safe() {
   [[ ! -e "${marker}" ]] || { echo "    welcome pane executed injected command"; return 1; }
 }
 
+test_config_injection_safe() {
+  local marker="/tmp/PWNED_CONFIG_$$"
+  rm -f "${marker}"
+
+  # Payload exploits bash arithmetic's recursive evaluation:
+  # RECENT_THRESHOLD=a[$(>${marker})] triggers the command substitution
+  # when the value is later used in $((...)).
+  cat > "${CONFIG_FILE}" <<EOF
+recent_threshold=a[\$(>${marker})]
+EOF
+
+  cs_load_config 2>/dev/null
+  # Force arithmetic eval of the (possibly malicious) value
+  : $((RECENT_THRESHOLD + 0))
+
+  # Reset for subsequent tests
+  : > "${CONFIG_FILE}"
+  RECENT_THRESHOLD=10
+
+  if [[ -e "${marker}" ]]; then
+    echo "    config injection fired: marker created"
+    rm -f "${marker}"
+    return 1
+  fi
+}
+
 test_hook_injection_safe() {
   local marker="/tmp/PWNED_HOOK_$$"
   rm -f "${marker}"
@@ -2033,6 +2059,7 @@ main() {
   # Security tests
   run_test "welcome injection safe"      test_welcome_injection_safe
   run_test "hook injection safe"         test_hook_injection_safe
+  run_test "config injection safe"       test_config_injection_safe
 
   echo ""
   echo "══════════════════════════════════"

@@ -115,6 +115,22 @@ cs_load_config() {
     [[ -z "${key}" || "${key}" =~ ^[[:space:]]*# ]] && continue
     key="${key// /}"
     value="${value// /}"
+    # Validate numeric keys before assignment — values reach bash arithmetic,
+    # which recursively evaluates and would execute $(...) in malformed input.
+    case "${key}" in
+      recent_threshold|window_name_len|min_claude_width|min_claude_height|show_index)
+        if [[ ! "${value}" =~ ^[0-9]+$ ]]; then
+          echo "WARN: ignoring invalid ${key}=${value} (expected non-negative integer)" >&2
+          continue
+        fi
+        ;;
+      picker_width|terminal_height|terminal_width)
+        if [[ ! "${value}" =~ ^[0-9]+%?$ ]]; then
+          echo "WARN: ignoring invalid ${key}=${value} (expected integer or percentage)" >&2
+          continue
+        fi
+        ;;
+    esac
     # shellcheck disable=SC2034
     case "${key}" in
       picker_width) PICKER_WIDTH="${value}" ;;
