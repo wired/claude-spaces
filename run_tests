@@ -1920,6 +1920,36 @@ test_welcome_injection_safe() {
   [[ ! -e "${marker}" ]] || { echo "    welcome pane executed injected command"; return 1; }
 }
 
+test_hook_injection_safe() {
+  local marker="/tmp/PWNED_HOOK_$$"
+  rm -f "${marker}"
+
+  # Override STATE_DIR with a payload that would fire if interpolation is unescaped
+  local orig_state="${STATE_DIR}"
+  STATE_DIR="${TEST_TMP}/state-\$(touch ${marker})"
+  mkdir -p "${STATE_DIR}"
+
+  cs_install_bell_hook
+
+  # Capture installed hooks; payload must not appear as code
+  local hooks
+  hooks=$(_tmux show-hooks -g 2>/dev/null)
+
+  cs_remove_bell_hook
+  STATE_DIR="${orig_state}"
+
+  if [[ "${hooks}" == *"touch ${marker}"* ]]; then
+    echo "    hook string contains raw attacker payload"
+    return 1
+  fi
+
+  if [[ -e "${marker}" ]]; then
+    echo "    marker created during hook install"
+    rm -f "${marker}"
+    return 1
+  fi
+}
+
 # ── Main ─────────────────────────────────────────
 main() {
   echo "claude-spaces integration tests"
@@ -2002,6 +2032,7 @@ main() {
 
   # Security tests
   run_test "welcome injection safe"      test_welcome_injection_safe
+  run_test "hook injection safe"         test_hook_injection_safe
 
   echo ""
   echo "══════════════════════════════════"

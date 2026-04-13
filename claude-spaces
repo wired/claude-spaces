@@ -2991,17 +2991,25 @@ cs_install_bell_hook() {
   _tmux set -s focus-events on
   _tmux set -g bell-action any
   _tmux setw -g monitor-bell on
+  # Paths reach run-shell via tmux env vars so attacker-controlled characters
+  # in STATE_DIR cannot break out of the hook command string.
+  _tmux set-environment -g CS_BELLS_FILE "${bells_file}"
+  _tmux set-environment -g CS_FOCUS_IN "${STATE_DIR}/focus_in"
+  _tmux set-environment -g CS_FOCUS_OUT "${STATE_DIR}/focus_out"
   # alert-bell fires with the window that belled — log its pane IDs
-  _tmux set-hook -g alert-bell "run-shell 'tmux list-panes -t \"#{window_id}\" -F \"#{pane_id}\" >> \"${bells_file}\"'"
+  _tmux set-hook -g alert-bell 'run-shell "tmux list-panes -t \"#{window_id}\" -F \"#{pane_id}\" >> \"\$CS_BELLS_FILE\""'
   # focus-in/out track window focus for bell suppression
-  _tmux set-hook -g client-focus-in "run-shell 'touch \"${STATE_DIR}/focus_in\"'"
-  _tmux set-hook -g client-focus-out "run-shell 'touch \"${STATE_DIR}/focus_out\"'"
+  _tmux set-hook -g client-focus-in 'run-shell "touch \"\$CS_FOCUS_IN\""'
+  _tmux set-hook -g client-focus-out 'run-shell "touch \"\$CS_FOCUS_OUT\""'
 }
 
 cs_remove_bell_hook() {
   _tmux set-hook -gu alert-bell 2>/dev/null || true
   _tmux set-hook -gu client-focus-in 2>/dev/null || true
   _tmux set-hook -gu client-focus-out 2>/dev/null || true
+  _tmux set-environment -gu CS_BELLS_FILE 2>/dev/null || true
+  _tmux set-environment -gu CS_FOCUS_IN 2>/dev/null || true
+  _tmux set-environment -gu CS_FOCUS_OUT 2>/dev/null || true
 }
 
 cs_bind() {
