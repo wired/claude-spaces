@@ -1947,8 +1947,8 @@ cs_show_welcome() {
     echo 'echo "  claude-spaces"'
     echo 'echo "  ─────────────────"'
     local _wname="${PROJECT_NAMES[${PWD_SANITIZED}]:-${DISPLAY_NAMES[${PWD}]:-${PWD##*/}}}"
-    echo "echo \"  Project: ${_wname} (${PWD})\""
-    echo "echo \"  Sessions: ${n}\""
+    printf 'echo %q\n' "  Project: ${_wname} (${PWD})"
+    printf 'echo %q\n' "  Sessions: ${n}"
     echo 'echo ""'
     echo 'echo "  Select a session in the picker (→)"'
     echo 'echo "  or press :n for a new session."'

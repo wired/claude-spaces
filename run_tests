@@ -1895,6 +1895,31 @@ test_session_dies_resume_cleans_orphan() {
   cs_assert_consistent "session_dies_resume"
 }
 
+# ── Security tests ───────────────────────────────
+test_welcome_injection_safe() {
+  local marker="${TEST_TMP}/WELCOME_PWNED"
+
+  # Save current (mocked) cs_show_welcome, load only the real function body
+  # (load_functions would reset TMUX_SERVER and other globals)
+  local mock_body
+  mock_body=$(declare -f cs_show_welcome)
+  eval "$(sed -n '/^cs_show_welcome()/,/^}$/p' "${SCRIPT_UNDER_TEST}")"
+
+  # Payload closes the echo string and injects `touch ${marker}` if
+  # interpolation is unescaped.
+  PWD_SANITIZED=$(cs_sanitize_path "${PWD}")
+  PROJECT_NAMES[${PWD_SANITIZED}]='x"; touch '"'${marker}'"'; echo "'
+
+  cs_show_welcome
+  sleep 0.2
+
+  # Restore mock; cs_test_reset will clean up the welcome pane.
+  eval "${mock_body}"
+  unset "PROJECT_NAMES[${PWD_SANITIZED}]"
+
+  [[ ! -e "${marker}" ]] || { echo "    welcome pane executed injected command"; return 1; }
+}
+
 # ── Main ─────────────────────────────────────────
 main() {
   echo "claude-spaces integration tests"
@@ -1974,6 +1999,9 @@ main() {
   run_test "term min claude height"      test_term_min_claude_height
   run_test "session dies with term"      test_session_dies_externally_with_term
   run_test "session dies resume cleans"  test_session_dies_resume_cleans_orphan
+
+  # Security tests
+  run_test "welcome injection safe"      test_welcome_injection_safe
 
   echo ""
   echo "══════════════════════════════════"
