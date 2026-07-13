@@ -206,7 +206,7 @@ in red in the picker. Add a Claude Code Stop hook to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a' > /dev/tty"
+            "command": "printf '\\a' | jq -Rsc '{terminalSequence: .}'"
           }
         ]
       }
@@ -215,8 +215,11 @@ in red in the picker. Add a Claude Code Stop hook to `~/.claude/settings.json`:
 }
 ```
 
-The `> /dev/tty` is critical — without it the bell doesn't reach tmux. Bell
-state clears when the session is brought to the foreground.
+Claude Code runs hooks without a controlling terminal (v2.1.139+), so the older
+`printf '\a' > /dev/tty` recipe now fails with `No such device or address`.
+Returning the bell in the `terminalSequence` field instead makes Claude Code
+emit it through its own terminal, where tmux sees it. Requires Claude Code
+v2.1.141+. Bell state clears when the session is brought to the foreground.
 
 </details>
 

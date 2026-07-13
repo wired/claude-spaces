@@ -64,8 +64,9 @@ collisions, the uncompressed suffix is used.
 
 - **Atomic pane swap**: the break-pane + join-pane + resize-pane sequence must be a single
   `_tmux` call (semicolon-chained). Splitting it causes flicker and race conditions.
-- **Bell detection**: requires a Claude Code Stop hook with `> /dev/tty`. The `#{window_bell_flag}`
-  approach does NOT work (flag is momentary). See specs/mechanics.md § Bell Detection.
+- **Bell detection**: requires a Claude Code Stop hook returning the BEL in `terminalSequence` —
+  hooks have no controlling terminal since Claude Code 2.1.139, so `> /dev/tty` fails. The
+  `#{window_bell_flag}` approach does NOT work (flag is momentary). See specs/mechanics.md § Bell Detection.
 - **`~/.claude/sessions/`**: this is Claude Code's own session tracking dir, not ours. Don't rename it.
 
 ## Testing

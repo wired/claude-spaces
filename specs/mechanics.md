@@ -44,10 +44,14 @@ Swaps keep focus on the picker. User explicitly focuses via `hjkl`/arrows or sec
 
 Uses tmux's `alert-bell` hook. Requires a Stop hook in `~/.claude/settings.json`:
 ```json
-{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "printf '\\a' > /dev/tty"}]}]}}
+{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "printf '\\a' | jq -Rsc '{terminalSequence: .}'"}]}]}}
 ```
 
-The `> /dev/tty` is critical. `#{window_bell_flag}` polling does NOT work (flag is momentary).
+Claude Code hooks run without a controlling terminal (v2.1.139+), so `> /dev/tty` fails with
+`No such device or address`. The bell must be returned in the `terminalSequence` field (v2.1.141+),
+which Claude Code emits through its own terminal write path — landing on the pane's tty, where tmux
+sees it. `jq` does the JSON encoding because a raw BEL byte is not valid inside a JSON string; it
+must be escaped as `\u0007`. `#{window_bell_flag}` polling does NOT work (flag is momentary).
 
 Bell state clears when the session is brought to the foreground, or when the terminal window regains focus (via `client-focus-in` hook, requires `focus-events on` which the picker sets automatically). Switching away from the active pane also clears its bell (outgoing clear in `cs_show_pane`). The bell hook is installed on picker startup and removed on exit/reset.
 
