@@ -50,6 +50,8 @@ PROJECT_NAMES_FILE="${CS_DATA_DIR}/project_names"
 # State root: under XDG_RUNTIME_DIR the parent is already per-user 0700, so we
 # keep the original path for compatibility. Under /tmp fallback, append -${UID}
 # to prevent cross-user collisions on shared hosts.
+# This is the default only — the state_root config key overrides it (see
+# cs_load_config), for hosts that reap /tmp out from under a live session.
 if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
   CS_STATE_ROOT="${XDG_RUNTIME_DIR}/claude-spaces"
 else
@@ -144,6 +146,21 @@ cs_load_config() {
           continue
         fi
         ;;
+      state_root)
+        # No shell expansion happens on config values, so expand ~/ ourselves —
+        # a literal ~ would create a directory named '~' in $PWD.
+        # SC2088: matching the literal tilde is the point.
+        # shellcheck disable=SC2088
+        [[ "${value}" == "~/"* ]] && value="${HOME}/${value#\~/}"
+        value="${value%/}"
+        # Relative paths would make the state root follow $PWD and break
+        # cross-project discovery. $HOME is refused because cs_init_state
+        # chmod 700s the root.
+        if [[ "${value}" != /* || "${value}" == "${HOME}" ]]; then
+          echo "WARN: ignoring invalid state_root=${value} (expected absolute path, not \$HOME)" >&2
+          continue
+        fi
+        ;;
     esac
     # shellcheck disable=SC2034
     case "${key}" in
@@ -160,6 +177,7 @@ cs_load_config() {
       min_claude_height) MIN_CLAUDE_HEIGHT="${value}" ;;
       show_index) SHOW_INDEX="${value}" ;;
       prefix) CS_PREFIX="${value}" ;;
+      state_root) CS_STATE_ROOT="${value}" ;;
       color_header_bg) CS_CLR_HEADER_BG="${value}" ;;
       color_active) CS_CLR_ACTIVE="${value}" ;;
       color_bell) CS_CLR_BELL="${value}" ;;
@@ -200,6 +218,13 @@ cs_create_default_config() {
 
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
+
+# Directory for runtime state. Defaults to $XDG_RUNTIME_DIR/claude-spaces, or
+# /tmp/claude-spaces-$UID when that is unset. Set this if your /tmp is reaped
+# while sessions are still live. Must be an absolute path (~/ is expanded).
+# A persistent location means state survives reboot and keeps a small entry per
+# project; `claude-spaces --reset` clears the current project's.
+# state_root=~/.local/state/claude-spaces
 
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
 # terminal_height=35%
@@ -340,9 +365,11 @@ cs_init_state() {
   # Guard CS_STATE_ROOT against pre-existing symlink/wrong-owner attacks.
   [[ -L "${CS_STATE_ROOT}" ]] && { echo "ERROR: ${CS_STATE_ROOT} is a symlink — aborting" >&2; exit 1; }
   [[ -e "${CS_STATE_ROOT}" && ! -O "${CS_STATE_ROOT}" ]] && { echo "ERROR: ${CS_STATE_ROOT} not owned by current user" >&2; exit 1; }
-  # SC2174: only one level deep here (parent /tmp or XDG_RUNTIME_DIR pre-exists).
+  # SC2174: -m only applies to the deepest component. A custom state_root may
+  # need intermediate dirs, whose mode is left to umask; the leaf mode is
+  # enforced by the chmod below.
   # shellcheck disable=SC2174
-  mkdir -m 700 -p "${CS_STATE_ROOT}"
+  mkdir -m 700 -p "${CS_STATE_ROOT}" || { echo "ERROR: cannot create state root ${CS_STATE_ROOT} (check state_root in ${CONFIG_FILE})" >&2; exit 1; }
   chmod 700 "${CS_STATE_ROOT}" || { echo "ERROR: chmod 700 ${CS_STATE_ROOT} failed" >&2; exit 1; }
   [[ -L "${CS_STATE_ROOT}" || ! -O "${CS_STATE_ROOT}" ]] && { echo "ERROR: ${CS_STATE_ROOT} swapped after mkdir" >&2; exit 1; }
 

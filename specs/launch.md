@@ -26,9 +26,23 @@ On picker startup, validates all pane IDs in the state dir. Dead refs are remove
 
 ## Runtime State
 
-Directory: `${XDG_RUNTIME_DIR:-/tmp}/claude-spaces/<sanitized-cwd>/`
+Directory: `<state-root>/<sanitized-cwd>/`, where `<state-root>` is
+`${XDG_RUNTIME_DIR}/claude-spaces`, or `/tmp/claude-spaces-${UID}` when
+`XDG_RUNTIME_DIR` is unset (UID-suffixed so shared hosts don't collide).
 
-Ephemeral. Stale refs cleaned up on picker startup.
+The `state_root` config key overrides both, for hosts that reap `/tmp` while
+sessions are live. It must be an absolute path (leading `~/` is expanded);
+relative paths and `$HOME` itself are rejected with a warning and the default is
+kept. An unusable root is a hard failure at launch, never a silent fallback —
+falling back would fragment `.servers/` across two roots, making live sessions
+invisible to the picker.
+
+Ephemeral by default. Stale refs cleaned up on picker startup: `cs_init_state`
+wipes the whole state dir when the recorded `picker_pane` is dead, which is what
+makes a persistent `state_root` safe across reboots (a fresh tmux server restarts
+pane IDs at `%0`, so stale `panes/<num>` entries must not survive). Other
+projects' dirs and `.servers/` symlinks persist but are inert — discovery gates
+on a live socket and `has-session`.
 
 | File              | Contents                                    |
 |-------------------|---------------------------------------------|

@@ -246,6 +246,13 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # Path to tmux.conf to source on dedicated server (empty = don't source)
 # tmux_conf=~/.tmux.conf
 
+# Directory for runtime state. Defaults to $XDG_RUNTIME_DIR/claude-spaces, or
+# /tmp/claude-spaces-$UID when that is unset. Set this if your /tmp is reaped
+# while sessions are still live. Must be an absolute path (~/ is expanded).
+# A persistent location means state survives reboot and keeps a small entry per
+# project; `claude-spaces --reset` clears the current project's.
+# state_root=~/.local/state/claude-spaces
+
 # Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
 # terminal_height=35%
 

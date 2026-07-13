@@ -2019,6 +2019,45 @@ test_state_root_symlink_guard() {
   [[ ${exit_code} -ne 0 ]] || { echo "    cs_init_state did not reject symlink CS_STATE_ROOT"; return 1; }
 }
 
+test_config_state_root() {
+  local orig_root="${CS_STATE_ROOT}"
+  local custom="${TEST_TMP}/custom-state"
+  local rc=0
+
+  # Valid absolute path is honored.
+  echo "state_root=${custom}" > "${CONFIG_FILE}"
+  cs_load_config 2>/dev/null
+  [[ "${CS_STATE_ROOT}" == "${custom}" ]] || { echo "    state_root not applied: ${CS_STATE_ROOT}"; rc=1; }
+
+  # Trailing slash stripped.
+  echo "state_root=${custom}/" > "${CONFIG_FILE}"
+  CS_STATE_ROOT="${orig_root}"
+  cs_load_config 2>/dev/null
+  [[ "${CS_STATE_ROOT}" == "${custom}" ]] || { echo "    trailing slash not stripped: ${CS_STATE_ROOT}"; rc=1; }
+
+  # Leading ~/ expanded.
+  echo "state_root=~/some-state" > "${CONFIG_FILE}"
+  CS_STATE_ROOT="${orig_root}"
+  cs_load_config 2>/dev/null
+  [[ "${CS_STATE_ROOT}" == "${HOME}/some-state" ]] || { echo "    ~/ not expanded: ${CS_STATE_ROOT}"; rc=1; }
+
+  # Relative path rejected, default kept.
+  echo "state_root=relative/path" > "${CONFIG_FILE}"
+  CS_STATE_ROOT="${orig_root}"
+  cs_load_config 2>/dev/null
+  [[ "${CS_STATE_ROOT}" == "${orig_root}" ]] || { echo "    relative state_root not rejected: ${CS_STATE_ROOT}"; rc=1; }
+
+  # $HOME rejected (cs_init_state would chmod 700 it), default kept.
+  echo "state_root=${HOME}" > "${CONFIG_FILE}"
+  CS_STATE_ROOT="${orig_root}"
+  cs_load_config 2>/dev/null
+  [[ "${CS_STATE_ROOT}" == "${orig_root}" ]] || { echo "    \$HOME state_root not rejected: ${CS_STATE_ROOT}"; rc=1; }
+
+  : > "${CONFIG_FILE}"
+  CS_STATE_ROOT="${orig_root}"
+  return ${rc}
+}
+
 test_hook_injection_safe() {
   local marker="/tmp/PWNED_HOOK_$$"
   rm -f "${marker}"
@@ -2136,6 +2175,7 @@ main() {
   run_test "hook injection safe"         test_hook_injection_safe
   run_test "config injection safe"       test_config_injection_safe
   run_test "state root symlink guard"    test_state_root_symlink_guard
+  run_test "state root config key"       test_config_state_root
 
   echo ""
   echo "══════════════════════════════════"

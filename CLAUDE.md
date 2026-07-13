@@ -35,12 +35,20 @@ Session list is stored as parallel arrays: `ENTRIES_ID`, `ENTRIES_NAME`, `ENTRIE
 `ENTRIES_STATUS`, `ENTRIES_PANE`, `ENTRIES_TYPE`, `ENTRIES_PATH`. Always use `cs_entry_append`,
 `cs_entry_prepend`, `cs_entry_clear` — all expect exactly 7 args (enforced in test mode).
 
-### State dir is ephemeral
+### State dir is ephemeral (by default)
 
 Under `XDG_RUNTIME_DIR`: `${XDG_RUNTIME_DIR}/claude-spaces/<sanitized-cwd>/`.
 Under `/tmp` fallback: `/tmp/claude-spaces-${UID}/<sanitized-cwd>/` — UID-suffixed
 so shared hosts don't collide. Root created mode 0700 with symlink/ownership guards.
 Runtime only, wiped on reboot.
+
+The `state_root` config key overrides the root (for hosts that reap `/tmp` while
+sessions are live), which opts out of wipe-on-reboot. That's safe because
+`cs_init_state` wipes the state dir whenever the recorded `picker_pane` is dead —
+stale `panes/<num>` entries must never outlive their tmux server, since a fresh
+server restarts pane IDs at `%0`. Never silently fall back to the default root if
+a configured one is unusable: state would fragment across two roots and live
+sessions would vanish from discovery. Fail loudly instead.
 Stale pane refs are cleaned up automatically on picker startup.
 
 ### Pane existence checking
