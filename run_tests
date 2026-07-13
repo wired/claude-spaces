@@ -2058,6 +2058,26 @@ test_config_state_root() {
   return ${rc}
 }
 
+test_config_tmux_conf_tilde() {
+  local orig_conf="${TMUX_CONF}"
+  local rc=0
+
+  # Leading ~/ expanded — a literal ~ would fail the -f guard in cs_launch,
+  # silently skipping the user's tmux.conf.
+  echo "tmux_conf=~/.tmux.conf" > "${CONFIG_FILE}"
+  cs_load_config 2>/dev/null
+  [[ "${TMUX_CONF}" == "${HOME}/.tmux.conf" ]] || { echo "    ~/ not expanded: ${TMUX_CONF}"; rc=1; }
+
+  # Absolute path passes through untouched.
+  echo "tmux_conf=/etc/tmux.conf" > "${CONFIG_FILE}"
+  cs_load_config 2>/dev/null
+  [[ "${TMUX_CONF}" == "/etc/tmux.conf" ]] || { echo "    absolute path mangled: ${TMUX_CONF}"; rc=1; }
+
+  : > "${CONFIG_FILE}"
+  TMUX_CONF="${orig_conf}"
+  return ${rc}
+}
+
 test_hook_injection_safe() {
   local marker="/tmp/PWNED_HOOK_$$"
   rm -f "${marker}"
@@ -2176,6 +2196,7 @@ main() {
   run_test "config injection safe"       test_config_injection_safe
   run_test "state root symlink guard"    test_state_root_symlink_guard
   run_test "state root config key"       test_config_state_root
+  run_test "tmux_conf tilde expansion"   test_config_tmux_conf_tilde
 
   echo ""
   echo "══════════════════════════════════"

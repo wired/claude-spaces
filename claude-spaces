@@ -122,6 +122,17 @@ cs_exec_tmux() {
 }
 
 # ── Config ────────────────────────────────────────
+# Config values get no shell expansion, so a literal ~ would be used verbatim.
+cs_expand_tilde() {
+  # SC2088: matching the literal tilde is the point.
+  # shellcheck disable=SC2088
+  if [[ "$1" == "~/"* ]]; then
+    printf '%s\n' "${HOME}/${1#\~/}"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
 cs_load_config() {
   mkdir -p "${CS_CONFIG_DIR}" "${CS_DATA_DIR}"
   if [[ ! -f "${CONFIG_FILE}" ]]; then
@@ -146,12 +157,14 @@ cs_load_config() {
           continue
         fi
         ;;
+      tmux_conf)
+        # Expansion only — empty still means "don't source", and a bad path
+        # already degrades gracefully via the -f guard in cs_launch.
+        value=$(cs_expand_tilde "${value}")
+        ;;
       state_root)
-        # No shell expansion happens on config values, so expand ~/ ourselves —
-        # a literal ~ would create a directory named '~' in $PWD.
-        # SC2088: matching the literal tilde is the point.
-        # shellcheck disable=SC2088
-        [[ "${value}" == "~/"* ]] && value="${HOME}/${value#\~/}"
+        # A literal ~ would create a directory named '~' in $PWD.
+        value=$(cs_expand_tilde "${value}")
         value="${value%/}"
         # Relative paths would make the state root follow $PWD and break
         # cross-project discovery. $HOME is refused because cs_init_state
