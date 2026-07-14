@@ -10,7 +10,8 @@ Per-session pane to the side of the Claude session. Displays plans, code, or oth
 context pushed by a Claude skill.
 
 **Decided:**
-- Per-session (same as terminal — travels with session on swap, parked in hidden windows)
+- Per-session (same as terminal — lives in the session's own window, so it needs no park/restore
+  on swap: the picker travels, the session's panes never move)
 - Layout: `[ context | session | picker ]` top, `[ terminal ]` below context+session
 - Keybinds: `prefix+e` focus (open if needed), `prefix+E` toggle visibility
 - Side configurable (left of session default, option for right)
@@ -43,9 +44,14 @@ Visibility is global (open/closed applies to all sessions). Controlled by `termi
 config option.
 
 **Approach:** Add a `cs_term_state_key` helper that redirects all `STATE_DIR/term/` file paths
-from per-session keys to a fixed `shared` key. The atomic swap chain in `cs_show_pane` is
-unchanged — it already parks the terminal if shown and reattaches after swap. `cs_term_kill`
-becomes a no-op in shared mode (terminal only dies via `cs_reset`). ~15-20 lines of changes.
+from per-session keys to a fixed `shared` key. `cs_term_kill` becomes a no-op in shared mode
+(terminal only dies via `cs_reset`).
+
+Note this got *harder*, not easier, under the travelling-picker topology: a terminal now lives
+inside its session's own window and never moves on a swap, so a genuinely shared terminal would
+have to be relocated between session windows on every switch — reintroducing exactly the
+join/break traffic (and the SIGWINCH) that the current design exists to avoid. Re-derive the
+estimate before starting.
 
 **Why not yet:** Per-session terminals work fine. Only implement if testing shows a shared
 shell is actually needed.

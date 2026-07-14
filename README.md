@@ -64,6 +64,7 @@ Requires bash 4.3+, tmux 3.0+, jq.
 
 ```
 claude-spaces              # launch
+claude-spaces --restart    # restart the server (e.g. to apply an update)
 claude-spaces --reset      # kill all managed panes, clear state
 claude-spaces --help
 ```
@@ -150,7 +151,15 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 | `:` | Command menu (new, fork, rename, close, hide, shutdown) |
 | `?` | Show help screen |
 | `Q` | Detach (exit) |
-| `R` | Reload picker in-place (picks up code changes) |
+| `R` | Reload picker in-place (picks up code changes) — see note below |
+
+> **Note on `R` after an update.** Most updates hot-reload in place. If an update changes the
+> session layout, the new picker can't run against the running server — `R` stops it instead, and
+> tells you to run `claude-spaces` again. Your sessions restart, but **conversations are not
+> lost**: they come straight back in the picker, resumable. `claude-spaces --restart` does the
+> same thing without going through the picker. Running `claude-spaces` while such an update is
+> pending prints a notice and leaves the server alone, so nothing is ever restarted behind
+> your back.
 
 ### Prefix key bindings (from any pane)
 
@@ -220,6 +229,34 @@ Claude Code runs hooks without a controlling terminal (v2.1.139+), so the older
 Returning the bell in the `terminalSequence` field instead makes Claude Code
 emit it through its own terminal, where tmux sees it. Requires Claude Code
 v2.1.141+. Bell state clears when the session is brought to the foreground.
+
+</details>
+
+<details>
+<summary><strong>Rendering (recommended: <code>tui: fullscreen</code>)</strong></summary>
+
+Recommended when using Claude Code under claude-spaces. In `~/.claude/settings.json`:
+
+```json
+{
+  "tui": "fullscreen"
+}
+```
+
+By default Claude Code draws into the terminal's normal buffer, so its output
+lands in tmux's scrollback. tmux reflows scrollback whenever a pane's width
+changes — so resizing your terminal (or opening a side terminal) can mangle the
+history, with parts of the transcript doubled or tripled.
+
+`tui: fullscreen` moves Claude onto the alternate screen, which tmux never
+writes into scrollback and never reflows, so the mangling cannot occur.
+
+Switching sessions does **not** resize the Claude pane — the picker moves, not
+Claude — so swapping between sessions is already reflow-free either way.
+
+Trade-off: you lose tmux-native scrollback and copy-mode for the Claude pane —
+use Claude's own scrolling instead. The picker and terminal panes are
+unaffected.
 
 </details>
 

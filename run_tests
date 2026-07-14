@@ -73,6 +73,8 @@ mock_cs_new_session() {
   fi
   local pane_id
   pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
+  # Every session window must carry a filler in its slot, same as the real birth path.
+  cs_make_filler "${pane_id}" >/dev/null || return 1
   echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
   echo "${pane_id}" > "${STATE_DIR}/new_pane"
   if [[ -n "${auto_name}" ]]; then
@@ -87,6 +89,7 @@ mock_cs_resume_session() {
   local session_id="$1"
   local pane_id
   pane_id=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
+  cs_make_filler "${pane_id}" >/dev/null || return 1
   echo "${session_id}" > "${STATE_DIR}/panes/${pane_id#%}"
   cs_show_pane "${pane_id}"
 }
@@ -94,6 +97,7 @@ mock_cs_resume_session() {
 mock_cs_show_welcome() {
   local welcome_pane
   welcome_pane=$(_tmux new-window -d -t "${TEST_SESSION}" -P -F '#{pane_id}' "sleep 99999")
+  cs_make_filler "${welcome_pane}" >/dev/null || return 1
   echo "${welcome_pane}" > "${STATE_DIR}/welcome_pane"
   cs_show_pane "${welcome_pane}"
 }
@@ -266,6 +270,31 @@ cs_assert_consistent() {
     if [[ ! -f "${STATE_DIR}/term/${base}" ]]; then
       echo -e "    ${RED}FAIL${RESET} [${label}] term/${base}.shown exists but term/${base} does not"
       ((errors++))
+    fi
+  done
+
+  # 9. Slot invariant: every session window holds exactly one slot occupant — the picker
+  #    if the session is shown, otherwise exactly one tagged filler. A parked session with
+  #    no filler is unreachable (cs_show_pane cannot swap into it); one with two has lost
+  #    columns permanently.
+  for f in "${STATE_DIR}"/panes/*; do
+    [[ -f "${f}" ]] || continue
+    local spid="%$(basename "${f}")"
+    pane_alive "${spid}" || continue
+    local swin fill_count has_picker
+    swin=$(_tmux display-message -t "${spid}" -p '#{window_id}' 2>/dev/null) || continue
+    fill_count=$(_tmux list-panes -t "${spid}" -F '#{?@cs_filler,1,}' 2>/dev/null | grep -c '^1$')
+    has_picker=$(_tmux list-panes -t "${spid}" -F '#{pane_id}' 2>/dev/null | grep -cx "${pp}")
+    if [[ "${spid}" == "${cp}" ]]; then
+      if ((has_picker != 1 || fill_count != 0)); then
+        echo -e "    ${RED}FAIL${RESET} [${label}] shown session ${spid} window ${swin}: picker=${has_picker} fillers=${fill_count} (want 1/0)"
+        ((errors++))
+      fi
+    else
+      if ((has_picker != 0 || fill_count != 1)); then
+        echo -e "    ${RED}FAIL${RESET} [${label}] parked session ${spid} window ${swin}: picker=${has_picker} fillers=${fill_count} (want 0/1)"
+        ((errors++))
+      fi
     fi
   done
 

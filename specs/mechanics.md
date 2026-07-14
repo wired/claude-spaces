@@ -5,36 +5,91 @@ Parent: [SPEC.md](../SPEC.md)
 
 ## Pane Swap
 
-Each session runs in its own tmux pane. Only one is visible at a time. Others are parked in hidden tmux windows via `break-pane -d`.
+**The picker travels; Claude never moves.**
+
+Every session permanently owns one tmux window, laid out `[claude (+ its terminal) | slot]`.
+The slot is `PICKER_WIDTH` wide and holds either the picker pane or a **filler** pane — a
+`sleep` placeholder tagged with the tmux pane option `@cs_filler`. Exactly one window holds
+the picker; every other session window holds exactly one filler.
 
 ### Swap operation (atomic)
 
 ```
-_tmux break-pane -d -s $OLD -t $SESSION: \;
-     join-pane -h [-b] -s $NEW -t $PICKER \;
-     resize-pane -t $PICKER -x $PICKER_WIDTH \;
+_tmux swap-pane -d -s $PICKER -t $TARGET_FILLER \;
+     select-window -t $TARGET_WIN \;
      select-pane -t $PICKER
 ```
 
-The `-t $SESSION:` ensures parked panes stay in the correct tmux session. The `resize-pane` pins the picker width. WINCH handler re-pins on terminal resize.
+`$TARGET_FILLER` is the tagged pane currently in the target session's window, resolved by
+`cs_filler_for`. The picker and the filler are identical geometry, so **nothing resizes**.
+A `resize-pane -x $PICKER_WIDTH` follows outside the chain, in case the slot drifted while
+that session was parked (see § Drift).
 
-### Swap with terminal pane
+### Why: zero SIGWINCH
 
-When the old session has a visible terminal, the terminal is parked first (extended chain):
+tmux reflows a pane's scrollback whenever its **width** changes, and Claude's renderer repaints.
+The previous design parked the outgoing session with `break-pane -d`, which put it alone in a
+new window at full width — so the Claude pane oscillated `169 → 200` on park and `200 → 169` on
+unpark: **two reflows per swap**, four for a session with a side terminal.
 
-```
-_tmux break-pane -d -s $OLD_TERM -t $SESSION: \;
-     break-pane -d -s $OLD -t $SESSION: \;
-     join-pane -h [-b] -s $NEW -t $PICKER \;
-     resize-pane -t $PICKER -x $PICKER_WIDTH \;
-     select-pane -t $PICKER
-```
+Swapping the narrow picker instead costs zero. Measured with a real Node/libuv resize consumer:
 
-After the main swap, if the new session has `term/<num>.shown`, its terminal is attached:
-- Parked terminal exists: `join-pane -v -d -s $TERM -t $SESSION -l $HEIGHT`
-- No terminal yet: `split-window -v -d -t $SESSION -l $HEIGHT`
+| swap | outgoing claude | incoming claude | terminals | picker |
+|---|---|---|---|---|
+| plain → plain           | 0 | 0 | — | 0 |
+| plain → bottom-terminal | 0 | 0 | 0 | 0 |
+| bottom-term → side-term | 0 | 0 | 0 | 0 |
 
-Terminal height is saved per-session before parking (`term/<num>.height`).
+This is also the only arrangement that keeps a terminal glued to its session. Swapping the
+*Claude* panes instead breaks: a side terminal splits Claude's cell (e.g. to 119 columns), so the
+incoming Claude lands in a mis-sized cell and the outgoing terminal is stranded beside the wrong
+session.
+
+### Terminal panes
+
+Terminals **stay in their session's window** across a swap — there is no park/reattach at all.
+`cs_show_pane` still calls `cs_term_save_size` for the outgoing session (it moves no panes, so it
+costs no winch); without it, `cs_handle_winch` would revert a manually-resized terminal to the
+stored ratio on the next SIGWINCH.
+
+`cs_term_hide` still breaks a hidden terminal out into its own `cs:term` window. Those windows are
+untagged, so the reaper spares them.
+
+### Fillers permute
+
+`swap-pane` deposits the target's filler into the picker's *previous* window. Fillers are
+therefore fungible and move between windows — there is no stable "session X's filler". It must
+be resolved dynamically at swap time (`cs_filler_for`); a cached mapping strands the picker in a
+hidden window after two swaps.
+
+### Reaping
+
+A window whose panes are **all** tagged `@cs_filler` is garbage and is killed by
+`cs_reap_fillers`. This happens after a swap (`cs_show_pane`), after a close/hide
+(`cs_after_remove`), and when the welcome pane is torn down (`cs_kill_welcome`).
+
+Conservative by construction: a live Claude pane is never tagged, so a window holding one can
+never be all-tagged. The reaper also skips the picker's own window. Orphan filler windows are
+inert between reaps — invisible (`window-status-format` is blank), never targeted, and with no
+effect on any other window's geometry.
+
+**Reap after the swap, never before**: beforehand, the window about to be orphaned still holds
+the picker and does not look like garbage.
+
+### Drift
+
+Under `window-size latest`, resizing the outer terminal resizes *every* window, including parked
+ones, so their slots drift off `PICKER_WIDTH`. The next show re-pins the picker, which costs that
+session one winch — the same cost as the old design paid on every swap — and it self-heals
+permanently.
+
+### Empty targets are a hazard
+
+`kill-pane -t ""`, `swap-pane -t ""`, `swap-pane -s ""`, `split-window -t ""` and
+`kill-window -t ""` all silently act on the **active** pane/window and exit 0. `kill-window -t ""`
+destroys the picker and the live Claude beside it. `display-message -t ""` also resolves to the
+active pane and returns a non-empty window id, so it cannot be used as a guard. Every target in
+the swap path is explicitly guarded non-empty.
 
 ### Focus behavior
 

@@ -51,6 +51,36 @@ a configured one is unusable: state would fragment across two roots and live
 sessions would vanish from discovery. Fail loudly instead.
 Stale pane refs are cleaned up automatically on picker startup.
 
+### Window topology: the picker travels, Claude never moves
+
+Every session permanently owns one tmux window, laid out `[claude (+ its terminal) | slot]`.
+The slot is `PICKER_WIDTH` wide and holds **either the picker pane or a filler pane** (a
+`sleep`, tagged with the tmux pane option `@cs_filler`). Exactly one window holds the picker.
+
+Showing a session is `swap-pane -d -s <picker> -t <the tagged filler in that session's window>`
+plus `select-window`. Both panes are identical geometry, so **nothing resizes**: zero SIGWINCH
+for the outgoing Claude, the incoming Claude, and both their terminals. That matters because a
+width change makes tmux reflow the pane's scrollback and forces Claude's renderer to repaint.
+The old design parked sessions with `break-pane`, which widened them to full width and cost two
+reflows per swap.
+
+A window whose panes are **all** tagged `@cs_filler` is garbage and is reaped (`cs_reap_fillers`).
+This is conservative by construction: a live Claude pane is never tagged, so a window holding one
+can never be all-tagged. Parked `cs:term` windows are untagged and are spared too.
+
+Helpers: `cs_make_filler`, `cs_filler_for` (dynamic — see "easy to break"), `cs_reap_fillers`.
+
+### Compatibility gate
+
+`CS_COMPAT_VERSION` is stamped into `${STATE_DIR}/compat_version`. Bump it for **any** change a
+running server cannot survive (topology, state format). New code never migrates an old server —
+the picker detects the mismatch, kills the server, and the launcher explains.
+
+`cs_init_state` stamps **exactly when there is no live picker** — i.e. only when it is the thing about to
+build the topology. Keying this on "is the state dir fresh" instead is a **boot loop**:
+`picker_pane` is written by the picker itself (later), so a dir can exist without one, would
+never be stamped, and the gate would then kill every server it starts.
+
 ### Pane existence checking
 
 Uses cached `_tmux list-panes -a` result (`LIVE_PANES`), refreshed once per scan cycle.
@@ -70,8 +100,18 @@ collisions, the uncompressed suffix is used.
 
 ## Things that are easy to break
 
-- **Atomic pane swap**: the break-pane + join-pane + resize-pane sequence must be a single
-  `_tmux` call (semicolon-chained). Splitting it causes flicker and race conditions.
+- **Never cache "session X's filler"**. Fillers are fungible and *permute*: `swap-pane` deposits
+  the target's filler into the picker's previous window. A cached mapping strands the picker in a
+  hidden window after two swaps. Always resolve via `cs_filler_for` at swap time.
+- **Empty tmux targets are silently destructive.** `kill-pane -t ""`, `swap-pane -t ""`,
+  `swap-pane -s ""`, `split-window -t ""` and `kill-window -t ""` all act on the *active*
+  pane/window and exit 0. `kill-window -t ""` destroys the picker **and** the live Claude beside
+  it. `display-message -t ""` also resolves to the active pane and returns a non-empty window id,
+  so it is not a guard either. Guard every target explicitly.
+- **Reap after the swap, never before.** Before the swap, the window about to be orphaned still
+  holds the picker, so it doesn't look like garbage.
+- **`cs_show_pane` swap chain**: `swap-pane` + `select-window` + `select-pane` must stay a single
+  semicolon-chained `_tmux` call. Splitting it causes flicker and race conditions.
 - **Bell detection**: requires a Claude Code Stop hook returning the BEL in `terminalSequence` —
   hooks have no controlling terminal since Claude Code 2.1.139, so `> /dev/tty` fails. The
   `#{window_bell_flag}` approach does NOT work (flag is momentary). See specs/mechanics.md § Bell Detection.

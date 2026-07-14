@@ -28,9 +28,22 @@ Two modes controlled by `CS_PICKER`:
 - **Launcher mode** (default): `cs_launch()` — loop: create/attach session, handle project switching
 - **Picker mode** (`CS_PICKER=1`): `cs_picker_loop()` — TUI event loop
 
-The `R` key re-execs the picker, picking up code changes instantly.
+The `R` key re-execs the picker, picking up code changes instantly. If the update bumped
+`CS_COMPAT_VERSION`, the new picker cannot run against the old server's layout, so it stops the
+server instead and the launcher explains — sessions restart, conversations are preserved.
 
-> See [specs/launch.md](specs/launch.md) for launch loop details, state management, and `--reset` behavior.
+### Window topology
+
+Every session permanently owns one tmux window: `[claude (+ its terminal) | slot]`. The slot is
+`PICKER_WIDTH` wide and holds **either the picker pane or a filler pane** (tagged `@cs_filler`).
+Switching sessions swaps the picker with the target window's filler — identical geometry, so
+nothing resizes and Claude never reflows its scrollback. The Claude pane and its terminal never
+move.
+
+> See [specs/mechanics.md](specs/mechanics.md) for the swap chain, filler lifecycle, and reaping.
+
+> See [specs/launch.md](specs/launch.md) for launch loop details, state management, the
+> compatibility gate, and `--reset` / `--restart` behavior.
 
 ### Rendering
 
@@ -200,7 +213,9 @@ See README.md for the full list of options and their defaults.
 ## Dependencies
 
 - **bash** 4+ (associative arrays)
-- **tmux** 3.0+ (`alert-bell` hook, `break-pane -d`, dedicated servers via `-L`)
+- **tmux** 3.0+ (`alert-bell` hook, dedicated servers via `-L`, and **pane options** — the swap
+  marks filler panes with `set -p @cs_filler` and queries them via `#{?@cs_filler,…}`; `set -p`
+  is the binding constraint on the minimum version)
 - **jq** (session metadata extraction from JSONL)
 - **coreutils**: `stat`, `date`, `sed`, `sort`, `head`
 
@@ -209,7 +224,7 @@ See README.md for the full list of options and their defaults.
 | File | Coverage |
 |------|----------|
 | [specs/discovery.md](specs/discovery.md) | Session scanning, name resolution, remote/inactive discovery, cross-server switching |
-| [specs/launch.md](specs/launch.md) | Launch loop, re-attach, stale cleanup, reset, runtime/persistent state files |
+| [specs/launch.md](specs/launch.md) | Launch loop, re-attach, stale cleanup, compatibility gate, reset/restart, runtime/persistent state files |
 | [specs/mechanics.md](specs/mechanics.md) | Atomic pane swap, bell detection, binding lifecycle |
 | [specs/testing.md](specs/testing.md) | Test infrastructure, shellcheck, invariant checks |
 | [specs/future.md](specs/future.md) | Planned features |

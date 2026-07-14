@@ -60,6 +60,14 @@ fi
 # Pre-namespace path; used only for legacy detection/cleanup under /tmp fallback.
 CS_LEGACY_ROOT="/tmp/claude-spaces"
 
+# ── Compatibility ─────────────────────────────────
+# Bump for ANY change a running server cannot survive (tmux topology, state format).
+# The picker refuses to run against a server stamped with a different value and
+# restarts it instead of migrating. Stamped into ${STATE_DIR}/compat_version.
+CS_COMPAT_VERSION=2
+# Filler pane placeholder. `sleep infinity` is GNU-only; cs also ships via Homebrew.
+CS_FILLER_CMD='exec sleep 2147483647'
+
 # ── Defaults ──────────────────────────────────────
 PICKER_WIDTH="30"
 RECENT_THRESHOLD=10
@@ -399,6 +407,15 @@ cs_init_state() {
   fi
   mkdir -p "${STATE_DIR}/panes" "${STATE_DIR}/term"
   echo "${PWD}" > "${STATE_DIR}/project_path"
+  # Stamp compat_version exactly when there is no live picker — i.e. we are the ones about to
+  # build this server's topology. Keying this on "is the dir fresh" instead would never
+  # stamp a dir that exists without a picker_pane (picker_pane is written by the picker
+  # itself, later), and the gate would then kill every server it starts: a boot loop.
+  # A LIVE picker means some other version built this server — leave it unstamped so
+  # the gate can see the mismatch.
+  if [[ -z "${old_picker}" ]] || ! cs_pane_alive "${old_picker}"; then
+    echo "${CS_COMPAT_VERSION}" > "${STATE_DIR}/compat_version"
+  fi
   # Server → state dir mapping for cross-server discovery
   mkdir -p "${CS_STATE_ROOT}/.servers"
   ln -snf "${STATE_DIR}" "${CS_STATE_ROOT}/.servers/${TMUX_SERVER}"
@@ -1451,6 +1468,9 @@ cs_after_remove() {
     cs_show_welcome
     _tmux select-pane -t "${PICKER_PANE}"
   fi
+  # Closing/hiding a PARKED session never reaches cs_show_pane, and its window is now
+  # a lone filler. Collect it here too.
+  cs_reap_fillers
 }
 
 cs_fingerprint() {
@@ -1479,71 +1499,121 @@ cs_format_age() {
   fi
 }
 
+# ── Filler Panes ──────────────────────────────────
+# Every session owns a window laid out [claude (+term) | slot]. The slot holds either
+# the picker or a filler pane; switching sessions swaps the picker with the target's
+# filler. Both are PICKER_WIDTH wide, so nothing resizes and Claude never reflows.
+
+# Split a tagged filler into a session's window, opposite the Claude pane.
+cs_make_filler() {
+  local sess_pane="$1"
+  # split-window -t "" splits the ACTIVE pane and returns rc=0 with a real pane id.
+  [[ -n "${sess_pane}" ]] || return 1
+  local side_flag=""
+  [[ "${PICKER_SIDE}" == "left" ]] && side_flag="-b"
+  local fp
+  fp=$(_tmux split-window -h ${side_flag} -d -l "${PICKER_WIDTH}" -t "${sess_pane}" \
+        -P -F '#{pane_id}' "${CS_FILLER_CMD}" 2>/dev/null) || return 1
+  [[ -n "${fp}" ]] || return 1
+  # An untagged filler is invisible to both cs_filler_for and cs_reap_fillers — never leave one.
+  if ! _tmux set -p -t "${fp}" @cs_filler 1 2>/dev/null; then
+    _tmux kill-pane -t "${fp}" 2>/dev/null || true
+    return 1
+  fi
+  printf '%s\n' "${fp}"
+}
+
+# Which pane currently occupies the slot in this session's window?
+# Fillers are fungible and permute across windows on every swap — resolve this
+# dynamically, never cache it.
+cs_filler_for() {
+  local sess_pane="$1" pid flag
+  [[ -n "${sess_pane}" ]] || return 1
+  while read -r pid flag; do
+    [[ "${flag}" == "1" ]] || continue
+    printf '%s\n' "${pid}"
+    return 0
+  done < <(_tmux list-panes -t "${sess_pane}" -F '#{pane_id} #{?@cs_filler,1,0}' 2>/dev/null)
+  return 1
+}
+
+# Kill windows whose panes are ALL tagged fillers. Conservative by construction: a live
+# Claude pane is never tagged, so a window holding one can never be all-tagged. Parked
+# cs:term windows are untagged and are spared too.
+cs_reap_fillers() {
+  local -A wtot wfil wrep wskip
+  local wid pid flag
+  while read -r wid pid flag; do
+    [[ -n "${wid}" ]] || continue
+    wtot["${wid}"]=$(( ${wtot["${wid}"]:-0} + 1 ))
+    if [[ "${flag}" == "1" ]]; then
+      wfil["${wid}"]=$(( ${wfil["${wid}"]:-0} + 1 ))
+      wrep["${wid}"]="${pid}"
+    fi
+    [[ "${pid}" == "${PICKER_PANE:-}" ]] && wskip["${wid}"]=1
+  done < <(_tmux list-panes -a -F '#{window_id} #{pane_id} #{?@cs_filler,1,0}' 2>/dev/null)
+  for wid in "${!wtot[@]}"; do
+    [[ -v "wskip[${wid}]" ]] && continue
+    (( wtot["${wid}"] == ${wfil["${wid}"]:-0} )) || continue
+    [[ -n "${wrep["${wid}"]:-}" ]] || continue
+    _tmux kill-window -t "${wrep["${wid}"]}" 2>/dev/null || true
+  done
+}
+
 # ── Pane Lifecycle ────────────────────────────────
 cs_show_pane() {
   local target_pane="$1"
+  [[ -n "${target_pane}" ]] || return 1
   # Verify target pane exists before attempting swap
   cs_refresh_pane_cache
   if ! cs_pane_alive "${target_pane}"; then
     return 1
   fi
-  local cur_pane picker_pane picker_session
-  cur_pane=$(cs_read_state current_pane)
+  local cur_pane picker_pane
   picker_pane=$(cs_read_state picker_pane)
-  picker_session=$(_tmux display-message -t "${picker_pane}" -p '#{session_name}' 2>/dev/null)
+  # swap-pane -s "" silently uses the ACTIVE pane, which is routinely Claude.
+  [[ -n "${picker_pane}" ]] || return 1
+  cur_pane=$(cs_read_state current_pane)
 
-  # -b = join before (left of) target. Omit = join after (right of) target.
-  local join_dir="-b"
-  [[ "${PICKER_SIDE}" == "left" ]] && join_dir=""
+  # Persist the outgoing session's terminal ratio. This is the only place on the switch
+  # path that does so; without it cs_handle_winch reverts any manual terminal resize on
+  # the next SIGWINCH. Moves no panes, so it costs no winch.
+  if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]] \
+     && cs_pane_alive "${cur_pane}" && cs_term_is_shown "${cur_pane}"; then
+    local _ot
+    _ot=$(cs_term_pane_for "${cur_pane}")
+    [[ -n "${_ot}" ]] && cs_pane_alive "${_ot}" && cs_term_save_size "${_ot}" "${cur_pane}"
+  fi
 
-  if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]]; then
-    if cs_pane_alive "${cur_pane}"; then
-      # Park old session's terminal first (if visible)
-      local old_term=""
-      if cs_term_is_shown "${cur_pane}"; then
-        old_term=$(cs_term_pane_for "${cur_pane}")
-      fi
-      if [[ -n "${old_term}" ]] && cs_pane_alive "${old_term}"; then
-        cs_term_save_size "${old_term}" "${cur_pane}"
-        # Extended chain: park terminal, park session, join new
-        _tmux break-pane -d -s "${old_term}" -t "${picker_session}:" \; \
-           break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
-           join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-           resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-           select-pane -t "${picker_pane}"
-        cs_rename_pane_window "${old_term}" "cs:term"
-      else
-        _tmux break-pane -d -s "${cur_pane}" -t "${picker_session}:" \; \
-           join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-           resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-           select-pane -t "${picker_pane}"
-      fi
-      # Rename the parked window
-      local parked_sid parked_name
-      parked_sid=$(cat "${STATE_DIR}/panes/${cur_pane#%}" 2>/dev/null || true)
-      parked_name="${parked_sid:0:8}"
-      for ((pi=0; pi < ${#ENTRIES_ID[@]}; pi++)); do
-        if [[ "${ENTRIES_ID[${pi}]}" == "${parked_sid}" ]]; then
-          parked_name="${ENTRIES_NAME[${pi}]}"
-          break
-        fi
-      done
-      cs_rename_pane_window "${cur_pane}" "${parked_name}"
-    else
-      cs_term_kill "${cur_pane}"
-      rm -f "${STATE_DIR}/panes/${cur_pane#%}"
-      _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-         resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-         select-pane -t "${picker_pane}"
-    fi
-  else
-    local visible
-    visible=$(_tmux list-panes -F '#{pane_id}' 2>/dev/null | grep "^${target_pane}$" || true)
-    if [[ -z "${visible}" ]]; then
-      _tmux join-pane -h ${join_dir} -s "${target_pane}" -t "${picker_pane}" \; \
-         resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" \; \
-         select-pane -t "${picker_pane}"
-    fi
+  # Move the picker into the target's window. Compare by window_id, not by cur_pane —
+  # after a reload cur_pane may not reflect reality. The Claude pane and its terminal
+  # never move: the picker and the target's filler are the same size, so nothing resizes.
+  local picker_win target_win
+  picker_win=$(_tmux display-message -t "${picker_pane}" -p '#{window_id}' 2>/dev/null || true)
+  target_win=$(_tmux display-message -t "${target_pane}" -p '#{window_id}' 2>/dev/null || true)
+  if [[ -n "${picker_win}" && -n "${target_win}" && "${picker_win}" != "${target_win}" ]]; then
+    local target_filler
+    # A filler can only be missing if its process died. Rebuild rather than strand the
+    # session forever; costs that pane one resize, once.
+    target_filler=$(cs_filler_for "${target_pane}") \
+      || target_filler=$(cs_make_filler "${target_pane}")
+    [[ -n "${target_filler}" ]] || return 1
+    # If the swap aborts, do not fall through and write current_pane: a desynced
+    # current_pane makes cs_activate_selected treat the session as already shown.
+    _tmux swap-pane -d -s "${picker_pane}" -t "${target_filler}" \; \
+       select-window -t "${target_win}" \; \
+       select-pane -t "${picker_pane}" || return 1
+    # The slot may have drifted if the terminal was resized while this session was parked.
+    _tmux resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+  fi
+
+  # Outgoing session died while it was shown: reap its orphaned terminal and drop its
+  # state. cs_scan_sessions does this too, but only on the next scan — resuming a dead
+  # session must not leave its terminal pane hanging around in the meantime. Placed after
+  # the early returns so a failed show can never strand current_pane on a dead pane.
+  if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]] && ! cs_pane_alive "${cur_pane}"; then
+    cs_term_kill "${cur_pane}"
+    rm -f "${STATE_DIR}/panes/${cur_pane#%}"
   fi
 
   echo "${target_pane}" > "${STATE_DIR}/current_pane"
@@ -1558,15 +1628,21 @@ cs_show_pane() {
   fi
   ((_bells_changed)) && cs_sync_bells_active
 
-  # Attach new session's terminal (if that session has term shown)
-  local wp
-  wp=$(cs_read_state welcome_pane)
-  if [[ "${target_pane}" != "${wp}" ]] && cs_term_is_shown "${target_pane}"; then
-    local _restore_orient
-    _restore_orient=$(cs_term_orient "${target_pane}")
-    cs_term_show "${target_pane}" "${_restore_orient}"
-    _tmux resize-pane -t "${picker_pane}" -x "${PICKER_WIDTH}" 2>/dev/null || true
+  # Name the outgoing session's window — it owns that window for life.
+  if [[ -n "${cur_pane}" && "${cur_pane}" != "${target_pane}" ]] && cs_pane_alive "${cur_pane}"; then
+    local parked_sid parked_name
+    parked_sid=$(cat "${STATE_DIR}/panes/${cur_pane#%}" 2>/dev/null || true)
+    parked_name="${parked_sid:0:8}"
+    for ((pi=0; pi < ${#ENTRIES_ID[@]}; pi++)); do
+      if [[ "${ENTRIES_ID[${pi}]}" == "${parked_sid}" ]]; then
+        parked_name="${ENTRIES_NAME[${pi}]}"
+        break
+      fi
+    done
+    cs_rename_pane_window "${cur_pane}" "${parked_name}"
   fi
+
+  cs_reap_fillers   # after the swap, never before
 
   # Let tmux settle layout before picker re-renders
   sleep 0.05
@@ -1975,6 +2051,12 @@ cs_new_session() {
   fi
   local pane_id
   pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${cmd}")
+  # kill-window -t "" destroys the ACTIVE window — the picker and the live session in it.
+  [[ -n "${pane_id}" ]] || return 1
+  if ! cs_make_filler "${pane_id}" >/dev/null; then
+    _tmux kill-window -t "${pane_id}" 2>/dev/null || true
+    return 1
+  fi
   echo "new" > "${STATE_DIR}/panes/${pane_id#%}"
   echo "${pane_id}" > "${STATE_DIR}/new_pane"
   if [[ -n "${auto_name}" ]]; then
@@ -1989,6 +2071,11 @@ cs_resume_session() {
   local session_id="$1"
   local pane_id
   pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec claude --resume ${session_id@Q}")
+  [[ -n "${pane_id}" ]] || return 1
+  if ! cs_make_filler "${pane_id}" >/dev/null; then
+    _tmux kill-window -t "${pane_id}" 2>/dev/null || true
+    return 1
+  fi
   echo "${session_id}" > "${STATE_DIR}/panes/${pane_id#%}"
   cs_show_pane "${pane_id}"
 }
@@ -2067,6 +2154,11 @@ WELCOMEEOF
   chmod +x "${script}"
   local welcome_pane
   welcome_pane=$(_tmux new-window -d -P -F '#{pane_id}' "${script}")
+  [[ -n "${welcome_pane}" ]] || return 1
+  if ! cs_make_filler "${welcome_pane}" >/dev/null; then
+    _tmux kill-window -t "${welcome_pane}" 2>/dev/null || true
+    return 1
+  fi
   echo "${welcome_pane}" > "${STATE_DIR}/welcome_pane"
   cs_show_pane "${welcome_pane}"
 }
@@ -2075,10 +2167,10 @@ cs_kill_welcome() {
   local wp
   wp=$(cs_read_state welcome_pane)
   [[ -n "${wp}" ]] || return 0
-  # If it's the current pane, it'll get parked by cs_show_pane.
-  # Either way, kill it.
   _tmux kill-pane -t "${wp}" 2>/dev/null || true
   rm -f "${STATE_DIR}/welcome_pane"
+  # The welcome pane's window is now a lone filler.
+  cs_reap_fillers
 }
 
 cs_render_header_bar() {
@@ -2492,12 +2584,12 @@ cs_picker_loop() {
             MENU_ACTIVE=0; DIRTY=1 ;;
           r) MENU_ACTIVE=0; cs_rename_selected; DIRTY=1 ;;
           p) MENU_ACTIVE=0; cs_rename_project; DIRTY=1 ;;
-          f) MENU_ACTIVE=0; cs_confirm_fork; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
+          f) MENU_ACTIVE=0; if cs_confirm_fork; then cs_focus_session; cs_kill_welcome; fi; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
           x) MENU_ACTIVE=0; cs_confirm_close; DIRTY=1 ;;
           h) MENU_ACTIVE=0; cs_confirm_hide; DIRTY=1 ;;
           o) MENU_ACTIVE=0; cs_hide_older; DIRTY=1 ;;
           v) MENU_ACTIVE=0; SHOW_HIDDEN=$((! SHOW_HIDDEN)); cs_rescan; DIRTY=1 ;;
-          c) MENU_ACTIVE=0; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
+          c) MENU_ACTIVE=0; if cs_new_session; then cs_focus_session; cs_kill_welcome; fi; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
           d) MENU_ACTIVE=0; _tmux detach-client ;;
           s) MENU_ACTIVE=0; cs_confirm_shutdown; DIRTY=1 ;;
           *) MENU_ACTIVE=0; DIRTY=1 ;;
@@ -2586,10 +2678,10 @@ cs_picker_loop() {
           $'\x19') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_project; DIRTY=1 ;;
           $'\x14') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_hide; DIRTY=1 ;;
           $'\x16') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_shutdown; DIRTY=1 ;;
-          $'\x02') _tmux select-pane -t "${PICKER_PANE}"; cs_new_session; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
+          $'\x02') _tmux select-pane -t "${PICKER_PANE}"; if cs_new_session; then cs_focus_session; cs_kill_welcome; fi; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
           $'\x05') _tmux select-pane -t "${PICKER_PANE}"; cs_menu_enter ;;
           $'\x06') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_close; DIRTY=1 ;;
-          $'\x0b') _tmux select-pane -t "${PICKER_PANE}"; cs_confirm_fork; cs_focus_session; cs_kill_welcome; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
+          $'\x0b') _tmux select-pane -t "${PICKER_PANE}"; if cs_confirm_fork; then cs_focus_session; cs_kill_welcome; fi; cs_rescan; { local _i; _i=$(cs_find_entry_by_pane "$(cs_read_state current_pane)"); [[ "$_i" != "-1" ]] && SELECTED=$_i; }; DIRTY=1 ;;
           $'\x0e')
             _tmux select-pane -t "${PICKER_PANE}"
             stty echo 2>/dev/null || true
@@ -2838,13 +2930,13 @@ cs_activate_selected() {
         # Already showing — second Enter focuses it
         cs_focus_session
       else
-        cs_show_pane "${pane}"
-        cs_kill_welcome
+        # Don't tear down the welcome pane if the show failed — that would leave the
+        # picker alone in its window with nothing beside it.
+        cs_show_pane "${pane}" && cs_kill_welcome
       fi
       ;;
     dormant)
-      cs_resume_session "${sid}"
-      cs_kill_welcome
+      cs_resume_session "${sid}" && cs_kill_welcome
       sleep "${CS_ACTIVATE_DELAY:-0.3}"
       cs_rescan
       ;;
@@ -3310,6 +3402,23 @@ cs_launch() {
     local session_name
     session_name="cs$(cs_sanitize_path "${PWD}")"
 
+    # A live server built by another version can't run this picker. Say so, but never
+    # kill it from under the user just because they ran claude-spaces.
+    if _tmux has-session 2>/dev/null \
+       && [[ "$(cs_read_state compat_version)" != "${CS_COMPAT_VERSION}" ]]; then
+      echo
+      echo "  claude-spaces was updated, but the running server still uses the old session"
+      echo "  layout — you're on the previous version until it restarts."
+      echo
+      echo "    press  prefix+R            (inside spaces), or"
+      echo "    run    claude-spaces --restart"
+      echo
+      echo "  Either restarts all sessions. Conversations, names and hidden flags are preserved."
+      echo
+      [[ -t 0 ]] && read -rsn1 -p "  Press any key to continue... "
+      echo
+    fi
+
     if ! _tmux has-session 2>/dev/null; then
       _tmux new-session -d -s "${session_name}" \
         "CS_PICKER=1 CS_STATE_DIR=${STATE_DIR@Q} exec ${SCRIPT_PATH@Q}"
@@ -3327,6 +3436,16 @@ cs_launch() {
 
     # Block until detach (NOT exec — we need control back for project switching)
     command tmux -L "${TMUX_SERVER}" attach-session
+
+    # The picker found an incompatible server and killed it. It couldn't tell the user —
+    # it was a pane inside that server — so we do it here, where the shell has the
+    # terminal back and the message survives in scrollback.
+    if [[ -f "${STATE_DIR}/restart_required" ]]; then
+      rm -f "${STATE_DIR}/restart_required"
+      echo "claude-spaces was updated and the session layout changed, so the server was stopped."
+      echo "Run claude-spaces again — your conversations are saved and resumable from the picker."
+      break
+    fi
 
     # Check for project switch
     if [[ -f "${STATE_DIR}/switch_target" ]]; then
@@ -3405,6 +3524,16 @@ if [[ "${CS_PICKER:-}" == "1" ]]; then
     exit 1
   fi
   cs_load_config
+  # Reached with new code inside an old server after `R` re-execs us. We can't run
+  # against a topology we didn't build, and we can't migrate it, so stop the server.
+  # Leave a marker for cs_launch to explain — anything printed here dies with the
+  # server. Do NOT wipe STATE_DIR (cs_confirm_shutdown does; copying that would eat
+  # the marker and dump the user to a bare shell with no explanation).
+  if [[ "$(cs_read_state compat_version)" != "${CS_COMPAT_VERSION}" ]]; then
+    : > "${STATE_DIR}/restart_required"
+    _tmux kill-server 2>/dev/null || true
+    exit 0
+  fi
   cs_picker_loop
 else
   cs_check_legacy_root
