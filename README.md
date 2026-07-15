@@ -273,8 +273,8 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # Picker pane position: "right" (default) or "left"
 # picker_side=right
 
-# Sessions modified within this many minutes sort by name at the top;
-# older sessions sort by most recent first below them.
+# Sessions modified within this many minutes sort at the top (running sessions
+# first, then by name); older sessions sort by most recent first below them.
 # recent_threshold=10
 
 # Max length for tmux window names

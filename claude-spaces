@@ -227,8 +227,8 @@ cs_create_default_config() {
 # Picker pane width: characters (e.g. 30) or percentage (e.g. 20%)
 # picker_width=30
 
-# Sessions modified within this many minutes sort by name at the top;
-# older sessions sort by most recent first below them.
+# Sessions modified within this many minutes sort at the top (running sessions
+# first, then by name); older sessions sort by most recent first below them.
 # recent_threshold=10
 
 # Picker pane position: "right" (default) or "left"
@@ -840,13 +840,15 @@ cs_sort_entries() {
     fi
   done
 
-  # Sort recent by name (case-insensitive), index first to handle spaces
+  # Sort recent by managed-first, then name (case-insensitive); index first to handle spaces
   local sorted_recent=""
   if ((${#recent_indices[@]} > 0)); then
     sorted_recent=$(
       for i in "${recent_indices[@]}"; do
-        echo "${i} ${ENTRIES_NAME[${i}],,}"
-      done | sort -t' ' -k2
+        local rank=1
+        [[ "${ENTRIES_STATUS[i]}" == "managed" ]] && rank=0
+        echo "${i} ${rank} ${ENTRIES_NAME[${i}],,}"
+      done | sort -t' ' -k2,2 -k3
     )
   fi
 
