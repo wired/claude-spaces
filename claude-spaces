@@ -342,7 +342,7 @@ cs_help_text() {
   echo ""
   echo "  Bell detection (highlights finished sessions):"
   echo "    Add to hooks in ~/.claude/settings.json:"
-  echo '    "Stop": [{"hooks": [{"type": "command", "command": "printf '"'"'\\a'"'"' > /dev/tty"}]}]'
+  echo '    "Stop": [{"hooks": [{"type": "command", "command": "printf '"'"'\\a'"'"' | jq -Rsc '"'"'{terminalSequence: .}'"'"'"}]}]'
   echo ""
   echo "  Full README: https://github.com/wired/claude-spaces"
 }
@@ -2143,7 +2143,7 @@ cs_show_welcome() {
     cat << 'WELCOMEEOF'
 echo ""
 recs=""
-if ! grep -q 'printf.*\\a.*dev/tty' ~/.claude/settings.json 2>/dev/null; then
+if ! grep -q 'terminalSequence' ~/.claude/settings.json 2>/dev/null; then
   recs+="    Add Stop hook in ~/.claude/settings.json\n"
 fi
 if [[ -n "${recs}" ]]; then
