@@ -497,6 +497,7 @@ declare -gA CUSTOM_NAMES
 declare -gA PROJECT_NAMES
 declare -gA UNNAMED_AT
 declare -gA SORT_MEMO_IN SORT_MEMO_OUT
+declare -gA INACTIVE_CWD
 
 cs_load_shared_maps() {
   HIDDEN_SET=()
@@ -1307,19 +1308,19 @@ cs_remote_scan_needed() {
 
 cs_discover_servers() {
   REMOTE_SERVERS=()
-  local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
+  local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-${EUID}}"
   [[ -d "${socket_dir}" ]] || return 0
   local my_server="${TMUX_SERVER}"
   for sock in "${socket_dir}"/cs-*; do
     [[ -S "${sock}" ]] || continue
     local name
-    name=$(basename "${sock}")
+    name="${sock##*/}"
     [[ "${name}" == "${my_server}" ]] && continue
     [[ "${name}" == cs-test-* ]] && continue
     local remote_state="${CS_STATE_ROOT}/.servers/${name}"
     local remote_path=""
     if [[ -f "${remote_state}/project_path" ]]; then
-      remote_path=$(cat "${remote_state}/project_path")
+      remote_path=$(< "${remote_state}/project_path")
     fi
     [[ -n "${remote_path}" && -d "${remote_path}" ]] || continue
     command tmux -L "${name}" has-session 2>/dev/null || continue
@@ -1344,17 +1345,22 @@ cs_discover_inactive() {
     done
     ((has_jsonl)) || continue
     local sanitized
-    sanitized=$(basename "${dir}")
+    sanitized="${dir%/}"
+    sanitized="${sanitized##*/}"
     [[ -v "active_set[${sanitized}]" ]] && continue
     # Resolve path
     local path=""
     local state_dir="${CS_STATE_ROOT}/${sanitized}"
     if [[ -f "${state_dir}/project_path" ]]; then
-      path=$(cat "${state_dir}/project_path")
+      path=$(< "${state_dir}/project_path")
     else
       local jsonl_files=("${dir}"*.jsonl)
       if [[ -f "${jsonl_files[0]}" ]]; then
-        path=$(head -20 "${jsonl_files[0]}" | jq -r 'select(.cwd) | .cwd' 2>/dev/null | head -1)
+        path="${INACTIVE_CWD[${jsonl_files[0]}]:-}"
+        if [[ -z "${path}" ]]; then
+          path=$(head -20 "${jsonl_files[0]}" | jq -r 'select(.cwd) | .cwd' 2>/dev/null | head -1)
+          [[ -n "${path}" ]] && INACTIVE_CWD["${jsonl_files[0]}"]="${path}"
+        fi
       fi
     fi
     [[ -n "${path}" && -d "${path}" ]] || continue
@@ -1370,7 +1376,7 @@ cs_scan_project_sessions() {
     for pf in "${remote_state_dir}/panes/"*; do
       [[ -f "${pf}" ]] || continue
       local psid
-      psid=$(cat "${pf}" 2>/dev/null)
+      { psid=$(< "${pf}"); } 2>/dev/null
       [[ -n "${psid}" && "${psid}" != "new" ]] && remote_managed["${psid}"]=1
     done
   fi

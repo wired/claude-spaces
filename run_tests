@@ -1184,6 +1184,41 @@ test_read_state_into() {
   rm -f "${STATE_DIR}/rsi_multi"
 }
 
+test_inactive_cwd_cache() {
+  # cs_discover_inactive's loop vars (dir, f) aren't local: avoid those names here
+  local san="-tmp-inactive-cwd-$$" san2="-tmp-inactive-nocwd-$$"
+  local pdir="${PROJECTS_DIR}/${san}" pdir2="${PROJECTS_DIR}/${san2}"
+  local cwd="/tmp/inactive-cwd-$$"
+  local jf="${pdir}/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+  local jf2="${pdir2}/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl"
+  mkdir -p "${pdir}" "${pdir2}" "${cwd}"
+  printf '{"type":"user","message":{"role":"user","content":"test"},"cwd":"%s"}\n' "${cwd}" > "${jf}"
+  printf '{"type":"user","message":{"role":"user","content":"test"}}\n' > "${jf2}"
+  local ok=1 entries
+
+  # No state dir: resolved from the JSONL and cached
+  cs_discover_inactive
+  entries=" ${INACTIVE_PROJECTS[*]} "
+  [[ "${entries}" == *" ${san}|${cwd} "* ]] || { echo "    not discovered: ${entries}"; ok=0; }
+  [[ "${INACTIVE_CWD[${jf}]:-}" == "${cwd}" ]] || { echo "    INACTIVE_CWD not set"; ok=0; }
+  [[ -z "${INACTIVE_CWD[${jf2}]:-}" ]] || { echo "    empty cwd was cached"; ok=0; }
+
+  # Cache hit: the file is not read again
+  printf '{"cwd":"/nonexistent-%s"}\n' "$$" > "${jf}"
+  cs_discover_inactive
+  entries=" ${INACTIVE_PROJECTS[*]} "
+  [[ "${entries}" == *" ${san}|${cwd} "* ]] || { echo "    cached path not used: ${entries}"; ok=0; }
+
+  # The -d check still runs: a deleted project drops out
+  rm -rf "${cwd}"
+  cs_discover_inactive
+  entries=" ${INACTIVE_PROJECTS[*]} "
+  [[ "${entries}" != *" ${san}|"* ]] || { echo "    deleted project still listed"; ok=0; }
+
+  rm -rf "${pdir}" "${pdir2}" "${cwd}"
+  ((ok)) || return 1
+}
+
 test_sort_entries_order() {
   local now
   printf -v now '%(%s)T' -1
@@ -2375,6 +2410,7 @@ main() {
   run_test "sort entries order"          test_sort_entries_order
   run_test "pane cache focus"            test_pane_cache_focus
   run_test "read state into"             test_read_state_into
+  run_test "inactive cwd cache"          test_inactive_cwd_cache
 
   echo ""
   echo "══════════════════════════════════"
