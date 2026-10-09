@@ -1112,6 +1112,52 @@ test_out_var_helpers() {
   [[ "${fp}" == focus:* ]] || { echo "    fingerprint: expected 'focus:...', got '${fp}'"; return 1; }
 }
 
+test_sort_memo() {
+  local lines=("3 1 beta" "1 0 alpha" "2 1 alpha" "0 1 -n flag" "4 0 back\\slash" "5 1   spaced  out" "6 1 ünïcode" "8 1 _under" "9 1 a-b")
+  local in="" l out expect
+  for l in "${lines[@]}"; do in+="${in:+$'\n'}${l}"; done
+
+  # Miss: same output as the old echo | sort pipeline
+  expect=$(printf '%s\n' "${lines[@]}" | sort -t' ' -k2,2 -k3)
+  cs_sort_memo out t "${in}" -t' ' -k2,2 -k3
+  [[ "${out}" == "${expect}" ]] || { echo "    miss: output differs from sort"; return 1; }
+
+  # Hit: served from the memo (tampered to prove sort didn't run)
+  SORT_MEMO_OUT[t]="from-memo"
+  cs_sort_memo out t "${in}" -t' ' -k2,2 -k3
+  [[ "${out}" == "from-memo" ]] || { echo "    hit: expected memo output, got '${out}'"; return 1; }
+
+  # Changed input: recomputed
+  expect=$(printf '%s\n' "${lines[@]}" "7 0 aaa" | sort -t' ' -k2,2 -k3)
+  cs_sort_memo out t "${in}"$'\n'"7 0 aaa" -t' ' -k2,2 -k3
+  [[ "${out}" == "${expect}" ]] || { echo "    changed input: not recomputed"; return 1; }
+
+  # Numeric descending with ties
+  local nums=("100 0" "300 1" "300 2" "50 3" "300 10")
+  in=""
+  for l in "${nums[@]}"; do in+="${in:+$'\n'}${l}"; done
+  expect=$(printf '%s\n' "${nums[@]}" | sort -rnk1)
+  cs_sort_memo out n "${in}" -rnk1
+  [[ "${out}" == "${expect}" ]] || { echo "    numeric: output differs from sort"; return 1; }
+}
+
+test_sort_entries_order() {
+  local now
+  printf -v now '%(%s)T' -1
+  RECENT_THRESHOLD=10
+  cs_entry_clear
+  cs_entry_append "a" "Zed" "${now}" "dormant" "" "local" ""
+  cs_entry_append "b" "alpha" "${now}" "dormant" "" "local" ""
+  cs_entry_append "c" "Mid" "${now}" "managed" "%1" "local" ""
+  cs_entry_append "d" "old1" "1000" "dormant" "" "local" ""
+  cs_entry_append "e" "old2" "2000" "dormant" "" "local" ""
+  cs_entry_append "f" "hidden" "${now}" "dormant" "" "local" ""
+  HIDDEN_SET[f]=1
+  cs_sort_entries
+  local got="${ENTRIES_ID[*]}"
+  [[ "${got}" == "c b a f e d" ]] || { echo "    order: expected 'c b a f e d', got '${got}'"; return 1; }
+}
+
 test_normalize_pwd_exits_on_missing() {
   local dead_dir="${TEST_TMP}/dead-$$"
   mkdir "${dead_dir}"
@@ -2282,6 +2328,8 @@ main() {
   run_test "tmux_conf tilde expansion"   test_config_tmux_conf_tilde
   run_test "unnamed session name cache"  test_resolve_name_unnamed_cache
   run_test "out-var helpers"             test_out_var_helpers
+  run_test "sort memo"                   test_sort_memo
+  run_test "sort entries order"          test_sort_entries_order
 
   echo ""
   echo "══════════════════════════════════"
