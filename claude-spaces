@@ -666,12 +666,6 @@ cs_cache_restore() {
 }
 
 # ── Session Discovery ─────────────────────────────
-cs_get_project_dir() {
-  local sanitized
-  sanitized=$(cs_sanitize_path "${PWD}")
-  echo "${PROJECTS_DIR}/${sanitized}"
-}
-
 cs_clean_message() {
   local msg="$1"
   # First line only
@@ -733,8 +727,7 @@ cs_check_new_pane() {
 
 cs_scan_sessions() {
   cs_refresh_pane_cache
-  local project_dir
-  project_dir=$(cs_get_project_dir)
+  local project_dir="${PROJECTS_DIR}/${PWD_SANITIZED}"
 
   cs_entry_clear
   cs_load_shared_maps
@@ -775,7 +768,7 @@ cs_scan_sessions() {
         local rsid
         rsid=$(jq -r '.sessionId' "${SESSIONS_DIR}/${pp}.json" 2>/dev/null)
         local pdir
-        pdir=$(cs_get_project_dir)
+        pdir="${PROJECTS_DIR}/${PWD_SANITIZED}"
         if [[ -n "${rsid}" && -f "${pdir}/${rsid}.jsonl" ]]; then
           echo "${rsid}" > "${f}"
           rm -f "${STATE_DIR}/new_pane"
@@ -1338,7 +1331,7 @@ cs_discover_inactive() {
   INACTIVE_PROJECTS=()
   # Build set of active sanitized paths (current + remote servers)
   local -A active_set
-  active_set["$(cs_sanitize_path "${PWD}")"]=1
+  active_set["${PWD_SANITIZED}"]=1
   for entry in "${REMOTE_SERVERS[@]}"; do
     active_set["$(cs_sanitize_path "${entry#*|}")"]=1
   done
