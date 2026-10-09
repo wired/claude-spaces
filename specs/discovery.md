@@ -41,7 +41,7 @@ Local sessions rescanned every 1 second. Fingerprint comparison (IDs, statuses, 
 
 ### Pane Existence Checking
 
-Uses `_tmux list-panes -a -F '#{pane_id}'` with a cached result (`LIVE_PANES`). Pure bash string matching — no subprocess per check. Cache refreshed once per scan cycle. `tmux display-message -t PANE_ID` is NOT reliable for existence checks (falls back to current pane on miss).
+Uses `_tmux list-panes -a -F '#{pane_id}'` with a cached result (`LIVE_PANES`). Pure bash string matching — no subprocess per check. Cache refreshed once per scan cycle. `tmux display-message -t PANE_ID` is NOT reliable for existence checks (falls back to current pane on miss). The same tmux call also reads the picker's `#{pane_active}` into `PICKER_ACTIVE`, which the once-per-second fingerprint check uses instead of its own query (render and key handling still query focus directly).
 
 ## Remote Discovery
 

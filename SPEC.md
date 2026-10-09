@@ -217,7 +217,7 @@ See README.md for the full list of options and their defaults.
   marks filler panes with `set -p @cs_filler` and queries them via `#{?@cs_filler,…}`; `set -p`
   is the binding constraint on the minimum version)
 - **jq** (session metadata extraction from JSONL)
-- **coreutils**: `stat`, `date`, `sed`, `sort`, `head`
+- **coreutils**: `stat`, `sed`, `sort`, `head`
 
 ## Detailed Specs
 
