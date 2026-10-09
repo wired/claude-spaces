@@ -1274,7 +1274,7 @@ test_discover_remote_servers() {
   # Create a second tmux server
   local remote_server="cs-fake-remote-$$"
   local remote_sanitized="-fake-remote-$$"
-  local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-$(id -u)}"
+  local socket_dir="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)"
   local remote_state="${CS_STATE_ROOT}/${remote_sanitized}"
   mkdir -p "${remote_state}"
   echo "/tmp/fake-remote-project" > "${remote_state}/project_path"
@@ -1314,6 +1314,24 @@ test_discover_remote_servers() {
   [[ -n "${socket_dir}" && -n "${remote_server}" ]] && rm -f "${socket_dir}/${remote_server}"
   rm -rf "${remote_state}" "/tmp/fake-remote-project"
   rm -f "${CS_STATE_ROOT}/.servers/${remote_server}"
+}
+
+test_discover_servers_tmux_tmpdir() {
+  local tmpdir="/tmp/cs-tt-$$"
+  local remote_server="cs-tmpdir-remote-$$"
+  local remote_state="${CS_STATE_ROOT}/-tmpdir-remote-$$"
+  local remote_path="${TEST_TMP}/tmpdir-remote-project"
+  mkdir -p "${tmpdir}" "${remote_state}" "${remote_path}" "${CS_STATE_ROOT}/.servers"
+  echo "${remote_path}" > "${remote_state}/project_path"
+  ln -snf "${remote_state}" "${CS_STATE_ROOT}/.servers/${remote_server}"
+  TMUX_TMPDIR="${tmpdir}" command tmux -L "${remote_server}" new-session -d -s test "sleep 99999"
+  sleep 0.05
+  local found
+  found=$(export TMUX_TMPDIR="${tmpdir}"; cs_discover_servers; printf '%s\n' "${REMOTE_SERVERS[@]}")
+  TMUX_TMPDIR="${tmpdir}" command tmux -L "${remote_server}" kill-server 2>/dev/null
+  rm -rf "${tmpdir}" "${remote_state}" "${remote_path}"
+  rm -f "${CS_STATE_ROOT}/.servers/${remote_server}"
+  [[ $'\n'"${found}"$'\n' == *$'\n'"${remote_server}|${remote_path}"$'\n'* ]] || { echo "    not found under TMUX_TMPDIR: '${found}'"; return 1; }
 }
 
 test_discover_inactive_projects() {
@@ -2436,6 +2454,7 @@ main() {
   run_test "read state into"             test_read_state_into
   run_test "inactive cwd cache"          test_inactive_cwd_cache
   run_test "unnamed cache settle margin" test_resolve_name_settle_margin
+  run_test "discover under TMUX_TMPDIR"  test_discover_servers_tmux_tmpdir
 
   echo ""
   echo "══════════════════════════════════"

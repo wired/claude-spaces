@@ -1309,7 +1309,7 @@ cs_remote_scan_needed() {
 
 cs_discover_servers() {
   REMOTE_SERVERS=()
-  local socket_dir="${TMUX_TMPDIR:-/tmp/tmux-${EUID}}"
+  local socket_dir="${TMUX_TMPDIR:-/tmp}/tmux-${EUID}"
   [[ -d "${socket_dir}" ]] || return 0
   local my_server="${TMUX_SERVER}"
   for sock in "${socket_dir}"/cs-*; do
