@@ -1096,6 +1096,30 @@ test_resolve_name_unnamed_cache() {
   [[ -z "${UNNAMED_AT[${sid2}]:-}" ]] || { echo "    UNNAMED_AT set for unsettled mtime"; return 1; }
 }
 
+test_resolve_name_settle_margin() {
+  local sid="eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+  local f="${MOCK_PROJECT_DIR}/${sid}.jsonl"
+  local name mt T n
+  printf '{"type":"summary","summary":"new"}\n' > "${f}"
+  # Start at the top of a fresh second T
+  printf -v T '%(%s)T' -1
+  while printf -v n '%(%s)T' -1; ((n == T)); do sleep 0.005; done
+  T=${n}
+  touch -d "@$((T - 1))" "${f}"
+  jq() {
+    command jq "$@"
+    printf '{"type":"user","message":{"role":"user","content":"usable message"}}\n' >> "${f}"
+    touch -d "@$((T - 1))" "${f}"
+    while printf -v n '%(%s)T' -1; ((n <= T)); do sleep 0.01; done
+  }
+  cs_resolve_name "${sid}" "${f}" name "$((T - 1))"
+  unset -f jq
+  [[ -z "${UNNAMED_AT[${sid}]:-}" ]] || { echo "    cached mtime $((T - 1)), which a later write still carries"; return 1; }
+  read -r mt _ < <(_cs_stat "${f}")
+  cs_resolve_name "${sid}" "${f}" name "${mt}"
+  [[ "${name}" == "usable message" ]] || { echo "    write missed: got '${name}'"; return 1; }
+}
+
 test_out_var_helpers() {
   local age idx fp pair
   NOW=1000000
@@ -2411,6 +2435,7 @@ main() {
   run_test "pane cache focus"            test_pane_cache_focus
   run_test "read state into"             test_read_state_into
   run_test "inactive cwd cache"          test_inactive_cwd_cache
+  run_test "unnamed cache settle margin" test_resolve_name_settle_margin
 
   echo ""
   echo "══════════════════════════════════"

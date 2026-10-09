@@ -683,6 +683,8 @@ cs_resolve_name() {
     return
   fi
   local _rn=""
+  local _now
+  printf -v _now '%(%s)T' -1
   if [[ -z "${_mt}" || "${UNNAMED_AT[${sid}]:-}" != "${_mt}" ]]; then
     _rn=$(head -20 "${jsonl}" | jq -r '
       select(.type == "user" and (.message.content | type) == "string" and (((.message.content | startswith("<local-command-")) or (.message.content | startswith("<command-"))) | not))
@@ -695,9 +697,8 @@ cs_resolve_name() {
   fi
   if [[ -z "${_rn}" || ${#_rn} -lt 3 ]]; then
     _rn="${sid:0:8}"
-    local _now
-    printf -v _now '%(%s)T' -1
-    [[ -n "${_mt}" ]] && ((_mt < _now)) && UNNAMED_AT["${sid}"]="${_mt}"
+    # _now predates the read, and mtimes can trail it by a tick: only cache 2s-old mtimes
+    [[ -n "${_mt}" ]] && ((_mt < _now - 1)) && UNNAMED_AT["${sid}"]="${_mt}"
   else
     cs_set_kv "${NAMES_FILE}" "${sid}" "${_rn}"
     CUSTOM_NAMES["${sid}"]="${_rn}"
