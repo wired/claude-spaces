@@ -2805,6 +2805,7 @@ cs_picker_loop() {
           rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height,.width,.orient}
         fi
       fi
+      # PICKER_ACTIVE is from cs_rescan above: nothing between it and here may change focus
       local fp
       cs_fingerprint fp "${PICKER_ACTIVE}"
       if [[ "${fp}" != "${LAST_FINGERPRINT}" ]]; then
