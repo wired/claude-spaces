@@ -1141,6 +1141,28 @@ test_sort_memo() {
   [[ "${out}" == "${expect}" ]] || { echo "    numeric: output differs from sort"; return 1; }
 }
 
+test_pane_cache_focus() {
+  local plain direct
+  plain=$(_tmux list-panes -a -F '#{pane_id}')
+  direct=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}')
+
+  cs_refresh_pane_cache
+  [[ "${LIVE_PANES}" == "${plain}" ]] || { echo "    live picker: LIVE_PANES differs from list-panes"; return 1; }
+  [[ "${PICKER_ACTIVE}" == "${direct}" ]] || { echo "    live picker: PICKER_ACTIVE '${PICKER_ACTIVE}', expected '${direct}'"; return 1; }
+
+  local saved="${PICKER_PANE}"
+  PICKER_PANE=""
+  cs_refresh_pane_cache
+  [[ "${LIVE_PANES}" == "${plain}" ]] || { echo "    empty picker: LIVE_PANES differs from list-panes"; PICKER_PANE="${saved}"; return 1; }
+  [[ -z "${PICKER_ACTIVE}" ]] || { echo "    empty picker: PICKER_ACTIVE set to '${PICKER_ACTIVE}'"; PICKER_PANE="${saved}"; return 1; }
+
+  PICKER_PANE="%999999"
+  cs_refresh_pane_cache
+  PICKER_PANE="${saved}"
+  [[ "${LIVE_PANES}" == "${plain}" ]] || { echo "    dead picker: LIVE_PANES differs from list-panes: '${LIVE_PANES}'"; return 1; }
+  [[ -z "${PICKER_ACTIVE}" ]] || { echo "    dead picker: PICKER_ACTIVE set to '${PICKER_ACTIVE}'"; return 1; }
+}
+
 test_sort_entries_order() {
   local now
   printf -v now '%(%s)T' -1
@@ -2330,6 +2352,7 @@ main() {
   run_test "out-var helpers"             test_out_var_helpers
   run_test "sort memo"                   test_sort_memo
   run_test "sort entries order"          test_sort_entries_order
+  run_test "pane cache focus"            test_pane_cache_focus
 
   echo ""
   echo "══════════════════════════════════"

@@ -443,8 +443,21 @@ cs_rename_pane_window() {
 }
 
 LIVE_PANES=""
+PICKER_ACTIVE=""
 cs_refresh_pane_cache() {
-  LIVE_PANES=$(_tmux list-panes -a -F '#{pane_id}' 2>/dev/null || true)
+  PICKER_ACTIVE=""
+  if [[ -z "${PICKER_PANE:-}" ]]; then
+    LIVE_PANES=$(_tmux list-panes -a -F '#{pane_id}' 2>/dev/null || true)
+    return 0
+  fi
+  local _o _last
+  _o=$(_tmux list-panes -a -F '#{pane_id}' \; display-message -t "${PICKER_PANE}" -p 'F#{pane_active}' 2>/dev/null || true)
+  _last="${_o##*$'\n'}"
+  if [[ "${_last}" == F* ]]; then
+    PICKER_ACTIVE="${_last#F}"
+    _o="${_o%$'\n'*}"
+  fi
+  LIVE_PANES="${_o}"
 }
 cs_pane_alive() {
   [[ $'\n'"${LIVE_PANES}"$'\n' == *$'\n'"$1"$'\n'* ]]
@@ -1499,8 +1512,8 @@ cs_after_remove() {
 }
 
 cs_fingerprint() {
-  local _out="$1" _pf
-  _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+  local _out="$1" _pf="${2:-}"
+  [[ -n "${_pf}" ]] || _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
   local _fpv="focus:${_pf}|menu:${MENU_ACTIVE}|search:${SEARCH_ACTIVE}:${SEARCH_TERM}:${SEARCH_FIELD_FOCUSED}|"
   for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
     _fpv+="${ENTRIES_ID[${fi}]}:${ENTRIES_STATUS[${fi}]}:${ENTRIES_MTIME[${fi}]}:${ENTRIES_TYPE[${fi}]}|"
@@ -2788,7 +2801,7 @@ cs_picker_loop() {
         fi
       fi
       local fp
-      cs_fingerprint fp
+      cs_fingerprint fp "${PICKER_ACTIVE}"
       if [[ "${fp}" != "${LAST_FINGERPRINT}" ]]; then
         LAST_FINGERPRINT="${fp}"
         DIRTY=1
