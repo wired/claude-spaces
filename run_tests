@@ -1058,6 +1058,60 @@ test_symlinked_cwd_finds_sessions() {
   ((ok)) || return 1
 }
 
+test_resolve_name_unnamed_cache() {
+  local sid="cccccccc-cccc-cccc-cccc-cccccccccccc"
+  local f="${MOCK_PROJECT_DIR}/${sid}.jsonl"
+  local name mt
+  cs_create_mock_session "${sid}" "hi"
+  touch -d "2 hours ago" "${f}"
+  read -r mt _ < <(_cs_stat "${f}")
+  cs_resolve_name "${sid}" "${f}" name "${mt}"
+  [[ "${name}" == "${sid:0:8}" ]] || { echo "    unnamed: expected '${sid:0:8}', got '${name}'"; return 1; }
+  [[ "${UNNAMED_AT[${sid}]:-}" == "${mt}" ]] || { echo "    UNNAMED_AT not set to ${mt}: '${UNNAMED_AT[${sid}]:-}'"; return 1; }
+
+  # Same mtime: lookup is skipped, so the new message is not seen
+  cs_create_mock_session "${sid}" "usable message"
+  touch -d "@${mt}" "${f}"
+  cs_resolve_name "${sid}" "${f}" name "${mt}"
+  [[ "${name}" == "${sid:0:8}" ]] || { echo "    cached: expected '${sid:0:8}', got '${name}'"; return 1; }
+
+  # New mtime: lookup runs again
+  touch -d "1 hour ago" "${f}"
+  read -r mt _ < <(_cs_stat "${f}")
+  cs_resolve_name "${sid}" "${f}" name "${mt}"
+  [[ "${name}" == "usable message" ]] || { echo "    after write: expected 'usable message', got '${name}'"; return 1; }
+  [[ "${CUSTOM_NAMES[${sid}]:-}" == "usable message" ]] || { echo "    CUSTOM_NAMES not set"; return 1; }
+
+  # mtime not yet in the past: not cached (future mtime keeps this deterministic)
+  local sid2="dddddddd-dddd-dddd-dddd-dddddddddddd"
+  local f2="${MOCK_PROJECT_DIR}/${sid2}.jsonl"
+  cs_create_mock_session "${sid2}" "hi"
+  touch -d "1 hour" "${f2}"
+  read -r mt _ < <(_cs_stat "${f2}")
+  cs_resolve_name "${sid2}" "${f2}" name "${mt}"
+  [[ -z "${UNNAMED_AT[${sid2}]:-}" ]] || { echo "    UNNAMED_AT set for unsettled mtime"; return 1; }
+}
+
+test_out_var_helpers() {
+  local age idx fp pair
+  NOW=1000000
+  for pair in "30 <1m" "300 5m" "10800 3h" "172800 2d" "604800 1w"; do
+    cs_format_age "$((NOW - ${pair%% *}))" age
+    [[ "${age}" == "${pair#* }" ]] || { echo "    format_age ${pair%% *}s: expected '${pair#* }', got '${age}'"; return 1; }
+  done
+
+  cs_entry_clear
+  cs_entry_append "x" "" "0" "" "" "local" ""
+  cs_entry_append "y" "" "0" "" "" "local" ""
+  cs_find_entry_index "y" idx
+  [[ "${idx}" == "1" ]] || { echo "    find_entry_index hit: expected 1, got '${idx}'"; return 1; }
+  cs_find_entry_index "z" idx
+  [[ "${idx}" == "-1" ]] || { echo "    find_entry_index miss: expected -1, got '${idx}'"; return 1; }
+
+  cs_fingerprint fp
+  [[ "${fp}" == focus:* ]] || { echo "    fingerprint: expected 'focus:...', got '${fp}'"; return 1; }
+}
+
 test_normalize_pwd_exits_on_missing() {
   local dead_dir="${TEST_TMP}/dead-$$"
   mkdir "${dead_dir}"
@@ -2226,6 +2280,8 @@ main() {
   run_test "state root symlink guard"    test_state_root_symlink_guard
   run_test "state root config key"       test_config_state_root
   run_test "tmux_conf tilde expansion"   test_config_tmux_conf_tilde
+  run_test "unnamed session name cache"  test_resolve_name_unnamed_cache
+  run_test "out-var helpers"             test_out_var_helpers
 
   echo ""
   echo "══════════════════════════════════"

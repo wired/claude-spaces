@@ -421,7 +421,7 @@ cs_init_state() {
   ln -snf "${STATE_DIR}" "${CS_STATE_ROOT}/.servers/${TMUX_SERVER}"
 }
 
-cs_read_state() { cat "${STATE_DIR}/$1" 2>/dev/null || true; }
+cs_read_state() { { local v; v=$(< "${STATE_DIR}/$1"); } 2>/dev/null || return 0; printf '%s' "${v}"; }
 
 _cs_find_session_pid() {
   local pid="$1"
@@ -477,6 +477,7 @@ cs_entry_clear() {
 declare -gA HIDDEN_SET
 declare -gA CUSTOM_NAMES
 declare -gA PROJECT_NAMES
+declare -gA UNNAMED_AT
 
 cs_load_shared_maps() {
   HIDDEN_SET=()
@@ -662,27 +663,32 @@ cs_clean_message() {
 }
 
 cs_resolve_name() {
-  local sid="$1" jsonl="$2"
+  local sid="$1" jsonl="$2" _out="$3" _mt="$4"
   if [[ -n "${CUSTOM_NAMES[${sid}]:-}" ]]; then
-    echo "${CUSTOM_NAMES[${sid}]}"
+    printf -v "${_out}" '%s' "${CUSTOM_NAMES[${sid}]}"
     return
   fi
-  local name
-  name=$(head -20 "${jsonl}" | jq -r '
-    select(.type == "user" and (.message.content | type) == "string" and (((.message.content | startswith("<local-command-")) or (.message.content | startswith("<command-"))) | not))
-    | .message.content
-    | split("\n")[0]
-  ' 2>/dev/null | head -1)
-  if [[ -n "${name}" ]]; then
-    name=$(cs_clean_message "${name}")
+  local _rn=""
+  if [[ -z "${_mt}" || "${UNNAMED_AT[${sid}]:-}" != "${_mt}" ]]; then
+    _rn=$(head -20 "${jsonl}" | jq -r '
+      select(.type == "user" and (.message.content | type) == "string" and (((.message.content | startswith("<local-command-")) or (.message.content | startswith("<command-"))) | not))
+      | .message.content
+      | split("\n")[0]
+    ' 2>/dev/null | head -1)
+    if [[ -n "${_rn}" ]]; then
+      _rn=$(cs_clean_message "${_rn}")
+    fi
   fi
-  if [[ -z "${name}" || ${#name} -lt 3 ]]; then
-    name="${sid:0:8}"
+  if [[ -z "${_rn}" || ${#_rn} -lt 3 ]]; then
+    _rn="${sid:0:8}"
+    local _now
+    printf -v _now '%(%s)T' -1
+    [[ -n "${_mt}" ]] && ((_mt < _now)) && UNNAMED_AT["${sid}"]="${_mt}"
   else
-    cs_set_kv "${NAMES_FILE}" "${sid}" "${name}"
-    CUSTOM_NAMES["${sid}"]="${name}"
+    cs_set_kv "${NAMES_FILE}" "${sid}" "${_rn}"
+    CUSTOM_NAMES["${sid}"]="${_rn}"
   fi
-  echo "${name}"
+  printf -v "${_out}" '%s' "${_rn}"
 }
 
 cs_check_new_pane() {
@@ -699,7 +705,9 @@ cs_check_new_pane() {
     else
       local _label="(new session)"
       [[ -f "${STATE_DIR}/new_pane_auto_name" ]] && _label="(forked session)"
-      cs_entry_prepend "__new__" "${_label}" "$(date +%s)" "managed" "${new_p}" "local" ""
+      local _now
+      printf -v _now '%(%s)T' -1
+      cs_entry_prepend "__new__" "${_label}" "${_now}" "managed" "${new_p}" "local" ""
     fi
   fi
 }
@@ -736,7 +744,7 @@ cs_scan_sessions() {
   for f in "${STATE_DIR}"/panes/*; do
     [[ -f "${f}" ]] || continue
     local content
-    content=$(cat "${f}" 2>/dev/null)
+    { content=$(< "${f}"); } 2>/dev/null
     if [[ "${content}" == "new" ]]; then
       local pn
       pn="%${f##*/}"
@@ -771,7 +779,7 @@ cs_scan_sessions() {
     local pane_num pane_id sid
     pane_num="${f##*/}"
     pane_id="%${pane_num}"
-    sid=$(cat "${f}" 2>/dev/null) || continue
+    { sid=$(< "${f}"); } 2>/dev/null || continue
     if cs_pane_alive "${pane_id}"; then
       managed_panes["${sid}"]="${pane_id}"
     else
@@ -798,7 +806,7 @@ cs_scan_sessions() {
     local mtime="${mtimes[${f}]}"
 
     local name
-    name=$(cs_resolve_name "${sid}" "${f}")
+    cs_resolve_name "${sid}" "${f}" name "${mtime}"
     [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
 
     # Status
@@ -824,7 +832,7 @@ cs_sort_entries() {
   ((n <= 1)) && return 0
 
   local now
-  now=$(date +%s)
+  printf -v now '%(%s)T' -1
   local cutoff=$((now - RECENT_THRESHOLD * 60))
   RECENT_CUTOFF=${cutoff}
 
@@ -907,7 +915,7 @@ cs_rescan() {
   local _sel_found=0
   if [[ -n "${selected_id}" ]]; then
     local idx
-    idx=$(cs_find_entry_index "${selected_id}")
+    cs_find_entry_index "${selected_id}" idx
     if [[ "${idx}" != "-1" ]]; then
       SELECTED=${idx}
       _sel_found=1
@@ -934,14 +942,14 @@ cs_rescan() {
 }
 
 cs_find_entry_index() {
-  local target_id="$1"
+  local target_id="$1" _out="$2"
   for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
     if [[ "${ENTRIES_ID[${fi}]}" == "${target_id}" ]]; then
-      echo "${fi}"
+      printf -v "${_out}" '%s' "${fi}"
       return
     fi
   done
-  echo "-1"
+  printf -v "${_out}" '%s' "-1"
 }
 
 cs_find_entry_by_pane() {
@@ -1085,7 +1093,7 @@ cs_search_apply_filter() {
   local new_n=${#ENTRIES_ID[@]}
   if [[ -n "${selected_id}" ]]; then
     local idx
-    idx=$(cs_find_entry_index "${selected_id}")
+    cs_find_entry_index "${selected_id}" idx
     if [[ "${idx}" != "-1" ]]; then
       SELECTED=${idx}
       SCROLL=0
@@ -1137,7 +1145,7 @@ cs_search_exit() {
   # Remap SELECTED in the full list
   if [[ -n "${selected_id}" ]]; then
     local idx
-    idx=$(cs_find_entry_index "${selected_id}")
+    cs_find_entry_index "${selected_id}" idx
     if [[ "${idx}" != "-1" ]]; then
       SELECTED=${idx}
       DIRTY=1
@@ -1266,7 +1274,7 @@ cs_search_move_up() {
 
 cs_remote_scan_needed() {
   local now
-  now=$(date +%s)
+  printf -v now '%(%s)T' -1
   ((now - LAST_REMOTE_SCAN >= 5))
 }
 
@@ -1361,7 +1369,7 @@ cs_scan_project_sessions() {
     [[ -v "HIDDEN_SET[${sid}]" ]] && ((! SHOW_HIDDEN)) && continue
     local mtime="${r_mtimes_map[${f}]}"
     local name
-    name=$(cs_resolve_name "${sid}" "${f}")
+    cs_resolve_name "${sid}" "${f}" name "${mtime}"
     [[ -v "HIDDEN_SET[${sid}]" ]] && name="[h] ${name}"
     local rstatus="dormant"
     [[ -v "remote_managed[${sid}]" ]] && rstatus="managed"
@@ -1394,7 +1402,7 @@ cs_build_all_entries() {
   if cs_remote_scan_needed; then
     cs_discover_servers
     cs_discover_inactive
-    LAST_REMOTE_SCAN=$(date +%s)
+    printf -v LAST_REMOTE_SCAN '%(%s)T' -1
 
     # Recompute display names if project set changed
     local _path_set="${PWD}"
@@ -1476,28 +1484,28 @@ cs_after_remove() {
 }
 
 cs_fingerprint() {
-  local pf
-  pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
-  local fp="focus:${pf}|menu:${MENU_ACTIVE}|search:${SEARCH_ACTIVE}:${SEARCH_TERM}:${SEARCH_FIELD_FOCUSED}|"
+  local _out="$1" _pf
+  _pf=$(_tmux display-message -t "${PICKER_PANE}" -p '#{pane_active}' 2>/dev/null || echo "1")
+  local _fpv="focus:${_pf}|menu:${MENU_ACTIVE}|search:${SEARCH_ACTIVE}:${SEARCH_TERM}:${SEARCH_FIELD_FOCUSED}|"
   for ((fi=0; fi < ${#ENTRIES_ID[@]}; fi++)); do
-    fp+="${ENTRIES_ID[${fi}]}:${ENTRIES_STATUS[${fi}]}:${ENTRIES_MTIME[${fi}]}:${ENTRIES_TYPE[${fi}]}|"
+    _fpv+="${ENTRIES_ID[${fi}]}:${ENTRIES_STATUS[${fi}]}:${ENTRIES_MTIME[${fi}]}:${ENTRIES_TYPE[${fi}]}|"
   done
-  echo "${fp}"
+  printf -v "${_out}" '%s' "${_fpv}"
 }
 
 # ── Age Formatting ────────────────────────────────
 cs_format_age() {
-  local diff=$((NOW - $1))
+  local diff=$((NOW - $1)) _out="$2"
   if ((diff < 60)); then
-    echo "<1m"
+    printf -v "${_out}" '%s' "<1m"
   elif ((diff < 3600)); then
-    echo "$((diff / 60))m"
+    printf -v "${_out}" '%s' "$((diff / 60))m"
   elif ((diff < 86400)); then
-    echo "$((diff / 3600))h"
+    printf -v "${_out}" '%s' "$((diff / 3600))h"
   elif ((diff < 604800)); then
-    echo "$((diff / 86400))d"
+    printf -v "${_out}" '%s' "$((diff / 86400))d"
   else
-    echo "$((diff / 604800))w"
+    printf -v "${_out}" '%s' "$((diff / 604800))w"
   fi
 }
 
@@ -1711,7 +1719,7 @@ cs_jump_to_session() {
 
 # Get terminal pane ID for a session pane (O(1) lookup)
 cs_term_pane_for() {
-  cat "${STATE_DIR}/term/${1#%}" 2>/dev/null || true
+  cs_read_state "term/${1#%}"
 }
 
 # Check if session's terminal should be visible
@@ -2255,7 +2263,7 @@ cs_menu_render() {
 }
 
 cs_picker_render() {
-  NOW=$(date +%s)
+  printf -v NOW '%(%s)T' -1
   local width height avail
   width=$(tput cols)
   height=$(tput lines)
@@ -2328,7 +2336,7 @@ cs_picker_render() {
     local pane="${ENTRIES_PANE[${i}]}"
     local entry_type="${ENTRIES_TYPE[${i}]}"
     local age
-    age=$(cs_format_age "${ENTRIES_MTIME[${i}]}")
+    cs_format_age "${ENTRIES_MTIME[${i}]}" age
     if [[ "${entry_type}" == "local" ]] && ((ENTRIES_MTIME[i] >= RECENT_CUTOFF)) \
       && ! [[ -v "HIDDEN_SET[${ENTRIES_ID[i]}]" ]]; then
       age="<${RECENT_THRESHOLD}m"
@@ -2725,7 +2733,7 @@ cs_picker_loop() {
         rm -f "${STATE_DIR}/pending_load"
         cs_rescan
         local pidx
-        pidx=$(cs_find_entry_index "${pending}")
+        cs_find_entry_index "${pending}" pidx
         if [[ "${pidx}" != "-1" ]]; then
           SELECTED=${pidx}
           cs_activate_selected
@@ -2765,7 +2773,7 @@ cs_picker_loop() {
         fi
       fi
       local fp
-      fp=$(cs_fingerprint)
+      cs_fingerprint fp
       if [[ "${fp}" != "${LAST_FINGERPRINT}" ]]; then
         LAST_FINGERPRINT="${fp}"
         DIRTY=1
@@ -2778,7 +2786,7 @@ cs_picker_loop() {
     if ((DIRTY)); then
       cs_picker_render
       DIRTY=0
-      LAST_FINGERPRINT=$(cs_fingerprint)
+      cs_fingerprint LAST_FINGERPRINT
     fi
   done
 }
