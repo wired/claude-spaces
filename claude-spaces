@@ -421,7 +421,12 @@ cs_init_state() {
   ln -snf "${STATE_DIR}" "${CS_STATE_ROOT}/.servers/${TMUX_SERVER}"
 }
 
-cs_read_state() { { local v; v=$(< "${STATE_DIR}/$1"); } 2>/dev/null || return 0; printf '%s' "${v}"; }
+cs_read_state_into() {
+  local _v=""
+  { _v=$(< "${STATE_DIR}/$2"); } 2>/dev/null
+  printf -v "$1" '%s' "${_v}"
+}
+cs_read_state() { local _rs; cs_read_state_into _rs "$1"; printf '%s' "${_rs}"; }
 
 _cs_find_session_pid() {
   local pid="$1"
@@ -707,7 +712,7 @@ cs_resolve_name() {
 
 cs_check_new_pane() {
   local new_p
-  new_p=$(cs_read_state new_pane)
+  cs_read_state_into new_p new_pane
   if [[ -n "${new_p}" ]]; then
     if ! cs_pane_alive "${new_p}"; then
       rm -f "${STATE_DIR}/new_pane" "${STATE_DIR}/panes/${new_p#%}" "${STATE_DIR}/new_pane_auto_name"
@@ -2756,7 +2761,7 @@ cs_picker_loop() {
       fi
       # Timeout — check pending load, poll bells, rescan sessions
       local pending
-      pending=$(cs_read_state pending_load)
+      cs_read_state_into pending pending_load
       if [[ -n "${pending}" ]]; then
         rm -f "${STATE_DIR}/pending_load"
         cs_rescan
@@ -2792,7 +2797,7 @@ cs_picker_loop() {
       # Check if current session's terminal died externally
       # (must be after cs_rescan which refreshes the pane cache)
       local _cur_pane
-      _cur_pane=$(cs_read_state current_pane)
+      cs_read_state_into _cur_pane current_pane
       if [[ -n "${_cur_pane}" ]] && cs_term_is_shown "${_cur_pane}"; then
         local _tp
         _tp=$(cs_term_pane_for "${_cur_pane}")

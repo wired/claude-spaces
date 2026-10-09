@@ -1163,6 +1163,23 @@ test_pane_cache_focus() {
   [[ -z "${PICKER_ACTIVE}" ]] || { echo "    dead picker: PICKER_ACTIVE set to '${PICKER_ACTIVE}'"; return 1; }
 }
 
+test_read_state_into() {
+  local v rc
+  printf 'a\nb\n\n' > "${STATE_DIR}/rsi_multi"
+  rm -f "${STATE_DIR}/rsi_missing"
+
+  cs_read_state_into v rsi_multi
+  [[ "${v}" == $'a\nb' ]] || { echo "    present: got '${v}'"; return 1; }
+  cs_read_state_into v rsi_missing
+  [[ -z "${v}" ]] || { echo "    missing: stale value kept: '${v}'"; return 1; }
+
+  v=$(cs_read_state rsi_multi); rc=$?
+  [[ "${v}" == $'a\nb' && ${rc} -eq 0 ]] || { echo "    cs_read_state present: '${v}' rc=${rc}"; return 1; }
+  v=$(cs_read_state rsi_missing); rc=$?
+  [[ -z "${v}" && ${rc} -eq 0 ]] || { echo "    cs_read_state missing: '${v}' rc=${rc}"; return 1; }
+  rm -f "${STATE_DIR}/rsi_multi"
+}
+
 test_sort_entries_order() {
   local now
   printf -v now '%(%s)T' -1
@@ -2353,6 +2370,7 @@ main() {
   run_test "sort memo"                   test_sort_memo
   run_test "sort entries order"          test_sort_entries_order
   run_test "pane cache focus"            test_pane_cache_focus
+  run_test "read state into"             test_read_state_into
 
   echo ""
   echo "══════════════════════════════════"
