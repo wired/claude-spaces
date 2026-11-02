@@ -55,6 +55,25 @@ stored ratio on the next SIGWINCH.
 `cs_term_hide` still breaks a hidden terminal out into its own `cs:term` window. Those windows are
 untagged, so the reaper spares them.
 
+### Terminal sizing
+
+`cs_handle_winch` re-fits the current session's terminal on every SIGWINCH. Its preferred size is
+`terminal_width`/`terminal_height`, or for a percentage the saved `term/<num>.width`/`.height`
+share. It **fits** when that leaves Claude at least `min_claude_width`/`min_claude_height`.
+
+- Fits: resize to the preferred size and drop `term/<num>.keep`.
+- Doesn't fit, percentage: squeeze the terminal so Claude keeps its minimum.
+- Doesn't fit, fixed size, no `.keep`: hide it (`cs_term_autohide`), focusing Claude if the
+  terminal had focus. A fixed size never saves its size, so only a resize (or a config change
+  picked up by `R`) can take its room away.
+- Doesn't fit, fixed size, `.keep`: squeeze it. `.keep` is written by the clamp in
+  `cs_term_compute_width`/`_height`, which only runs when the terminal is shown: the user opened
+  it without room.
+
+When even Claude's minimum doesn't fit, the terminal drops to its floor (10 columns / 3 rows).
+Percentage saves (`cs_term_save_width`/`_height`) skip a split where Claude is at or below its
+minimum, so a squeezed terminal or a drag past the minimum never becomes the saved preference.
+
 ### Fillers permute
 
 `swap-pane` deposits the target's filler into the picker's *previous* window. Fillers are

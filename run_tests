@@ -352,6 +352,9 @@ cs_test_setup() {
   # Reduce dormant-activate sleep for tests
   CS_ACTIVATE_DELAY=0.05
 
+  # The 120-column test window can't fit a side terminal next to the default minimum (60)
+  MIN_CLAUDE_WIDTH=10
+
   # Initialize globals
   SELECTED=0
   SCROLL=0
@@ -1724,7 +1727,7 @@ test_term_dies_externally() {
     local tp
     tp=$(cs_term_pane_for "${pane_a}")
     if [[ -n "${tp}" ]] && ! cs_pane_alive "${tp}"; then
-      rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height,.width,.orient}
+      rm -f "${STATE_DIR}/term/${pane_a#%}"{,.shown,.height,.width,.orient,.keep}
     fi
   fi
 
@@ -1800,7 +1803,7 @@ test_term_across_reload() {
     local tpid
     tpid=$(cat "${f}" 2>/dev/null || true)
     if [[ -n "${tpid}" ]] && ! cs_pane_alive "${tpid}"; then
-      rm -f "${f}" "${f}.shown" "${f}.height" "${f}.width" "${f}.orient"
+      rm -f "${f}" "${f}.shown" "${f}.height" "${f}.width" "${f}.orient" "${f}.keep"
     fi
   done
 
@@ -2226,6 +2229,165 @@ test_term_min_claude_height() {
   cs_assert_consistent "min_claude_height"
 }
 
+test_term_fixed_autohide() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  TERMINAL_WIDTH=30
+  MIN_CLAUDE_WIDTH=40
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  cs_term_smart side
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  local tw
+  tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null)
+  [[ "${tw}" == "30" ]] || { echo "    term width=${tw}, expected 30"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.keep" ]] || { echo "    .keep set though it fits"; return 1; }
+
+  _tmux select-pane -t "${term_pane}" 2>/dev/null
+  _tmux resize-window -x 100 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after shrink"; return 1; }
+  pane_alive "${term_pane}" || { echo "    term pane killed, expected parked"; return 1; }
+  local active
+  active=$(_tmux display-message -p '#{pane_id}' 2>/dev/null)
+  [[ "${active}" == "${pane_a}" ]] || { echo "    expected focus on claude, got ${active}"; return 1; }
+
+  cs_assert_consistent "term_fixed_autohide"
+}
+
+test_term_fixed_reopen_kept() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  TERMINAL_WIDTH=30
+  MIN_CLAUDE_WIDTH=40
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  cs_term_smart side
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  _tmux resize-window -x 100 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after shrink"; return 1; }
+
+  cs_term_smart
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after reopen"; return 1; }
+  [[ -f "${STATE_DIR}/term/${pane_a#%}.keep" ]] || { echo "    .keep not set on reopen without room"; return 1; }
+  local sw
+  sw=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  [[ "${sw}" == "40" ]] || { echo "    claude width=${sw}, expected 40 after reopen"; return 1; }
+
+  _tmux resize-window -x 90 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    hidden after further shrink, expected kept"; return 1; }
+  sw=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  [[ "${sw}" == "40" ]] || { echo "    claude width=${sw}, expected 40 after further shrink"; return 1; }
+
+  _tmux resize-window -x 120 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.keep" ]] || { echo "    .keep not cleared once it fits"; return 1; }
+  local tw
+  tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null)
+  [[ "${tw}" == "30" ]] || { echo "    term width=${tw}, expected 30 once it fits"; return 1; }
+
+  _tmux resize-window -x 100 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after shrinking again"; return 1; }
+
+  cs_assert_consistent "term_fixed_reopen_kept"
+}
+
+test_term_fixed_autohide_bottom() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  TERMINAL_HEIGHT=10
+  MIN_CLAUDE_HEIGHT=20
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  cs_term_smart bottom
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  local th
+  th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null)
+  [[ "${th}" == "10" ]] || { echo "    term height=${th}, expected 10"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.keep" ]] || { echo "    .keep set though it fits"; return 1; }
+
+  _tmux resize-window -y 25 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after shrink"; return 1; }
+  pane_alive "${term_pane}" || { echo "    term pane killed, expected parked"; return 1; }
+
+  cs_assert_consistent "term_fixed_autohide_bottom"
+}
+
+test_term_percent_squeeze() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  MIN_CLAUDE_WIDTH=30
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  cs_term_smart side
+  sleep 0.05
+  local saved
+  saved=$(cat "${STATE_DIR}/term/${pane_a#%}.width" 2>/dev/null || true)
+  [[ "${saved}" == "45%" ]] || { echo "    saved width=${saved}, expected 45%"; return 1; }
+
+  _tmux resize-window -x 80 2>/dev/null || true
+  sleep 0.05
+  cs_handle_winch
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    hidden after shrink, percentages never hide"; return 1; }
+  [[ ! -f "${STATE_DIR}/term/${pane_a#%}.keep" ]] || { echo "    .keep set for a percentage"; return 1; }
+  local sw
+  sw=$(_tmux display-message -t "${pane_a}" -p '#{pane_width}' 2>/dev/null)
+  [[ "${sw}" == "30" ]] || { echo "    claude width=${sw}, expected 30"; return 1; }
+
+  cs_term_toggle
+  sleep 0.05
+  saved=$(cat "${STATE_DIR}/term/${pane_a#%}.width" 2>/dev/null || true)
+  [[ "${saved}" == "45%" ]] || { echo "    saved width=${saved} after hiding squeezed, expected 45%"; return 1; }
+
+  cs_assert_consistent "term_percent_squeeze"
+}
+
 test_session_dies_externally_with_term() {
   local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
   cs_create_mock_session "${sid}" "session A"
@@ -2519,6 +2681,10 @@ main() {
   run_test "term side WINCH re-pin"      test_term_side_winch_repin
   run_test "term min claude width"       test_term_min_claude_width
   run_test "term min claude height"      test_term_min_claude_height
+  run_test "term fixed autohide"         test_term_fixed_autohide
+  run_test "term fixed reopen kept"      test_term_fixed_reopen_kept
+  run_test "term fixed autohide bottom"  test_term_fixed_autohide_bottom
+  run_test "term percent squeeze"        test_term_percent_squeeze
   run_test "session dies with term"      test_session_dies_externally_with_term
   run_test "session dies resume cleans"  test_session_dies_resume_cleans_orphan
 

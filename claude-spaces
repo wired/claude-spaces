@@ -86,7 +86,7 @@ TMUX_SERVER=$(cs_server_name "$PWD")
 TMUX_CONF="${HOME}/.tmux.conf"
 TERMINAL_HEIGHT="35%"
 TERMINAL_WIDTH="45%"
-MIN_CLAUDE_WIDTH=10
+MIN_CLAUDE_WIDTH=60
 MIN_CLAUDE_HEIGHT=10
 SHOW_INDEX=1
 CS_PREFIX=""
@@ -247,14 +247,18 @@ cs_create_default_config() {
 # project; `claude-spaces --reset` clears the current project's.
 # state_root=~/.local/state/claude-spaces
 
-# Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%).
+# A percentage shrinks with the window. A fixed height hides when a window
+# resize leaves it less than that next to min_claude_height; reopen it to
+# get what's left.
 # terminal_height=35%
 
-# Terminal pane width (side orientation): characters or percentage
+# Terminal pane width (side orientation): characters or percentage.
+# Resizes work the same way as terminal_height, against min_claude_width.
 # terminal_width=45%
 
 # Minimum Claude pane width when side terminal is open (characters)
-# min_claude_width=10
+# min_claude_width=60
 
 # Minimum Claude pane height when bottom terminal is open (characters)
 # min_claude_height=10
@@ -1779,7 +1783,11 @@ cs_term_compute_height() {
     h=$(( (pane_h * ${h%\%} + 50) / 100 ))
   fi
   local max_h=$(( pane_h - MIN_CLAUDE_HEIGHT - 1 ))
-  (( max_h > 0 && h > max_h )) && h="${max_h}"
+  rm -f "${STATE_DIR}/term/${session_pane#%}.keep"
+  if (( h > max_h )); then
+    h="${max_h}"
+    [[ "${TERMINAL_HEIGHT}" == *% ]] || echo "1" > "${STATE_DIR}/term/${session_pane#%}.keep"
+  fi
   (( h < 3 )) && h=3
   echo "${h}"
 }
@@ -1790,7 +1798,7 @@ cs_term_save_height() {
   local th sh
   th=$(_tmux display-message -t "${term_pane}" -p '#{pane_height}' 2>/dev/null || true)
   sh=$(_tmux display-message -t "${session_pane}" -p '#{pane_height}' 2>/dev/null || true)
-  if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 )); then
+  if [[ -n "${th}" && -n "${sh}" ]] && (( th + sh > 0 && sh > MIN_CLAUDE_HEIGHT )); then
     echo "$(( th * 100 / (th + sh) ))%" > "${STATE_DIR}/term/${session_pane#%}.height"
   fi
 }
@@ -1806,7 +1814,7 @@ cs_term_save_width() {
   local tw sw
   tw=$(_tmux display-message -t "${term_pane}" -p '#{pane_width}' 2>/dev/null || true)
   sw=$(_tmux display-message -t "${session_pane}" -p '#{pane_width}' 2>/dev/null || true)
-  if [[ -n "${tw}" && -n "${sw}" ]] && (( tw + sw > 0 )); then
+  if [[ -n "${tw}" && -n "${sw}" ]] && (( tw + sw > 0 && sw > MIN_CLAUDE_WIDTH )); then
     echo "$(( tw * 100 / (tw + sw) ))%" > "${STATE_DIR}/term/${session_pane#%}.width"
   fi
 }
@@ -1837,7 +1845,11 @@ cs_term_compute_width() {
     w=$(( (pane_w * ${w%\%} + 50) / 100 ))
   fi
   local max_w=$(( pane_w - MIN_CLAUDE_WIDTH - 1 ))
-  (( max_w > 0 && w > max_w )) && w="${max_w}"
+  rm -f "${STATE_DIR}/term/${session_pane#%}.keep"
+  if (( w > max_w )); then
+    w="${max_w}"
+    [[ "${TERMINAL_WIDTH}" == *% ]] || echo "1" > "${STATE_DIR}/term/${session_pane#%}.keep"
+  fi
   (( w < 10 )) && w=10
   echo "${w}"
 }
@@ -1884,7 +1896,7 @@ cs_term_show() {
 
   # No terminal or dead — create fresh
   if [[ -z "${term_pane}" ]] || ! cs_pane_alive "${term_pane}"; then
-    [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height,.width,.orient}
+    [[ -n "${term_pane}" ]] && rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height,.width,.orient,.keep}
     cs_term_create "${session_pane}" "${orient}"
     return
   fi
@@ -1956,6 +1968,16 @@ cs_term_hide() {
   rm -f "${STATE_DIR}/term/${session_pane#%}.shown"
 }
 
+cs_term_autohide() {
+  local session_pane="$1" term_pane="$2"
+  local active
+  active=$(_tmux display-message -p '#{pane_id}' 2>/dev/null || true)
+  cs_term_hide "${session_pane}"
+  if [[ "${active}" == "${term_pane}" ]]; then
+    _tmux select-pane -t "${session_pane}" 2>/dev/null || true
+  fi
+}
+
 # Kill terminal and clean up all state files.
 cs_term_kill() {
   local session_pane="$1"
@@ -1963,7 +1985,7 @@ cs_term_kill() {
   term_pane=$(cs_term_pane_for "${session_pane}")
   [[ -n "${term_pane}" ]] || return 0
   _tmux kill-pane -t "${term_pane}" 2>/dev/null || true
-  rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height,.width,.orient}
+  rm -f "${STATE_DIR}/term/${session_pane#%}"{,.shown,.height,.width,.orient,.keep}
 }
 
 # Toggle terminal visibility for current session (prefix+F).
@@ -2053,7 +2075,16 @@ cs_handle_winch() {
             new_w="${saved}"
           fi
           local max_w=$(( (term_w + sess_w) - MIN_CLAUDE_WIDTH ))
-          (( max_w > 0 && new_w > max_w )) && new_w="${max_w}"
+          if (( new_w > max_w )); then
+            if [[ "${TERMINAL_WIDTH}" != *% && ! -f "${STATE_DIR}/term/${cur_pane#%}.keep" ]]; then
+              cs_term_autohide "${cur_pane}" "${term_pane}"
+              DIRTY=1
+              return 0
+            fi
+            new_w="${max_w}"
+          else
+            [[ -f "${STATE_DIR}/term/${cur_pane#%}.keep" ]] && rm -f "${STATE_DIR}/term/${cur_pane#%}.keep"
+          fi
           (( new_w < 10 )) && new_w=10
           _tmux resize-pane -t "${term_pane}" -x "${new_w}" 2>/dev/null || true
         fi
@@ -2075,7 +2106,16 @@ cs_handle_winch() {
             new_h="${saved}"
           fi
           local max_h=$(( (term_h + sess_h) - MIN_CLAUDE_HEIGHT ))
-          (( max_h > 0 && new_h > max_h )) && new_h="${max_h}"
+          if (( new_h > max_h )); then
+            if [[ "${TERMINAL_HEIGHT}" != *% && ! -f "${STATE_DIR}/term/${cur_pane#%}.keep" ]]; then
+              cs_term_autohide "${cur_pane}" "${term_pane}"
+              DIRTY=1
+              return 0
+            fi
+            new_h="${max_h}"
+          else
+            [[ -f "${STATE_DIR}/term/${cur_pane#%}.keep" ]] && rm -f "${STATE_DIR}/term/${cur_pane#%}.keep"
+          fi
           (( new_h < 3 )) && new_h=3
           _tmux resize-pane -t "${term_pane}" -y "${new_h}" 2>/dev/null || true
         fi
@@ -2584,7 +2624,7 @@ cs_picker_loop() {
     local term_pane_id
     term_pane_id=$(cat "${f}" 2>/dev/null || true)
     if [[ -n "${term_pane_id}" ]] && ! cs_pane_alive "${term_pane_id}"; then
-      rm -f "${f}"{,.shown,.height,.width,.orient}
+      rm -f "${f}"{,.shown,.height,.width,.orient,.keep}
     fi
   done
 
@@ -2806,7 +2846,7 @@ cs_picker_loop() {
         local _tp
         _tp=$(cs_term_pane_for "${_cur_pane}")
         if [[ -n "${_tp}" ]] && ! cs_pane_alive "${_tp}"; then
-          rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height,.width,.orient}
+          rm -f "${STATE_DIR}/term/${_cur_pane#%}"{,.shown,.height,.width,.orient,.keep}
         fi
       fi
       # PICKER_ACTIVE is from cs_rescan above: nothing between it and here may change focus

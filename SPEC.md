@@ -14,7 +14,7 @@ claude-spaces --help   # Show help
 
 See README.md for the layout diagram.
 
-Terminal pane is per-session: each session independently tracks whether its terminal is visible and its orientation (bottom or side). Swapping sessions preserves each session's terminal state including orientation. Only the side and bottom bindings change orientation; hiding and reopening keeps it.
+Terminal pane is per-session: each session independently tracks whether its terminal is visible and its orientation (bottom or side). Swapping sessions preserves each session's terminal state including orientation. Only the side and bottom bindings change orientation; hiding and reopening keeps it. A fixed-size terminal is hidden when a window resize leaves less room than its size while keeping Claude's minimum, unless it was opened that way; percentage sizes are squeezed instead. See specs/mechanics.md § Terminal sizing.
 
 Picker width and side are configurable. Width re-pins on terminal resize.
 
@@ -226,6 +226,6 @@ See README.md for the full list of options and their defaults.
 |------|----------|
 | [specs/discovery.md](specs/discovery.md) | Session scanning, name resolution, remote/inactive discovery, cross-server switching |
 | [specs/launch.md](specs/launch.md) | Launch loop, re-attach, stale cleanup, compatibility gate, reset/restart, runtime/persistent state files |
-| [specs/mechanics.md](specs/mechanics.md) | Atomic pane swap, bell detection, binding lifecycle |
+| [specs/mechanics.md](specs/mechanics.md) | Atomic pane swap, terminal sizing, bell detection, binding lifecycle |
 | [specs/testing.md](specs/testing.md) | Test infrastructure, shellcheck, invariant checks |
 | [specs/future.md](specs/future.md) | Planned features |

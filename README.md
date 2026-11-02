@@ -122,6 +122,9 @@ highlights it in red. Never miss a completed task again.
 opens it (below the session by default), then toggles focus between it and the
 Claude pane without moving it. `prefix + Tab` moves it to the side, `prefix + q`
 back below. `prefix + t` toggles it on/off. Resize freely — size is saved per-session.
+If you set a fixed `terminal_width` or `terminal_height`, a window resize that
+leaves the terminal less than that next to Claude's minimum hides it; reopen it
+to get what's left.
 
 **Search and filter** — type `/` to filter sessions by name across all
 sections. Matches update as you type.
@@ -291,14 +294,18 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # project; `claude-spaces --reset` clears the current project's.
 # state_root=~/.local/state/claude-spaces
 
-# Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%)
+# Terminal pane height: characters (e.g. 15) or percentage (e.g. 35%).
+# A percentage shrinks with the window. A fixed height hides when a window
+# resize leaves it less than that next to min_claude_height; reopen it to
+# get what's left.
 # terminal_height=35%
 
-# Terminal pane width (side orientation): characters or percentage
+# Terminal pane width (side orientation): characters or percentage.
+# Resizes work the same way as terminal_height, against min_claude_width.
 # terminal_width=45%
 
 # Minimum Claude pane width when side terminal is open (characters)
-# min_claude_width=10
+# min_claude_width=60
 
 # Minimum Claude pane height when bottom terminal is open (characters)
 # min_claude_height=10

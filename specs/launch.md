@@ -97,6 +97,7 @@ discovery gates on a live socket and `has-session`.
 | `term/<num>.height` | Runtime height override (percentage)       |
 | `term/<num>.width`  | Runtime width override (percentage)        |
 | `term/<num>.orient` | Orientation: `bottom` or `side`            |
+| `term/<num>.keep`   | Presence = fixed-size terminal opened without room; a resize squeezes it instead of hiding it |
 
 See [discovery.md](discovery.md) for how `switch_target` and `pending_load` are written.
 
