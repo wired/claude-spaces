@@ -118,10 +118,10 @@ worktrees or any project where the directory name isn't descriptive enough.
 **Bell detection** — when Claude finishes in a background session, the picker
 highlights it in red. Never miss a completed task again.
 
-**Per-session terminal** — each session gets its own shell pane, either below
-it (`` prefix + ` ``) or to the side (`` prefix + Tab ``). Both open the terminal
-and toggle focus between it and the Claude pane. `prefix + t` toggles terminal
-visibility on/off. Resize freely — size is saved per-session.
+**Per-session terminal** — each session gets its own shell pane. `` prefix + ` ``
+opens it (below the session by default), then toggles focus between it and the
+Claude pane without moving it. `prefix + Tab` moves it to the side, `prefix + q`
+back below. `prefix + t` toggles it on/off. Resize freely — size is saved per-session.
 
 **Search and filter** — type `/` to filter sessions by name across all
 sections. Matches update as you type.
@@ -167,9 +167,10 @@ server. Stock tmux bindings are disabled. Your tmux.conf is sourced for visuals
 |-----|--------|
 | `prefix + Enter` / `prefix + i` | Focus Claude pane |
 | `prefix + Space` | Toggle picker / Claude pane |
-| `` prefix + ` `` | Smart terminal — bottom (open/focus toggle) |
-| `prefix + Tab` | Smart terminal — side (open/focus toggle) |
-| `prefix + t` | Toggle terminal on/off (unconditional) |
+| `` prefix + ` `` | Terminal — open, then toggle focus (never moves it) |
+| `prefix + Tab` | Terminal — move to the side (opens if closed; toggles focus if already there) |
+| `prefix + q` | Terminal — move to the bottom (opens if closed; toggles focus if already there) |
+| `prefix + t` | Toggle terminal on/off (unconditional; reopens where it was) |
 | `prefix + a` | Literal grave (`` ` ``) |
 | `prefix + h` / `prefix + ←` / `prefix + S-←` | Select pane left |
 | `prefix + j` / `prefix + ↓` | Select pane down |
@@ -311,6 +312,7 @@ commented defaults; respects `$XDG_CONFIG_HOME`).
 # Keybinding overrides (comma-separated for multiple keys)
 # bind_terminal=`
 # bind_side_terminal=Tab
+# bind_bottom_terminal=q
 # bind_toggle_terminal=t
 # bind_focus_claude=Enter,i
 # bind_nav_next=J,S-Down

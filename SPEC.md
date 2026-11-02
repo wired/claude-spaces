@@ -14,7 +14,7 @@ claude-spaces --help   # Show help
 
 See README.md for the layout diagram.
 
-Terminal pane is per-session: each session independently tracks whether its terminal is visible and its orientation (bottom or side). Swapping sessions preserves each session's terminal state including orientation.
+Terminal pane is per-session: each session independently tracks whether its terminal is visible and its orientation (bottom or side). Swapping sessions preserves each session's terminal state including orientation. Only the side and bottom bindings change orientation; hiding and reopening keeps it.
 
 Picker width and side are configurable. Width re-pins on terminal resize.
 
@@ -152,9 +152,10 @@ Default key assignments are documented in README.md. The available actions:
 |--------|-----------|-------------|
 | Focus Claude | `bind_focus_claude` | Focus the Claude session pane |
 | Focus toggle | `bind_focus_picker` | Toggle between picker and Claude pane |
-| Terminal bottom (smart) | `bind_terminal` | Closed→open bottom, wrong orient→move, focused→focus claude, unfocused→focus |
+| Terminal (smart) | `bind_terminal` | Closed→open in saved orient (bottom if none), focused→focus claude, unfocused→focus. Never changes orient |
 | Terminal side (smart) | `bind_side_terminal` | Closed→open side, wrong orient→move, focused→focus claude, unfocused→focus |
-| Terminal toggle | `bind_toggle_terminal` | If open (any orient)→hide, if hidden→open bottom |
+| Terminal bottom (smart) | `bind_bottom_terminal` | Closed→open bottom, wrong orient→move, focused→focus claude, unfocused→focus |
+| Terminal toggle | `bind_toggle_terminal` | If open (any orient)→hide, if hidden→open in saved orient (bottom if none) |
 | Nav next/prev | `bind_nav_next`, `bind_nav_prev` | Move + activate + focus session |
 | Pane movement | `bind_pane_left`, `bind_pane_right`, `bind_pane_up`, `bind_pane_down` | Directional pane movement |
 | Search | `bind_search` | Focus picker + enter search mode |

@@ -1982,6 +1982,87 @@ test_term_orient_switch() {
   cs_assert_consistent "term_orient_switch"
 }
 
+test_term_smart_keeps_orient() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  cs_term_smart
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after smart"; return 1; }
+  local orient
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "bottom" ]] || { echo "    orient=${orient}, expected bottom by default"; return 1; }
+
+  cs_term_smart side
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+
+  _tmux select-pane -t "${term_pane}" 2>/dev/null
+  cs_term_smart
+  sleep 0.05
+  local active
+  active=$(_tmux display-message -p '#{pane_id}' 2>/dev/null)
+  [[ "${active}" == "${pane_a}" ]] || { echo "    expected focus on claude, got ${active}"; return 1; }
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side after focus to claude"; return 1; }
+  [[ "$(cs_term_pane_for "${pane_a}")" == "${term_pane}" ]] || { echo "    pane changed on focus to claude"; return 1; }
+
+  cs_term_smart
+  sleep 0.05
+  active=$(_tmux display-message -p '#{pane_id}' 2>/dev/null)
+  [[ "${active}" == "${term_pane}" ]] || { echo "    expected focus on term, got ${active}"; return 1; }
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side after focus to term"; return 1; }
+
+  cs_term_toggle
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after toggle off"; return 1; }
+  cs_term_smart
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after reopen"; return 1; }
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side after reopen"; return 1; }
+  [[ "$(cs_term_pane_for "${pane_a}")" == "${term_pane}" ]] || { echo "    pane changed on reopen"; return 1; }
+
+  cs_assert_consistent "term_smart_keeps_orient"
+}
+
+test_term_toggle_keeps_orient() {
+  local sid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  cs_create_mock_session "${sid}" "session A"
+  cs_scan_sessions
+  cs_resume_session "${sid}"
+  sleep 0.05
+
+  local pane_a
+  pane_a=$(cs_read_state current_pane)
+
+  cs_term_smart side
+  sleep 0.05
+  local term_pane
+  term_pane=$(cs_term_pane_for "${pane_a}")
+  cs_term_toggle
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" && { echo "    still shown after toggle off"; return 1; }
+
+  cs_term_toggle
+  sleep 0.05
+  cs_term_is_shown "${pane_a}" || { echo "    not shown after toggle on"; return 1; }
+  local orient
+  orient=$(cs_term_orient "${pane_a}")
+  [[ "${orient}" == "side" ]] || { echo "    orient=${orient}, expected side after toggle on"; return 1; }
+  [[ "$(cs_term_pane_for "${pane_a}")" == "${term_pane}" ]] || { echo "    pane changed on toggle on"; return 1; }
+
+  cs_assert_consistent "term_toggle_keeps_orient"
+}
+
 test_term_side_swap() {
   local sid_a="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
   local sid_b="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -2432,6 +2513,8 @@ main() {
   run_test "term side create and kill"   test_term_side_create_and_kill
   run_test "term side smart open"        test_term_side_smart_open
   run_test "term orient switch"          test_term_orient_switch
+  run_test "term smart keeps orient"     test_term_smart_keeps_orient
+  run_test "term toggle keeps orient"    test_term_toggle_keeps_orient
   run_test "term side swap"              test_term_side_swap
   run_test "term side WINCH re-pin"      test_term_side_winch_repin
   run_test "term min claude width"       test_term_min_claude_width

@@ -269,6 +269,7 @@ cs_create_default_config() {
 # bind_terminal=`
 # bind_toggle_terminal=t
 # bind_side_terminal=Tab
+# bind_bottom_terminal=q
 # bind_focus_claude=Enter,i
 # bind_nav_next=J,S-Down
 # bind_nav_prev=K,S-Up
@@ -328,8 +329,9 @@ cs_help_text() {
   echo "    J/K, S-Arrows  Next/prev session + focus"
   echo "    Space          Picker/Claude toggle"
   echo "    Enter/i        Focus Claude pane"
-  echo "    \`              Terminal bottom (smart)"
-  echo "    Tab            Terminal side (smart)"
+  echo "    \`              Terminal: open / switch focus"
+  echo "    Tab            Terminal: move to side"
+  echo "    q              Terminal: move to bottom"
   echo "    t              Toggle terminal on/off"
   echo "    a              Literal grave (\`)"
   echo "    c  New   f  Fork   x  Close   r  Rename"
@@ -1977,7 +1979,7 @@ cs_term_toggle() {
   if cs_term_is_shown "${cur_pane}"; then
     cs_term_hide "${cur_pane}"
   else
-    cs_term_show "${cur_pane}" "bottom"
+    cs_term_show "${cur_pane}" "$(cs_term_orient "${cur_pane}")"
   fi
   _tmux resize-pane -t "${PICKER_PANE}" -x "${PICKER_WIDTH}" 2>/dev/null || true
   # Focus terminal on toggle-on
@@ -1990,13 +1992,14 @@ cs_term_toggle() {
 
 # Smart terminal: closed/wrong-orient→open+focus, focused→focus claude, unfocused→focus.
 cs_term_smart() {
-  local orient="${1:-bottom}"
+  local orient="${1:-}"
   local cur_pane
   cur_pane=$(cs_read_state current_pane)
   [[ -n "${cur_pane}" ]] && cs_pane_alive "${cur_pane}" || return 0
   local wp
   wp=$(cs_read_state welcome_pane)
   [[ -n "${wp}" && "${cur_pane}" == "${wp}" ]] && return 0
+  [[ -n "${orient}" ]] || orient=$(cs_term_orient "${cur_pane}")
 
   if ! cs_term_is_shown "${cur_pane}" || [[ "$(cs_term_orient "${cur_pane}")" != "${orient}" ]]; then
     # Closed or wrong orientation → open in requested orientation + focus
@@ -2713,8 +2716,9 @@ cs_picker_loop() {
           '?') cs_kill_welcome; cs_show_welcome; DIRTY=1 ;;
           Q) _tmux detach-client ;;
           '~') cs_term_toggle; DIRTY=1 ;;
-          '`') cs_term_smart bottom; DIRTY=1 ;;
+          '`') cs_term_smart; DIRTY=1 ;;
           $'\t') cs_term_smart side; DIRTY=1 ;;
+          '_') cs_term_smart bottom; DIRTY=1 ;;
           '|') cs_focus_session; DIRTY=1 ;;
           $'\x01') _tmux select-pane -t "${PICKER_PANE}"; cs_search_enter; DIRTY=1 ;;
           $'\x10') _tmux select-pane -t "${PICKER_PANE}"; cs_rename_selected; DIRTY=1 ;;
@@ -3268,6 +3272,7 @@ cs_install_keybindings() {
   # Terminal
   cs_bind terminal '`' send-keys -t "${PICKER_PANE}" '`'
   cs_bind side_terminal Tab send-keys -t "${PICKER_PANE}" $'\t'
+  cs_bind bottom_terminal q send-keys -t "${PICKER_PANE}" '_'
   cs_bind toggle_terminal t send-keys -t "${PICKER_PANE}" "~"
   _tmux bind-key a send-keys '`'
 
