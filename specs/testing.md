@@ -15,6 +15,11 @@ Parent: [SPEC.md](../SPEC.md)
 
 Requires a real tmux — nothing is mocked at the tmux level.
 
+The mocks replace both launch functions, so one test (`test_launch_disables_agent_view`) puts the
+real ones back and runs them against a stub `claude`. A pane takes its `PATH` from the client that
+ran `new-window`, not from the server environment, so the test first asks a pane what `claude`
+resolves to and launches nothing unless it is the stub.
+
 ## The slot invariant
 
 Every session window must hold exactly one slot occupant: the **picker** if that session is

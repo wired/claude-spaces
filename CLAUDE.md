@@ -116,6 +116,10 @@ collisions, the uncompressed suffix is used.
   hooks have no controlling terminal since Claude Code 2.1.139, so `> /dev/tty` fails. The
   `#{window_bell_flag}` approach does NOT work (flag is momentary). See specs/mechanics.md § Bell Detection.
 - **`~/.claude/sessions/`**: this is Claude Code's own session tracking dir, not ours. Don't rename it.
+- **Every Claude launch sets `CLAUDE_CODE_DISABLE_AGENT_VIEW=1`**, on the launch command itself
+  (`cs_new_session`, `cs_resume_session`), never in the tmux server environment. Without it `←` or
+  `/background` forks the conversation to a new session ID and the pane's `panes/<num>` mapping
+  goes stale. A new launch site that omits it brings that back silently.
 
 ## Testing
 

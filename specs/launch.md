@@ -45,6 +45,20 @@ Conversations are Claude's own JSONL transcripts and are never touched by a rest
 come straight back in the picker as resumable. Custom names and hidden flags live in
 `CS_DATA_DIR` and also survive.
 
+### Session launch environment
+
+Both commands that start Claude — a new or forked session (`cs_new_session`) and a resumed one
+(`cs_resume_session`) — run it through `env CLAUDE_CODE_DISABLE_AGENT_VIEW=1`.
+
+Without it, `←` on an empty prompt or `/background` copies the conversation into a background
+session under a new session ID. The pane lives on, but `panes/<num>` still names the old ID: the
+picker shows a frozen transcript as the managed session and the live one as locked.
+
+The variable is set on those two commands only, never in the tmux server environment, so
+per-session terminals keep agent view. Claude passes it on to the commands it runs, so
+`claude agents` and `claude --bg` are off inside a session too. `env` is used instead of a
+`VAR=1 exec …` prefix so the result does not depend on the shell tmux runs the command with.
+
 ### Stale State Cleanup
 
 On picker startup, validates all pane IDs in the state dir. Dead refs are removed automatically. No `--reset` needed after tmux restart.

@@ -2136,7 +2136,7 @@ cs_new_session() {
     rm -f "${STATE_DIR}/panes/${old_new#%}" "${STATE_DIR}/new_pane" "${STATE_DIR}/new_pane_auto_name"
   fi
   local pane_id
-  pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec ${cmd}")
+  pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec env CLAUDE_CODE_DISABLE_AGENT_VIEW=1 ${cmd}")
   # kill-window -t "" destroys the ACTIVE window — the picker and the live session in it.
   [[ -n "${pane_id}" ]] || return 1
   if ! cs_make_filler "${pane_id}" >/dev/null; then
@@ -2156,7 +2156,7 @@ cs_new_session() {
 cs_resume_session() {
   local session_id="$1"
   local pane_id
-  pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec claude --resume ${session_id@Q}")
+  pane_id=$(_tmux new-window -d -P -F '#{pane_id}' "cd ${PWD@Q} && exec env CLAUDE_CODE_DISABLE_AGENT_VIEW=1 claude --resume ${session_id@Q}")
   [[ -n "${pane_id}" ]] || return 1
   if ! cs_make_filler "${pane_id}" >/dev/null; then
     _tmux kill-window -t "${pane_id}" 2>/dev/null || true

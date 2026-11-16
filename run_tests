@@ -2444,6 +2444,94 @@ test_session_dies_resume_cleans_orphan() {
   cs_assert_consistent "session_dies_resume"
 }
 
+# ── Launch tests ─────────────────────────────────
+launch_log_wait() {
+  local log="$1" want="$2" i
+  for ((i = 0; i < 60; i++)); do
+    (($(wc -l < "${log}") >= want)) && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
+# The mocks replace both launch functions, so nothing else runs the real launch commands.
+test_launch_disables_agent_view() {
+  local stub_dir="${TEST_TMP}/stub-bin"
+  local log="${TEST_TMP}/launch.log"
+  mkdir -p "${stub_dir}"
+  : > "${log}"
+  cat > "${stub_dir}/claude" << STUBEOF
+#!/bin/bash
+printf '%s|%s\n' "\${CLAUDE_CODE_DISABLE_AGENT_VIEW:-unset}" "\$*" >> ${log@Q}
+exec sleep 99999
+STUBEOF
+  chmod +x "${stub_dir}/claude"
+
+  # tmux gives a pane the PATH of the client that ran new-window, and every other variable
+  # from the server environment. Put the stub first in both.
+  local saved_path="${PATH}" saved_server_path
+  saved_server_path=$(_tmux show-environment -g PATH 2>/dev/null)
+  saved_server_path="${saved_server_path#PATH=}"
+  PATH="${stub_dir}:${PATH}"
+  _tmux set-environment -g PATH "${stub_dir}:${saved_server_path:-${saved_path}}"
+  # A value inherited from the shell running the tests must not satisfy the assertions:
+  # the launch command itself has to set it.
+  _tmux set-environment -g CLAUDE_CODE_DISABLE_AGENT_VIEW 0
+
+  # Ask a pane what it would run before launching anything: the real claude must never
+  # start from a test.
+  local probe="${TEST_TMP}/launch.probe"
+  : > "${probe}"
+  _tmux new-window -d -t "${TEST_SESSION}" \
+    "{ command -v claude; echo \"\${CLAUDE_CODE_DISABLE_AGENT_VIEW:-unset}\"; } > ${probe@Q}"
+  launch_log_wait "${probe}" 2
+  local probe_cmd probe_env
+  probe_cmd=$(sed -n 1p "${probe}")
+  probe_env=$(sed -n 2p "${probe}")
+
+  local sid="22222222-2222-2222-2222-222222222222"
+  local rc_new=0 rc_fork=0 rc_resume=0
+  if [[ "${probe_cmd}" == "${stub_dir}/claude" && "${probe_env}" == "0" ]]; then
+    # Save the mocks, load only the real function bodies (see test_welcome_injection_safe).
+    local mock_new mock_resume
+    mock_new=$(declare -f cs_new_session)
+    mock_resume=$(declare -f cs_resume_session)
+    eval "$(sed -n '/^cs_new_session()/,/^}$/p' "${SCRIPT_UNDER_TEST}")"
+    eval "$(sed -n '/^cs_resume_session()/,/^}$/p' "${SCRIPT_UNDER_TEST}")"
+
+    # Wait for each stub to log before the next launch: a new session kills the previous
+    # uninitialized pane, and would take a stub that has not written yet with it.
+    cs_new_session || rc_new=$?
+    launch_log_wait "${log}" 1
+    # The command cs_confirm_fork builds.
+    cs_new_session "claude --resume ${sid@Q} --fork-session" "(fork) parent" || rc_fork=$?
+    launch_log_wait "${log}" 2
+    cs_resume_session "${sid}" || rc_resume=$?
+    launch_log_wait "${log}" 3
+
+    eval "${mock_new}"
+    eval "${mock_resume}"
+  fi
+
+  # Restore the environment; cs_test_reset cleans up the panes.
+  PATH="${saved_path}"
+  _tmux set-environment -g PATH "${saved_server_path:-${saved_path}}"
+  _tmux set-environment -gu CLAUDE_CODE_DISABLE_AGENT_VIEW
+
+  [[ "${probe_cmd}" == "${stub_dir}/claude" && "${probe_env}" == "0" ]] \
+    || { echo "    pane would not run the stub (claude='${probe_cmd}', variable='${probe_env}'); nothing launched"; return 1; }
+  local seen
+  seen=$(tr '\n' ' ' < "${log}")
+  ((rc_new == 0 && rc_fork == 0 && rc_resume == 0)) \
+    || { echo "    launch failed: new=${rc_new} fork=${rc_fork} resume=${rc_resume}"; return 1; }
+  grep -Fxq "1|" "${log}" \
+    || { echo "    new session launched without the variable (saw: ${seen})"; return 1; }
+  grep -Fxq "1|--resume ${sid} --fork-session" "${log}" \
+    || { echo "    fork launched without the variable (saw: ${seen})"; return 1; }
+  grep -Fxq "1|--resume ${sid}" "${log}" \
+    || { echo "    resume launched without the variable (saw: ${seen})"; return 1; }
+}
+
 # ── Security tests ───────────────────────────────
 test_welcome_injection_safe() {
   local marker="${TEST_TMP}/WELCOME_PWNED"
@@ -2687,6 +2775,9 @@ main() {
   run_test "term percent squeeze"        test_term_percent_squeeze
   run_test "session dies with term"      test_session_dies_externally_with_term
   run_test "session dies resume cleans"  test_session_dies_resume_cleans_orphan
+
+  # Launch tests
+  run_test "launch disables agent view"  test_launch_disables_agent_view
 
   # Security tests
   run_test "welcome injection safe"      test_welcome_injection_safe

@@ -132,6 +132,14 @@ sections. Matches update as you type.
 **Isolated per-project servers** — each project gets its own tmux server. No
 cross-contamination of keybindings, window state, or bell hooks.
 
+**Agent view is off inside sessions** — claude-spaces starts Claude with
+`CLAUDE_CODE_DISABLE_AGENT_VIEW=1`. Pressing `←` on an empty prompt or running
+`/background` would otherwise move the conversation into a background session
+under a new ID, out from under its pane, where the picker cannot follow it.
+`claude agents` and `claude --bg` are unavailable inside these sessions for the
+same reason. Sessions you start outside claude-spaces and the per-session
+terminal are not affected.
+
 <details>
 <summary><strong>Keybinds</strong></summary>
 
